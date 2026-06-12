@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScholarMind - 智能学术研究助手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+  /* ===== RESET & BASE ===== */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #0D1117;
+    --bg-card: #161B22;
+    --bg-card-hover: #1C2129;
+    --border: #30363D;
+    --border-light: #3D444D;
+    --accent-gold: #D4A574;
+    --accent-gold-dim: rgba(212, 165, 116, 0.15);
+    --accent-gold-glow: rgba(212, 165, 116, 0.35);
+    --accent-green: #3FB950;
+    --accent-green-dim: rgba(63, 185, 80, 0.15);
+    --text-primary: #E6EDF3;
+    --text-secondary: #8B949E;
+    --text-tertiary: #6E7681;
+    --font-serif: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+  }
+
+  /* ===== LAYOUT SHELL ===== */
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: relative;
+  }
+
+  /* ===== AMBIENT BACKGROUND ===== */
+  .app-shell::before {
+    content: '';
+    position: fixed;
+    top: -30%;
+    left: -10%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(ellipse, rgba(212, 165, 116, 0.04) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .app-shell::after {
+    content: '';
+    position: fixed;
+    bottom: -20%;
+    right: -10%;
+    width: 50%;
+    height: 50%;
+    background: radial-gradient(ellipse, rgba(63, 185, 80, 0.03) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ===== TOP NAV BAR ===== */
+  .nav-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 28px;
+    background: rgba(13, 17, 23, 0.82);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .logo-icon {
+    width: 34px;
+    height: 34px;
+    position: relative;
+  }
+
+  .logo-text {
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.3px;
+  }
+  .logo-text span {
+    color: var(--accent-gold);
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .nav-btn:hover {
+    border-color: var(--border-light);
+    color: var(--text-primary);
+    background: var(--bg-card-hover);
+  }
+  .nav-btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .nav-btn--agent {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+    background: var(--accent-gold-dim);
+  }
+  .nav-btn--agent:hover {
+    background: rgba(212, 165, 116, 0.25);
+    box-shadow: 0 0 16px rgba(212, 165, 116, 0.15);
+    color: var(--accent-gold);
+  }
+
+  /* ===== MAIN CONTENT ===== */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px 60px;
+    position: relative;
+    z-index: 1;
+    overflow-y: auto;
+  }
+
+  .content-inner {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  /* ===== WELCOME SECTION ===== */
+  .welcome-section {
+    text-align: center;
+    padding-top: 12px;
+  }
+
+  .welcome-title {
+    font-family: var(--font-serif);
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.25;
+    letter-spacing: -0.5px;
+    margin-bottom: 12px;
+  }
+
+  .welcome-subtitle {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    letter-spacing: 0.1px;
+  }
+  .welcome-subtitle .tech-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--accent-gold-dim);
+    color: var(--accent-gold);
+    font-size: 13px;
+    font-weight: 500;
+    vertical-align: baseline;
+    margin: 0 1px;
+  }
+
+  /* ===== CHAT AREA ===== */
+  .chat-container {
+    position: relative;
+    border-radius: 16px;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--border) 0%, rgba(212, 165, 116, 0.2) 50%, var(--border) 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 8s ease infinite;
+  }
+
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .chat-inner {
+    background: var(--bg-card);
+    border-radius: 15px;
+    padding: 32px;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  /* AI Message Bubble */
+  .ai-message {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .ai-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent-gold) 0%, #C4956A 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(212, 165, 116, 0.25);
+  }
+  .ai-avatar svg {
+    width: 20px;
+    height: 20px;
+    fill: #0D1117;
+  }
+
+  .ai-bubble {
+    background: rgba(212, 165, 116, 0.06);
+    border: 1px solid rgba(212, 165, 116, 0.12);
+    border-radius: 4px 16px 16px 16px;
+    padding: 16px 20px;
+    max-width: 560px;
+  }
+
+  .ai-bubble p {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--text-primary);
+    line-height: 1.7;
+    letter-spacing: 0.1px;
+  }
+
+  .typing-cursor {
+    display: inline-block;
+    width: 2px;
+    height: 16px;
+    background: var(--accent-gold);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* Discipline Selection */
+  .discipline-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding-left: 52px;
+  }
+
+  .discipline-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+  }
+
+  .discipline-buttons {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .discipline-btn {
+    flex: 1;
+    min-width: 180px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--accent-gold);
+    background: var(--accent-gold-dim);
+    color: var(--accent-gold);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .discipline-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(212, 165, 116, 0.08) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .discipline-btn:hover {
+    background: rgba(212, 165, 116, 0.2);
+    box-shadow: 0 0 24px rgba(212, 165, 116, 0.2), 0 0 48px rgba(212, 165, 116, 0.08);
+    transform: translateY(-1px);
+    border-color: var(--accent-gold);
+  }
+  .discipline-btn:hover::before {
+    opacity: 1;
+  }
+
+  .discipline-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 0 12px rgba(212, 165, 116, 0.15);
+  }
+
+  .discipline-btn .icon-wrap {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: rgba(212, 165, 116, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.25s ease;
+  }
+  .discipline-btn:hover .icon-wrap {
+    background: rgba(212, 165, 116, 0.22);
+  }
+
+  .discipline-btn svg {
+    width: 20px;
+    height: 20px;
+    stroke: var(--accent-gold);
+    fill: none;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .discipline-btn .btn-text {
+    position: relative;
+    z-index: 1;
+  }
+  .discipline-btn .btn-text-main {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .discipline-btn .btn-text-sub {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  /* ===== BOTTOM STATUS BAR ===== */
+  .status-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .status-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+  .status-left svg {
+    width: 14px;
+    height: 14px;
+    stroke: var(--text-tertiary);
+    fill: none;
+    stroke-width: 2;
+  }
+
+  .status-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 400;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    position: relative;
+  }
+  .status-dot::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    opacity: 0.35;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.35; }
+    50% { transform: scale(1.6); opacity: 0; }
+  }
+
+  .status-label-connected {
+    color: var(--accent-green);
+    font-weight: 500;
+  }
+
+  .status-workflow {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: 20px;
+    border-left: 1px solid var(--border);
+    font-weight: 400;
+  }
+  .status-workflow .status-label-ready {
+    color: var(--accent-green);
+    font-weight: 500;
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 640px) {
+    .nav-bar { padding: 0 16px; }
+    .main-content { padding: 72px 16px 52px; }
+    .welcome-title { font-size: 26px; }
+    .welcome-subtitle { font-size: 13px; }
+    .chat-inner { padding: 20px; }
+    .discipline-buttons { flex-direction: column; }
+    .discipline-btn { min-width: unset; }
+    .discipline-section { padding-left: 0; }
+    .status-bar { padding: 0 12px; font-size: 11px; gap: 8px; }
+    .status-right { gap: 12px; }
+    .status-workflow { padding-left: 12px; }
+  }
+
+  @media (max-width: 400px) {
+    .logo-text { font-size: 17px; }
+    .nav-btn span { display: none; }
+  }
+
+  /* ===== SCROLLBAR ===== */
+  .main-content::-webkit-scrollbar { width: 6px; }
+  .main-content::-webkit-scrollbar-track { background: transparent; }
+  .main-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .main-content::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+</style>
+</head>
+<body>
+<div class="app-shell">
+
+  <!-- ===== NAV BAR ===== -->
+  <nav class="nav-bar">
+    <div class="nav-logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 34 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Book base -->
+          <path d="M6 8C6 8 10 6 17 6C24 6 28 8 28 8V26C28 26 24 24 17 24C10 24 6 26 6 26V8Z" stroke="#D4A574" stroke-width="1.6" fill="rgba(212,165,116,0.08)" stroke-linejoin="round"/>
+          <line x1="17" y1="6" x2="17" y2="24" stroke="#D4A574" stroke-width="1.2" opacity="0.5"/>
+          <!-- Brain nodes -->
+          <circle cx="13" cy="13" r="1.5" fill="#D4A574" opacity="0.8"/>
+          <circle cx="21" cy="13" r="1.5" fill="#D4A574" opacity="0.8"/>
+          <circle cx="17" cy="17" r="1.5" fill="#D4A574" opacity="0.8"/>
+          <circle cx="13" cy="21" r="1.2" fill="#D4A574" opacity="0.5"/>
+          <circle cx="21" cy="21" r="1.2" fill="#D4A574" opacity="0.5"/>
+          <!-- Synapse lines -->
+          <line x1="14.3" y1="13.8" x2="15.8" y2="16.2" stroke="#D4A574" stroke-width="0.8" opacity="0.4"/>
+          <line x1="19.7" y1="13.8" x2="18.2" y2="16.2" stroke="#D4A574" stroke-width="0.8" opacity="0.4"/>
+          <line x1="14" y1="21.5" x2="15.8" y2="18" stroke="#D4A574" stroke-width="0.8" opacity="0.4"/>
+          <line x1="20" y1="21.5" x2="18.2" y2="18" stroke="#D4A574" stroke-width="0.8" opacity="0.4"/>
+        </svg>
+      </div>
+      <span class="logo-text">Scholar<span>Mind</span></span>
+    </div>
+
+    <div class="nav-right">
+      <!-- Settings button -->
+      <button class="nav-btn" title="设置">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="2.5"/>
+          <path d="M8 1.5V3M8 13V14.5M1.5 8H3M13 8H14.5M3.05 3.05L4.1 4.1M11.9 11.9L12.95 12.95M12.95 3.05L11.9 4.1M4.1 11.9L3.05 12.95"/>
+        </svg>
+        <span>设置</span>
+      </button>
+      <!-- Custom Agent button -->
+      <button class="nav-btn nav-btn--agent" title="自定义 Agent">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="3" x2="8" y2="13"/>
+          <line x1="3" y1="8" x2="13" y2="8"/>
+        </svg>
+        <span>自定义 Agent</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main class="main-content">
+    <div class="content-inner">
+
+      <!-- Welcome -->
+      <section class="welcome-section">
+        <h1 class="welcome-title">开启你的学术研究之旅</h1>
+        <p class="welcome-subtitle">
+          基于 <span class="tech-tag">RAG</span> + <span class="tech-tag">LangGraph</span> 架构的智能学术研究助手
+        </p>
+      </section>
+
+      <!-- Chat Container -->
+      <section class="chat-container">
+        <div class="chat-inner">
+
+          <!-- AI Message -->
+          <div class="ai-message">
+            <div class="ai-avatar">
+              <svg viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path d="M10 2C8.5 2 7.3 3.1 7.1 4.5C6.1 4.2 5 4.7 4.6 5.7C4.2 6.7 4.6 7.8 5.5 8.3C4.6 8.8 4.2 9.9 4.6 10.9C5 11.9 6.1 12.4 7.1 12.1C7.3 13.5 8.5 14.5 10 14.5C11.5 14.5 12.7 13.5 12.9 12.1C13.9 12.4 15 11.9 15.4 10.9C15.8 9.9 15.4 8.8 14.5 8.3C15.4 7.8 15.8 6.7 15.4 5.7C15 4.7 13.9 4.2 12.9 4.5C12.7 3.1 11.5 2 10 2Z"/>
+                <circle cx="8" cy="8" r="1" fill="#0D1117"/>
+                <circle cx="12" cy="8" r="1" fill="#0D1117"/>
+                <path d="M8.5 10.5C9 11 11 11 11.5 10.5" stroke="#0D1117" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="ai-bubble">
+              <p>你好，我是你的学术研究助手。请先选择你的研究学科，我将为你匹配最合适的研究路径。<span class="typing-cursor"></span></p>
+            </div>
+          </div>
+
+          <!-- Discipline Selection -->
+          <div class="discipline-section">
+            <span class="discipline-label">选择研究学科</span>
+            <div class="discipline-buttons">
+
+              <!-- Engineering -->
+              <button class="discipline-btn" onclick="selectDiscipline(this, '工科')">
+                <div class="icon-wrap">
+                  <svg viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                  </svg>
+                </div>
+                <div class="btn-text">
+                  <span class="btn-text-main">工科</span>
+                  <span class="btn-text-sub">Engineering</span>
+                </div>
+              </button>
+
+              <!-- Science -->
+              <button class="discipline-btn" onclick="selectDiscipline(this, '理科')">
+                <div class="icon-wrap">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M9 3h6v5.5l3.5 6A2 2 0 0 1 16.8 18H7.2a2 2 0 0 1-1.7-3.5L9 8.5V3z"/>
+                    <line x1="9" y1="3" x2="15" y2="3"/>
+                    <circle cx="10.5" cy="14" r="1"/>
+                    <circle cx="14" cy="12" r="0.8"/>
+                    <circle cx="12" cy="15.5" r="0.6"/>
+                  </svg>
+                </div>
+                <div class="btn-text">
+                  <span class="btn-text-main">理科</span>
+                  <span class="btn-text-sub">Science</span>
+                </div>
+              </button>
+
+              <!-- Humanities & Social Sciences -->
+              <button class="discipline-btn" onclick="selectDiscipline(this, '人文社科')">
+                <div class="icon-wrap">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    <line x1="8" y1="7" x2="16" y2="7"/>
+                    <line x1="8" y1="11" x2="14" y2="11"/>
+                    <path d="M15 15l2 2 4-4" stroke-width="1.6"/>
+                  </svg>
+                </div>
+                <div class="btn-text">
+                  <span class="btn-text-main">人文社科</span>
+                  <span class="btn-text-sub">Humanities & Social Sciences</span>
+                </div>
+              </button>
+
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ===== STATUS BAR ===== -->
+  <footer class="status-bar">
+    <div class="status-left">
+      <svg viewBox="0 0 16 16" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <ellipse cx="8" cy="8" rx="7" ry="3"/>
+        <path d="M1 8v2c0 1.66 3.13 3 7 3s7-1.34 7-3V8"/>
+      </svg>
+      <span>RAG 知识库连接</span>
+    </div>
+    <div class="status-right">
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span>CNKI</span>
+        <span class="status-label-connected">已连接</span>
+      </div>
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        <span>Web of Science</span>
+        <span class="status-label-connected">已连接</span>
+      </div>
+      <div class="status-workflow">
+        <span class="status-dot"></span>
+        <span>LangGraph 工作流:</span>
+        <span class="status-label-ready">就绪</span>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // Discipline selection interaction
+  function selectDiscipline(btn, name) {
+    // Reset all buttons
+    document.querySelectorAll('.discipline-btn').forEach(b => {
+      b.style.background = '';
+      b.style.borderColor = '';
+      b.style.boxShadow = '';
+    });
+    // Highlight selected
+    btn.style.background = 'rgba(212, 165, 116, 0.3)';
+    btn.style.borderColor = '#D4A574';
+    btn.style.boxShadow = '0 0 32px rgba(212, 165, 116, 0.3), inset 0 0 20px rgba(212, 165, 116, 0.05)';
+
+    // Remove typing cursor after interaction
+    const cursor = document.querySelector('.typing-cursor');
+    if (cursor) cursor.style.display = 'none';
+  }
+</script>
+</body>
+</html>

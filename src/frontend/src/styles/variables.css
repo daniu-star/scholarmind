@@ -1,0 +1,54 @@
+/* ========== CSS VARIABLES — 学术暖暗色主题 ========== */
+:root {
+  /* 背景层次 — 学术暖暗色主题 */
+  --bg-primary: #0F1419;
+  --bg-card: #1A1F26;
+  --bg-card-hover: #1F252C;
+  --bg-input: #0F1419;
+  --bg-elevated: #1E242C;
+  --bg-elevated-hover: #242B34;
+  --bg-user-bubble: #1E252C;
+  /* 边框 */
+  --border: #2A3038;
+  --border-hover: #3A414A;
+  --border-subtle: #1E2430;
+  /* 强调色 — 降低饱和度，更克制 */
+  --accent-amber: #B8956A;
+  --accent-amber-dim: rgba(184, 149, 106, 0.10);
+  --accent-amber-glow: rgba(184, 149, 106, 0.20);
+  --accent-green: #4A8C50;
+  --accent-green-dim: rgba(74, 140, 80, 0.12);
+  --accent-red: #D05A52;
+  --accent-blue: #5C9CE6;
+  --accent-purple: #9B85C8;
+  --accent-teal: #52B8AE;
+  /* 文字 */
+  --text-primary: #E8EEF4;
+  --text-secondary: #8E98A2;
+  --text-tertiary: #6A737D;
+  /* 字体 */
+  --font-serif: 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
+  --font-sans: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  /* 圆角系统 — 更克制 */
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --radius-full: 9999px;
+  /* 间距系统 */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  /* 阴影 — 增强层次 */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.25);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.45);
+  /* 过渡 */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}

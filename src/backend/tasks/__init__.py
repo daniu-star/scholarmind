@@ -1,0 +1,1 @@
+"""ScholarMind 后台任务层：Celery配置 + 异步图表生成"""

@@ -1,0 +1,2151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>架构师Agent - 学术研究AI产品</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+  /* ========== RESET & BASE ========== */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #0D1117;
+    --bg-card: #161B22;
+    --bg-card-hover: #1C2129;
+    --bg-input: #0D1117;
+    --bg-user-msg: #1F2937;
+    --border: #30363D;
+    --border-light: #21262D;
+    --accent-amber: #D4A574;
+    --accent-amber-dim: rgba(212,165,116,0.15);
+    --accent-amber-glow: rgba(212,165,116,0.3);
+    --accent-green: #3FB950;
+    --accent-green-dim: rgba(63,185,80,0.15);
+    --accent-red: #F85149;
+    --accent-red-dim: rgba(248,81,73,0.12);
+    --text-primary: #E6EDF3;
+    --text-secondary: #8B949E;
+    --text-tertiary: #6E7681;
+    --font-heading: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+    --transition-slow: 0.4s ease;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: var(--font-body);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* ========== SCROLLBAR ========== */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+  /* ========== LAYOUT ========== */
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ========== TOP NAV BAR ========== */
+  .top-nav {
+    height: 52px;
+    min-height: 52px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 100;
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent-amber), #B07D4F);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 14px;
+    color: #0D1117;
+  }
+
+  .logo-text {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-primary);
+    letter-spacing: 0.3px;
+  }
+
+  .nav-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+  }
+
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .breadcrumb span {
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+
+  .breadcrumb span:hover {
+    color: var(--accent-amber);
+  }
+
+  .breadcrumb .sep {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    cursor: default;
+  }
+
+  .breadcrumb .current {
+    color: var(--text-primary);
+    font-weight: 500;
+    cursor: default;
+  }
+
+  .breadcrumb .current:hover { color: var(--text-primary); }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .nav-btn {
+    height: 34px;
+    padding: 0 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all var(--transition-fast);
+  }
+
+  .nav-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+    border-color: var(--text-tertiary);
+  }
+
+  .nav-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  /* ========== LEFT SIDEBAR ========== */
+  .left-sidebar {
+    width: 252px;
+    min-width: 252px;
+    background: var(--bg-card);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    transition: all var(--transition-normal);
+    position: relative;
+  }
+
+  .left-sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    border-right: none;
+  }
+
+  .sidebar-toggle-left {
+    position: absolute;
+    top: 12px;
+    right: -14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all var(--transition-fast);
+    font-size: 12px;
+  }
+
+  .sidebar-toggle-left:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+    border-color: var(--text-tertiary);
+  }
+
+  .left-sidebar.collapsed .sidebar-toggle-left {
+    right: -40px;
+  }
+
+  .sidebar-section {
+    padding: 18px 16px;
+  }
+
+  .sidebar-section + .sidebar-section {
+    border-top: 1px solid var(--border-light);
+  }
+
+  /* Agent Profile Card */
+  .agent-profile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .agent-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent-green), #1A7F37);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 24px;
+    color: #0D1117;
+    margin-bottom: 10px;
+    box-shadow: 0 0 20px rgba(63,185,80,0.2);
+    position: relative;
+  }
+
+  .agent-avatar::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    border: 2px solid var(--bg-card);
+  }
+
+  .agent-name {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .online-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    display: inline-block;
+    animation: pulse-green 2s infinite;
+  }
+
+  @keyframes pulse-green {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.4); }
+    50% { box-shadow: 0 0 0 4px rgba(63,185,80,0); }
+  }
+
+  .agent-role {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .profile-divider {
+    width: 40px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 14px 0;
+  }
+
+  /* RAG Knowledge Base */
+  .sidebar-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+  }
+
+  .rag-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 0;
+  }
+
+  .rag-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+
+  .rag-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .rag-dot.green { background: var(--accent-green); }
+  .rag-dot.amber { background: var(--accent-amber); }
+
+  .rag-status {
+    font-size: 11.5px;
+    color: var(--text-secondary);
+  }
+
+  .rag-status.connected { color: var(--accent-green); }
+  .rag-status.optional { color: var(--accent-amber); }
+
+  /* Session Info */
+  .session-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .session-stat {
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+    padding: 10px 10px;
+    text-align: center;
+  }
+
+  .session-stat-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: var(--font-heading);
+  }
+
+  .session-stat-label {
+    font-size: 10.5px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  /* Quick Actions */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .quick-action-btn {
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all var(--transition-fast);
+  }
+
+  .quick-action-btn:hover {
+    background: var(--accent-green-dim);
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+  }
+
+  .quick-action-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ========== CENTER CHAT AREA ========== */
+  .chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* Message Bubbles */
+  .message {
+    display: flex;
+    gap: 12px;
+    max-width: 780px;
+    animation: msg-enter 0.4s ease-out;
+  }
+
+  @keyframes msg-enter {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .message.ai {
+    align-self: flex-start;
+  }
+
+  .message.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+
+  .msg-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: var(--font-heading);
+  }
+
+  .message.ai .msg-avatar {
+    background: linear-gradient(135deg, var(--accent-green), #1A7F37);
+    color: #0D1117;
+  }
+
+  .message.user .msg-avatar {
+    background: linear-gradient(135deg, #58A6FF, #1F6FEB);
+    color: #fff;
+    font-size: 12px;
+  }
+
+  .msg-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .msg-bubble {
+    padding: 14px 18px;
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    line-height: 1.65;
+    position: relative;
+  }
+
+  .message.ai .msg-bubble {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-top-left-radius: var(--radius-sm);
+    color: var(--text-primary);
+  }
+
+  .message.user .msg-bubble {
+    background: var(--bg-user-msg);
+    border: 1px solid rgba(88,166,255,0.15);
+    border-top-right-radius: var(--radius-sm);
+    color: var(--text-primary);
+  }
+
+  .msg-time {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  .message.user .msg-time { text-align: right; }
+
+  /* Option Buttons */
+  .option-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .option-btn {
+    padding: 9px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--accent-green);
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .option-btn:hover {
+    background: rgba(63,185,80,0.25);
+    box-shadow: 0 0 16px rgba(63,185,80,0.2);
+    transform: scale(1.03);
+  }
+
+  .option-btn:active {
+    transform: scale(0.98);
+  }
+
+  /* ========== PAPER ARCHITECTURE TREE ========== */
+  .arch-tree-container {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 18px 20px;
+    margin-top: 4px;
+    overflow-x: auto;
+  }
+
+  .arch-tree-title {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--accent-amber);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .arch-tree-title svg {
+    width: 16px;
+    height: 16px;
+    color: var(--accent-amber);
+  }
+
+  .arch-tree {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 13px;
+    line-height: 1;
+    user-select: none;
+  }
+
+  .arch-node {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+    margin: 2px 0;
+  }
+
+  .arch-node:hover {
+    background: rgba(255,255,255,0.04);
+  }
+
+  .arch-node-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .arch-node-indicator.green {
+    background: var(--accent-green);
+    box-shadow: 0 0 6px rgba(63,185,80,0.3);
+  }
+
+  .arch-node-indicator.amber {
+    background: var(--accent-amber);
+    box-shadow: 0 0 6px rgba(212,165,116,0.3);
+  }
+
+  .arch-node-indicator.red {
+    background: var(--accent-red);
+    box-shadow: 0 0 6px rgba(248,81,73,0.3);
+  }
+
+  .arch-node-label {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: var(--font-body);
+    font-weight: 400;
+  }
+
+  .arch-node-label.chapter {
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .arch-node-label.root {
+    font-weight: 700;
+    font-family: var(--font-heading);
+    font-size: 14px;
+    color: var(--accent-amber);
+  }
+
+  .arch-node-status {
+    font-size: 10px;
+    padding: 1px 7px;
+    border-radius: 8px;
+    font-weight: 500;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+
+  .arch-node-status.complete {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+  }
+
+  .arch-node-status.improve {
+    background: var(--accent-amber-dim);
+    color: var(--accent-amber);
+  }
+
+  .arch-node-status.missing {
+    background: var(--accent-red-dim);
+    color: var(--accent-red);
+  }
+
+  .arch-branch {
+    margin-left: 24px;
+    position: relative;
+  }
+
+  .arch-branch::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 0;
+    bottom: 12px;
+    width: 1.5px;
+    background: var(--border);
+  }
+
+  .arch-branch .arch-node::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    width: 10px;
+    height: 1.5px;
+    background: var(--border);
+  }
+
+  .arch-branch .arch-branch::before {
+    bottom: 12px;
+  }
+
+  /* ========== COMPLETENESS SCORE ========== */
+  .completeness-panel {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 20px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .completeness-circle {
+    position: relative;
+    width: 100px;
+    height: 100px;
+    flex-shrink: 0;
+  }
+
+  .completeness-circle svg {
+    width: 100px;
+    height: 100px;
+    transform: rotate(-90deg);
+  }
+
+  .completeness-circle .circle-bg {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 8;
+  }
+
+  .completeness-circle .circle-fill {
+    fill: none;
+    stroke: var(--accent-amber);
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 251.3;
+    stroke-dashoffset: 55.3;
+    transition: stroke-dashoffset 1.5s ease;
+  }
+
+  .completeness-circle .circle-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .completeness-circle .circle-value {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 26px;
+    color: var(--accent-amber);
+    line-height: 1;
+  }
+
+  .completeness-circle .circle-label {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  .completeness-metrics {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .metric-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .metric-label {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    width: 72px;
+    flex-shrink: 0;
+  }
+
+  .metric-bar-bg {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-card);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .metric-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1.2s ease;
+  }
+
+  .metric-bar-fill.green {
+    background: linear-gradient(90deg, var(--accent-green), #56D364);
+  }
+
+  .metric-bar-fill.amber {
+    background: linear-gradient(90deg, var(--accent-amber), #E8C89E);
+  }
+
+  .metric-bar-fill.red {
+    background: linear-gradient(90deg, var(--accent-red), #F87171);
+  }
+
+  .metric-value {
+    font-size: 12px;
+    font-weight: 600;
+    width: 34px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .metric-value.green { color: var(--accent-green); }
+  .metric-value.amber { color: var(--accent-amber); }
+  .metric-value.red { color: var(--accent-red); }
+
+  /* ========== ISSUE CARDS ========== */
+  .issue-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .issue-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .issue-card:hover {
+    border-color: var(--text-tertiary);
+    background: var(--bg-card-hover);
+    transform: translateX(4px);
+  }
+
+  .issue-card-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 1px;
+  }
+
+  .issue-card-icon.critical {
+    background: var(--accent-red-dim);
+    color: var(--accent-red);
+  }
+
+  .issue-card-icon.important {
+    background: var(--accent-amber-dim);
+    color: var(--accent-amber);
+  }
+
+  .issue-card-icon.suggestion {
+    background: rgba(88,166,255,0.12);
+    color: #58A6FF;
+  }
+
+  .issue-card-content {
+    flex: 1;
+  }
+
+  .issue-card-text {
+    font-size: 13.5px;
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+
+  .issue-card-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+
+  .issue-card-tag.critical {
+    background: var(--accent-red-dim);
+    color: var(--accent-red);
+  }
+
+  .issue-card-tag.important {
+    background: var(--accent-amber-dim);
+    color: var(--accent-amber);
+  }
+
+  .issue-card-tag.suggestion {
+    background: rgba(88,166,255,0.12);
+    color: #58A6FF;
+  }
+
+  /* ========== INPUT AREA ========== */
+  .chat-input-area {
+    padding: 16px 32px 20px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-primary);
+  }
+
+  .input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 4px 6px 4px 14px;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+
+  .input-wrapper:focus-within {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(63,185,80,0.1);
+  }
+
+  .input-attach {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+  }
+
+  .input-attach:hover {
+    color: var(--accent-green);
+    background: var(--accent-green-dim);
+  }
+
+  .input-attach svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .chat-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 14px;
+    outline: none;
+    padding: 10px 0;
+    line-height: 1.5;
+  }
+
+  .chat-input::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  .send-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--accent-green);
+    color: #0D1117;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+  }
+
+  .send-btn:hover {
+    background: #56D364;
+    box-shadow: 0 0 16px rgba(63,185,80,0.3);
+    transform: scale(1.05);
+  }
+
+  .send-btn:active {
+    transform: scale(0.95);
+  }
+
+  .send-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .input-hint {
+    text-align: center;
+    font-size: 11.5px;
+    color: var(--text-tertiary);
+    margin-top: 8px;
+  }
+
+  /* ========== RIGHT SIDEBAR ========== */
+  .right-sidebar {
+    width: 272px;
+    min-width: 272px;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    transition: all var(--transition-normal);
+    position: relative;
+  }
+
+  .right-sidebar.collapsed {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+    border-left: none;
+  }
+
+  .sidebar-toggle-right {
+    position: absolute;
+    top: 12px;
+    left: -14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 10;
+    transition: all var(--transition-fast);
+    font-size: 12px;
+  }
+
+  .sidebar-toggle-right:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+    border-color: var(--text-tertiary);
+  }
+
+  .right-sidebar.collapsed .sidebar-toggle-right {
+    left: -40px;
+  }
+
+  .right-section {
+    padding: 16px;
+  }
+
+  .right-section + .right-section {
+    border-top: 1px solid var(--border-light);
+  }
+
+  .right-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 12px;
+  }
+
+  .right-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+
+  .collapse-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--text-tertiary);
+    transition: transform var(--transition-fast);
+  }
+
+  .right-section.collapsed-section .collapse-icon {
+    transform: rotate(-90deg);
+  }
+
+  .right-section.collapsed-section .right-section-body {
+    display: none;
+  }
+
+  /* Control Buttons */
+  .control-btn {
+    width: 100%;
+    height: 38px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    transition: all var(--transition-fast);
+    margin-bottom: 6px;
+  }
+
+  .control-btn:last-child { margin-bottom: 0; }
+
+  .control-btn:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+    border-color: var(--text-tertiary);
+  }
+
+  .control-btn.danger:hover {
+    background: var(--accent-red-dim);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+  }
+
+  .control-btn.green-outline {
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+  }
+
+  .control-btn.green-outline:hover {
+    background: var(--accent-green-dim);
+  }
+
+  .control-btn svg {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+  }
+
+  .control-btn .chevron {
+    margin-left: auto;
+    width: 12px;
+    height: 12px;
+    color: var(--text-tertiary);
+  }
+
+  /* Agent Dropdown */
+  .agent-dropdown {
+    position: relative;
+  }
+
+  .dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 50;
+    overflow: hidden;
+    display: none;
+  }
+
+  .dropdown-menu.show { display: block; }
+
+  .dropdown-item {
+    padding: 9px 14px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all var(--transition-fast);
+  }
+
+  .dropdown-item:hover {
+    background: var(--accent-green-dim);
+    color: var(--text-primary);
+  }
+
+  .dropdown-item.active {
+    color: var(--accent-green);
+    font-weight: 500;
+  }
+
+  .dropdown-item-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-tertiary);
+  }
+
+  .dropdown-item.active .dropdown-item-dot {
+    background: var(--accent-green);
+  }
+
+  /* Skills Status */
+  .skill-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+  }
+
+  .skill-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--text-primary);
+    font-family: 'SF Mono', 'Fira Code', monospace;
+  }
+
+  .skill-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .skill-dot.active {
+    background: var(--accent-green);
+    box-shadow: 0 0 6px rgba(63,185,80,0.4);
+  }
+
+  .skill-dot.pending {
+    background: var(--text-tertiary);
+  }
+
+  .skill-status {
+    font-size: 11.5px;
+    font-weight: 500;
+  }
+
+  .skill-status.active { color: var(--accent-green); }
+  .skill-status.pending { color: var(--text-tertiary); }
+
+  /* Right Sidebar - Architecture Analysis */
+  .arch-score-mini {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 14px;
+  }
+
+  .arch-score-mini-circle {
+    position: relative;
+    width: 80px;
+    height: 80px;
+  }
+
+  .arch-score-mini-circle svg {
+    width: 80px;
+    height: 80px;
+    transform: rotate(-90deg);
+  }
+
+  .arch-score-mini-circle .circle-bg {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 6;
+  }
+
+  .arch-score-mini-circle .circle-fill {
+    fill: none;
+    stroke: var(--accent-amber);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 201.1;
+    stroke-dashoffset: 44.2;
+  }
+
+  .arch-score-mini-circle .circle-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .arch-score-mini-circle .circle-value {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 20px;
+    color: var(--accent-amber);
+    line-height: 1;
+  }
+
+  .arch-score-mini-circle .circle-label {
+    font-size: 9px;
+    color: var(--text-tertiary);
+    margin-top: 1px;
+  }
+
+  .arch-metric-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+  }
+
+  .arch-metric-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    width: 68px;
+    flex-shrink: 0;
+  }
+
+  .arch-metric-bar-bg {
+    flex: 1;
+    height: 5px;
+    background: var(--bg-primary);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .arch-metric-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  .arch-metric-bar-fill.green {
+    background: var(--accent-green);
+  }
+
+  .arch-metric-bar-fill.amber {
+    background: var(--accent-amber);
+  }
+
+  .arch-metric-value {
+    font-size: 11.5px;
+    font-weight: 600;
+    width: 30px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .arch-metric-value.green { color: var(--accent-green); }
+  .arch-metric-value.amber { color: var(--accent-amber); }
+
+  /* Progress Bar */
+  .progress-wrapper {
+    margin-top: 4px;
+  }
+
+  .progress-bar-bg {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-primary);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    width: 40%;
+    background: linear-gradient(90deg, var(--accent-green), #56D364);
+    border-radius: 3px;
+    position: relative;
+    transition: width 1s ease;
+  }
+
+  .progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255,255,255,0.2) 50%,
+      transparent 100%
+    );
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .progress-text {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 12px;
+  }
+
+  .progress-label {
+    color: var(--accent-green);
+    font-weight: 500;
+  }
+
+  .progress-detail {
+    color: var(--text-tertiary);
+    font-size: 11px;
+    margin-top: 4px;
+  }
+
+  /* Research Progress Tracker */
+  .progress-tracker {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .tracker-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0;
+    position: relative;
+  }
+
+  .tracker-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 30px;
+    bottom: -2px;
+    width: 1.5px;
+    background: var(--border);
+  }
+
+  .tracker-step.completed:not(:last-child)::after {
+    background: var(--accent-green);
+  }
+
+  .tracker-step.current:not(:last-child)::after {
+    background: linear-gradient(180deg, var(--accent-green), var(--border));
+  }
+
+  .tracker-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    position: relative;
+    z-index: 1;
+  }
+
+  .tracker-step.completed .tracker-icon {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    border: 1.5px solid var(--accent-green);
+  }
+
+  .tracker-step.current .tracker-icon {
+    background: var(--accent-green-dim);
+    color: var(--accent-green);
+    border: 1.5px solid var(--accent-green);
+    animation: pulse-green-border 2s infinite;
+  }
+
+  @keyframes pulse-green-border {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0.4); }
+    50% { box-shadow: 0 0 0 6px rgba(63,185,80,0); }
+  }
+
+  .tracker-step.pending .tracker-icon {
+    background: var(--bg-primary);
+    color: var(--text-tertiary);
+    border: 1.5px solid var(--border);
+  }
+
+  .tracker-label {
+    font-size: 13px;
+    font-weight: 500;
+    padding-top: 2px;
+  }
+
+  .tracker-step.completed .tracker-label { color: var(--accent-green); }
+  .tracker-step.current .tracker-label { color: var(--accent-green); }
+  .tracker-step.pending .tracker-label { color: var(--text-tertiary); }
+
+  /* ========== RESPONSIVE ========== */
+  @media (max-width: 1100px) {
+    .right-sidebar { width: 0; min-width: 0; overflow: hidden; border-left: none; }
+  }
+
+  @media (max-width: 860px) {
+    .left-sidebar { width: 0; min-width: 0; overflow: hidden; border-right: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app-layout">
+  <!-- ===== TOP NAV BAR ===== -->
+  <nav class="top-nav">
+    <div class="nav-left">
+      <div class="logo">
+        <div class="logo-icon">研</div>
+        <span class="logo-text">ScholarAI</span>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="breadcrumb">
+        <span>首页</span>
+        <span class="sep">›</span>
+        <span>人文社科</span>
+        <span class="sep">›</span>
+        <span>质化研究</span>
+        <span class="sep">›</span>
+        <span class="current">架构师</span>
+      </div>
+    </div>
+    <div class="nav-right">
+      <button class="nav-btn" onclick="toggleLeftSidebar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        侧栏
+      </button>
+      <button class="nav-btn" onclick="toggleRightSidebar()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+        面板
+      </button>
+      <button class="nav-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        设置
+      </button>
+      <button class="nav-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        自定义Agent
+      </button>
+    </div>
+  </nav>
+
+  <div class="main-content">
+    <!-- ===== LEFT SIDEBAR ===== -->
+    <aside class="left-sidebar" id="leftSidebar">
+      <button class="sidebar-toggle-left" onclick="toggleLeftSidebar()" title="收起侧栏">◀</button>
+
+      <!-- Agent Profile -->
+      <div class="sidebar-section">
+        <div class="agent-profile">
+          <div class="agent-avatar">构</div>
+          <div class="agent-name">
+            架构师
+            <span class="online-dot"></span>
+          </div>
+          <div class="agent-role">论文架构审查与优化专家</div>
+          <div class="profile-divider"></div>
+        </div>
+      </div>
+
+      <!-- RAG Knowledge Base -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">RAG 知识库</div>
+        <div class="rag-item">
+          <div class="rag-left">
+            <span class="rag-dot green"></span>
+            CNKI 学术文库
+          </div>
+          <span class="rag-status connected">已连接</span>
+        </div>
+        <div class="rag-item">
+          <div class="rag-left">
+            <span class="rag-dot green"></span>
+            Web of Science
+          </div>
+          <span class="rag-status connected">已连接</span>
+        </div>
+        <div class="rag-item">
+          <div class="rag-left">
+            <span class="rag-dot green"></span>
+            学科论文库
+          </div>
+          <span class="rag-status connected">已连接</span>
+        </div>
+        <div class="rag-item">
+          <div class="rag-left">
+            <span class="rag-dot amber"></span>
+            Scopus
+          </div>
+          <span class="rag-status optional">可选</span>
+        </div>
+      </div>
+
+      <!-- Session Info -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">当前会话</div>
+        <div class="session-info">
+          <div class="session-stat">
+            <div class="session-stat-value">5</div>
+            <div class="session-stat-label">对话轮次</div>
+          </div>
+          <div class="session-stat">
+            <div class="session-stat-value">3</div>
+            <div class="session-stat-label">架构版本</div>
+          </div>
+          <div class="session-stat">
+            <div class="session-stat-value">2.4<span style="font-size:11px;font-weight:400">KB</span></div>
+            <div class="session-stat-label">记忆使用</div>
+          </div>
+          <div class="session-stat">
+            <div class="session-stat-value" style="color:var(--accent-green)">●</div>
+            <div class="session-stat-label">状态正常</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">快捷操作</div>
+        <div class="quick-actions">
+          <button class="quick-action-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            新建对话
+          </button>
+          <button class="quick-action-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            导出架构报告
+          </button>
+          <button class="quick-action-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            对比历史版本
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===== CENTER CHAT AREA ===== -->
+    <main class="chat-area">
+      <div class="chat-messages" id="chatMessages">
+
+        <!-- AI Message 1 -->
+        <div class="message ai">
+          <div class="msg-avatar">构</div>
+          <div class="msg-content">
+            <div class="msg-bubble">
+              你好！我是架构师。请上传你的论文架构，我将从逻辑完整性、章节衔接、论证链路等维度进行全面审查。
+            </div>
+            <div class="option-buttons">
+              <button class="option-btn" onclick="selectOption(this, '上传论文架构')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                上传论文架构
+              </button>
+              <button class="option-btn" onclick="selectOption(this, '在线绘制架构')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;vertical-align:-2px;margin-right:4px"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                在线绘制架构
+              </button>
+            </div>
+            <div class="msg-time">14:32</div>
+          </div>
+        </div>
+
+        <!-- User Message 1 -->
+        <div class="message user">
+          <div class="msg-avatar">我</div>
+          <div class="msg-content">
+            <div class="msg-bubble">我上传了论文大纲，请帮我审查架构</div>
+            <div class="msg-time">14:34</div>
+          </div>
+        </div>
+
+        <!-- AI Message 2 - Architecture Visualization -->
+        <div class="message ai">
+          <div class="msg-avatar">构</div>
+          <div class="msg-content">
+            <div class="msg-bubble">
+              已收到你的论文架构。我已完成解析，以下是可视化呈现：
+            </div>
+
+            <!-- Paper Architecture Tree -->
+            <div class="arch-tree-container">
+              <div class="arch-tree-title">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                论文架构可视化
+              </div>
+              <div class="arch-tree">
+                <!-- Root -->
+                <div class="arch-node">
+                  <span class="arch-node-indicator green"></span>
+                  <span class="arch-node-label root">短视频平台用户认知偏移研究</span>
+                  <span class="arch-node-status complete">完整</span>
+                </div>
+                <!-- Chapter 1 -->
+                <div class="arch-branch">
+                  <div class="arch-node">
+                    <span class="arch-node-indicator green"></span>
+                    <span class="arch-node-label chapter">第一章 绪论</span>
+                    <span class="arch-node-status complete">完整</span>
+                  </div>
+                  <div class="arch-branch">
+                    <div class="arch-node">
+                      <span class="arch-node-indicator green"></span>
+                      <span class="arch-node-label">1.1 研究背景</span>
+                      <span class="arch-node-status complete">完整</span>
+                    </div>
+                    <div class="arch-node">
+                      <span class="arch-node-indicator green"></span>
+                      <span class="arch-node-label">1.2 研究问题</span>
+                      <span class="arch-node-status complete">完整</span>
+                    </div>
+                    <div class="arch-node">
+                      <span class="arch-node-indicator green"></span>
+                      <span class="arch-node-label">1.3 研究意义</span>
+                      <span class="arch-node-status complete">完整</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Chapter 2 -->
+                <div class="arch-branch">
+                  <div class="arch-node">
+                    <span class="arch-node-indicator amber"></span>
+                    <span class="arch-node-label chapter">第二章 文献综述</span>
+                    <span class="arch-node-status improve">待完善</span>
+                  </div>
+                  <div class="arch-branch">
+                    <div class="arch-node">
+                      <span class="arch-node-indicator green"></span>
+                      <span class="arch-node-label">2.1 短视频研究现状</span>
+                      <span class="arch-node-status complete">完整</span>
+                    </div>
+                    <div class="arch-node">
+                      <span class="arch-node-indicator amber"></span>
+                      <span class="arch-node-label">2.2 认知偏移理论</span>
+                      <span class="arch-node-status improve">待完善</span>
+                    </div>
+                    <div class="arch-node">
+                      <span class="arch-node-indicator red"></span>
+                      <span class="arch-node-label">2.3 理论对话与框架</span>
+                      <span class="arch-node-status missing">缺失</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Chapter 3 -->
+                <div class="arch-branch">
+                  <div class="arch-node">
+                    <span class="arch-node-indicator green"></span>
+                    <span class="arch-node-label chapter">第三章 研究方法</span>
+                    <span class="arch-node-status complete">完整</span>
+                  </div>
+                  <div class="arch-branch">
+                    <div class="arch-node">
+                      <span class="arch-node-indicator green"></span>
+                      <span class="arch-node-label">3.1 深度访谈设计</span>
+                      <span class="arch-node-status complete">完整</span>
+                    </div>
+                    <div class="arch-node">
+                      <span class="arch-node-indicator green"></span>
+                      <span class="arch-node-label">3.2 数据分析方法</span>
+                      <span class="arch-node-status complete">完整</span>
+                    </div>
+                  </div>
+                </div>
+                <!-- Chapter 4 -->
+                <div class="arch-branch">
+                  <div class="arch-node">
+                    <span class="arch-node-indicator red"></span>
+                    <span class="arch-node-label chapter">第四章 研究发现</span>
+                    <span class="arch-node-status missing">缺失</span>
+                  </div>
+                </div>
+                <!-- Chapter 5 -->
+                <div class="arch-branch">
+                  <div class="arch-node">
+                    <span class="arch-node-indicator amber"></span>
+                    <span class="arch-node-label chapter">第五章 讨论与结论</span>
+                    <span class="arch-node-status improve">待完善</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Architecture Completeness Score -->
+            <div class="completeness-panel">
+              <div class="completeness-circle">
+                <svg viewBox="0 0 100 100">
+                  <circle class="circle-bg" cx="50" cy="50" r="40"></circle>
+                  <circle class="circle-fill" cx="50" cy="50" r="40"></circle>
+                </svg>
+                <div class="circle-text">
+                  <div class="circle-value">78%</div>
+                  <div class="circle-label">架构完整度</div>
+                </div>
+              </div>
+              <div class="completeness-metrics">
+                <div class="metric-row">
+                  <span class="metric-label">逻辑连贯性</span>
+                  <div class="metric-bar-bg">
+                    <div class="metric-bar-fill green" style="width:85%"></div>
+                  </div>
+                  <span class="metric-value green">85%</span>
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">章节完整性</span>
+                  <div class="metric-bar-bg">
+                    <div class="metric-bar-fill amber" style="width:72%"></div>
+                  </div>
+                  <span class="metric-value amber">72%</span>
+                </div>
+                <div class="metric-row">
+                  <span class="metric-label">论证链路</span>
+                  <div class="metric-bar-bg">
+                    <div class="metric-bar-fill amber" style="width:65%"></div>
+                  </div>
+                  <span class="metric-value amber">65%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="msg-time">14:35</div>
+          </div>
+        </div>
+
+        <!-- AI Message 3 - Issues -->
+        <div class="message ai">
+          <div class="msg-avatar">构</div>
+          <div class="msg-content">
+            <div class="msg-bubble">
+              你的论文架构整体框架清晰，但以下环节需要加强：
+            </div>
+            <div class="issue-cards">
+              <div class="issue-card" onclick="expandIssue(this)">
+                <div class="issue-card-icon critical">!</div>
+                <div class="issue-card-content">
+                  <div class="issue-card-text">第四章与第三章的衔接逻辑缺失</div>
+                  <span class="issue-card-tag critical">关键</span>
+                </div>
+              </div>
+              <div class="issue-card" onclick="expandIssue(this)">
+                <div class="issue-card-icon important">⚠</div>
+                <div class="issue-card-content">
+                  <div class="issue-card-text">文献综述缺少理论对话部分</div>
+                  <span class="issue-card-tag important">重要</span>
+                </div>
+              </div>
+              <div class="issue-card" onclick="expandIssue(this)">
+                <div class="issue-card-icon suggestion">💡</div>
+                <div class="issue-card-content">
+                  <div class="issue-card-text">讨论章节应与研究发现更紧密呼应</div>
+                  <span class="issue-card-tag suggestion">建议</span>
+                </div>
+              </div>
+            </div>
+            <div class="msg-time">14:36</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Input Area -->
+      <div class="chat-input-area">
+        <div class="input-wrapper">
+          <button class="input-attach" title="上传附件">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>
+          <input type="text" class="chat-input" placeholder="输入你的想法或修改建议..." id="chatInput" onkeydown="handleKeyDown(event)">
+          <button class="send-btn" onclick="sendMessage()" title="发送">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+        <div class="input-hint">按 Enter 发送 · 支持 PDF/Word 附件上传 · 可直接粘贴论文大纲</div>
+      </div>
+    </main>
+
+    <!-- ===== RIGHT SIDEBAR ===== -->
+    <aside class="right-sidebar" id="rightSidebar">
+      <button class="sidebar-toggle-right" onclick="toggleRightSidebar()" title="收起面板">▶</button>
+
+      <!-- 对话控制 -->
+      <div class="right-section" id="sectionControl">
+        <div class="right-section-header" onclick="toggleSection('sectionControl')">
+          <span class="right-section-title">对话控制</span>
+          <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="right-section-body">
+          <button class="control-btn danger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            撤销Agent记忆
+          </button>
+          <button class="control-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            回退到上一步
+          </button>
+          <div class="agent-dropdown">
+            <button class="control-btn" onclick="toggleDropdown()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+              切换Agent
+              <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="dropdown-menu" id="agentDropdown">
+              <div class="dropdown-item"><span class="dropdown-item-dot"></span>研究员</div>
+              <div class="dropdown-item"><span class="dropdown-item-dot"></span>审查员</div>
+              <div class="dropdown-item active"><span class="dropdown-item-dot"></span>架构师</div>
+              <div class="dropdown-item"><span class="dropdown-item-dot"></span>综述员</div>
+              <div class="dropdown-item"><span class="dropdown-item-dot"></span>润色员</div>
+            </div>
+          </div>
+          <button class="control-btn green-outline">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            自定义Agent
+          </button>
+        </div>
+      </div>
+
+      <!-- 架构分析 -->
+      <div class="right-section" id="sectionArch">
+        <div class="right-section-header" onclick="toggleSection('sectionArch')">
+          <span class="right-section-title">架构分析</span>
+          <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="right-section-body">
+          <div class="arch-score-mini">
+            <div class="arch-score-mini-circle">
+              <svg viewBox="0 0 100 100">
+                <circle class="circle-bg" cx="50" cy="50" r="32"></circle>
+                <circle class="circle-fill" cx="50" cy="50" r="32"></circle>
+              </svg>
+              <div class="circle-text">
+                <div class="circle-value">78%</div>
+                <div class="circle-label">完整度</div>
+              </div>
+            </div>
+          </div>
+          <div class="arch-metric-item">
+            <span class="arch-metric-label">逻辑连贯性</span>
+            <div class="arch-metric-bar-bg">
+              <div class="arch-metric-bar-fill green" style="width:85%"></div>
+            </div>
+            <span class="arch-metric-value green">85%</span>
+          </div>
+          <div class="arch-metric-item">
+            <span class="arch-metric-label">章节完整性</span>
+            <div class="arch-metric-bar-bg">
+              <div class="arch-metric-bar-fill amber" style="width:72%"></div>
+            </div>
+            <span class="arch-metric-value amber">72%</span>
+          </div>
+          <div class="arch-metric-item">
+            <span class="arch-metric-label">论证链路</span>
+            <div class="arch-metric-bar-bg">
+              <div class="arch-metric-bar-fill amber" style="width:65%"></div>
+            </div>
+            <span class="arch-metric-value amber">65%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Skills 调用状态 -->
+      <div class="right-section" id="sectionSkills">
+        <div class="right-section-header" onclick="toggleSection('sectionSkills')">
+          <span class="right-section-title">Skills 调用状态</span>
+          <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="right-section-body">
+          <div class="skill-item">
+            <div class="skill-left">
+              <span class="skill-dot active"></span>
+              academic-researcher
+            </div>
+            <span class="skill-status active">活跃</span>
+          </div>
+          <div class="skill-item">
+            <div class="skill-left">
+              <span class="skill-dot pending"></span>
+              systematic-literature-review
+            </div>
+            <span class="skill-status pending">待调用</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 研究进度追踪 -->
+      <div class="right-section" id="sectionProgress">
+        <div class="right-section-header" onclick="toggleSection('sectionProgress')">
+          <span class="right-section-title">研究进度追踪</span>
+          <svg class="collapse-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="right-section-body">
+          <div class="progress-tracker">
+            <div class="tracker-step completed">
+              <div class="tracker-icon">✓</div>
+              <div class="tracker-label">选题方向</div>
+            </div>
+            <div class="tracker-step completed">
+              <div class="tracker-icon">✓</div>
+              <div class="tracker-label">问题建构</div>
+            </div>
+            <div class="tracker-step current">
+              <div class="tracker-icon">→</div>
+              <div class="tracker-label">架构审查</div>
+            </div>
+            <div class="tracker-step pending">
+              <div class="tracker-icon">○</div>
+              <div class="tracker-label">文献综述</div>
+            </div>
+            <div class="tracker-step pending">
+              <div class="tracker-icon">○</div>
+              <div class="tracker-label">研究设计</div>
+            </div>
+            <div class="tracker-step pending">
+              <div class="tracker-icon">○</div>
+              <div class="tracker-label">论文撰写</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+  // ===== Sidebar Toggle =====
+  function toggleLeftSidebar() {
+    document.getElementById('leftSidebar').classList.toggle('collapsed');
+  }
+
+  function toggleRightSidebar() {
+    document.getElementById('rightSidebar').classList.toggle('collapsed');
+  }
+
+  // ===== Section Collapse =====
+  function toggleSection(id) {
+    document.getElementById(id).classList.toggle('collapsed-section');
+  }
+
+  // ===== Agent Dropdown =====
+  function toggleDropdown() {
+    const menu = document.getElementById('agentDropdown');
+    menu.classList.toggle('show');
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function(e) {
+    const dropdown = document.querySelector('.agent-dropdown');
+    const menu = document.getElementById('agentDropdown');
+    if (!dropdown.contains(e.target)) {
+      menu.classList.remove('show');
+    }
+  });
+
+  // Dropdown item selection
+  document.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', function() {
+      document.querySelectorAll('.dropdown-item').forEach(i => i.classList.remove('active'));
+      this.classList.add('active');
+      document.getElementById('agentDropdown').classList.remove('show');
+    });
+  });
+
+  // ===== Option Button Selection =====
+  function selectOption(btn, text) {
+    const allBtns = btn.parentElement.querySelectorAll('.option-btn');
+    allBtns.forEach(b => {
+      b.style.background = 'var(--accent-green-dim)';
+      b.style.color = 'var(--accent-green)';
+    });
+    btn.style.background = 'var(--accent-green)';
+    btn.style.color = '#0D1117';
+
+    addMessage('user', text);
+  }
+
+  // ===== Issue Card Expand =====
+  function expandIssue(card) {
+    const allCards = card.parentElement.querySelectorAll('.issue-card');
+    allCards.forEach(c => {
+      c.style.borderColor = 'var(--border)';
+    });
+    card.style.borderColor = 'var(--accent-amber)';
+  }
+
+  // ===== Add Message =====
+  function addMessage(type, text) {
+    const chatMessages = document.getElementById('chatMessages');
+
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${type}`;
+
+    if (type === 'ai') {
+      msgDiv.innerHTML = `
+        <div class="msg-avatar">构</div>
+        <div class="msg-content">
+          <div class="msg-bubble">${text}</div>
+          <div class="msg-time">${getCurrentTime()}</div>
+        </div>
+      `;
+    } else {
+      msgDiv.innerHTML = `
+        <div class="msg-avatar">我</div>
+        <div class="msg-content">
+          <div class="msg-bubble">${text}</div>
+          <div class="msg-time">${getCurrentTime()}</div>
+        </div>
+      `;
+    }
+
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  // ===== Send Message =====
+  function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text) return;
+
+    addMessage('user', text);
+    input.value = '';
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  // ===== Time Helper =====
+  function getCurrentTime() {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  }
+
+  // ===== Auto-scroll to bottom on load =====
+  window.addEventListener('load', function() {
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+</script>
+
+</body>
+</html>

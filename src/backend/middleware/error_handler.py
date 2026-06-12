@@ -1,0 +1,123 @@
+"""
+ScholarMind 统一异常处理
+注册异常处理器，返回统一 JSON 错误响应格式：
+  {"success": false, "error": {"code": "...", "message": "...", "details": {...}}}
+"""
+from __future__ import annotations
+
+import logging
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException
+
+from ..core.exceptions import AppException
+from ..models.error_codes import ErrorCode
+
+logger = logging.getLogger(__name__)
+
+
+def error_response(
+    code: ErrorCode,
+    message: str,
+    status_code: int,
+    details: dict | None = None,
+    request_id: str | None = None,
+) -> dict:
+    """构建统一错误响应"""
+    resp: dict = {
+        "success": False,
+        "error": {
+            "code": code.value,
+            "message": message,
+        },
+    }
+    if details:
+        resp["error"]["details"] = details
+    if request_id:
+        resp["error"]["request_id"] = request_id
+    return resp
+
+
+def register_error_handlers(app: FastAPI) -> None:
+    """注册统一异常处理器到 FastAPI 应用"""
+
+    @app.exception_handler(AppException)
+    async def app_exception_handler(request: Request, exc: AppException):
+        """处理自定义应用异常（使用 to_response 格式）"""
+        request_id = getattr(request.state, "request_id", None)
+        logger.warning(
+            f"AppException: [{exc.code.value}] {exc.message}",
+            extra={"request_id": request_id},
+        )
+        body = exc.to_response()
+        if request_id:
+            body["error"]["request_id"] = request_id
+        return JSONResponse(status_code=exc.status_code, content=body)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: Request, exc: RequestValidationError
+    ):
+        """处理 Pydantic 请求验证错误"""
+        request_id = getattr(request.state, "request_id", None)
+        errors = []
+        for error in exc.errors():
+            field = ".".join(str(loc) for loc in error["loc"])
+            msg = error["msg"]
+            errors.append(f"{field}: {msg}")
+
+        return JSONResponse(
+            status_code=422,
+            content=error_response(
+                code=ErrorCode.VALIDATION_ERROR,
+                message="; ".join(errors),
+                status_code=422,
+                details={"fields": errors},
+                request_id=request_id,
+            ),
+        )
+
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc: HTTPException):
+        """处理标准 HTTP 异常（转换为统一格式）"""
+        request_id = getattr(request.state, "request_id", None)
+
+        # 映射 HTTP 状态码到错误码
+        code_map = {
+            404: ErrorCode.NOT_FOUND,
+            400: ErrorCode.VALIDATION_ERROR,
+            401: ErrorCode.AUTHENTICATION_FAILED,
+            403: ErrorCode.PERMISSION_DENIED,
+            429: ErrorCode.RATE_LIMITED,
+        }
+        code = code_map.get(exc.status_code, ErrorCode.INTERNAL_ERROR)
+
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=error_response(
+                code=code,
+                message=str(exc.detail),
+                status_code=exc.status_code,
+                request_id=request_id,
+            ),
+        )
+
+    @app.exception_handler(Exception)
+    async def general_exception_handler(request: Request, exc: Exception):
+        """处理未捕获的通用异常"""
+        request_id = getattr(request.state, "request_id", None)
+        logger.exception(
+            f"Unhandled exception: {exc}",
+            extra={"request_id": request_id},
+        )
+        return JSONResponse(
+            status_code=500,
+            content=error_response(
+                code=ErrorCode.INTERNAL_ERROR,
+                message="服务器内部错误，请稍后重试",
+                status_code=500,
+                details={"type": type(exc).__name__} if app.debug else None,
+                request_id=request_id,
+            ),
+        )

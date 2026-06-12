@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ScholarMind - 人文社科</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;0,8..60,900;1,8..60,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #0D1117;
+    --bg-card: #161B22;
+    --bg-card-hover: #1C2129;
+    --border: #30363D;
+    --border-hover: #D4A574;
+    --accent-amber: #D4A574;
+    --accent-amber-dim: rgba(212, 165, 116, 0.15);
+    --accent-amber-glow: rgba(212, 165, 116, 0.35);
+    --accent-green: #3FB950;
+    --accent-green-dim: rgba(63, 185, 80, 0.12);
+    --accent-green-glow: rgba(63, 185, 80, 0.4);
+    --text-primary: #E6EDF3;
+    --text-secondary: #8B949E;
+    --text-tertiary: #6E7681;
+    --font-serif: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  /* ── Ambient background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -40%; left: -20%;
+    width: 80vw; height: 80vw;
+    background: radial-gradient(circle, rgba(212,165,116,0.04) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: '';
+    position: fixed;
+    bottom: -30%; right: -15%;
+    width: 60vw; height: 60vw;
+    background: radial-gradient(circle, rgba(63,185,80,0.03) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Top Nav ── */
+  .top-nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: var(--text-primary);
+  }
+  .logo-icon {
+    width: 28px; height: 28px;
+    position: relative;
+  }
+  .logo-icon svg { width: 100%; height: 100%; }
+  .logo-text {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent-amber), #E8C9A0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .nav-btn:hover {
+    border-color: var(--text-tertiary);
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.04);
+  }
+  .nav-btn svg { width: 16px; height: 16px; }
+
+  /* ── Main Layout ── */
+  .page-wrapper {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    min-height: 100vh;
+    padding-top: 56px;
+  }
+
+  .main-content {
+    flex: 1;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 32px 24px 100px;
+  }
+
+  /* ── Breadcrumb ── */
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 32px;
+    font-size: 13px;
+  }
+  .breadcrumb a {
+    color: var(--text-tertiary);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .breadcrumb a:hover { color: var(--accent-amber); }
+  .breadcrumb .sep { color: var(--text-tertiary); font-size: 11px; }
+  .breadcrumb .current { color: var(--accent-amber); font-weight: 500; }
+
+  /* ── Title Section ── */
+  .title-section {
+    margin-bottom: 40px;
+  }
+  .page-title {
+    font-family: var(--font-serif);
+    font-size: 42px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+  }
+  .page-subtitle {
+    font-size: 16px;
+    color: var(--text-secondary);
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Research Type Cards ── */
+  .cards-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .type-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 28px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    text-decoration: none;
+    color: inherit;
+    overflow: hidden;
+  }
+  .type-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 14px;
+    opacity: 0;
+    background: linear-gradient(135deg, var(--accent-amber-dim), transparent 60%);
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .type-card:hover {
+    border-color: var(--accent-amber);
+    background: var(--bg-card-hover);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px var(--accent-amber), 0 0 24px var(--accent-amber-glow);
+  }
+  .type-card:hover::before { opacity: 1; }
+
+  .card-icon {
+    flex-shrink: 0;
+    width: 52px; height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: rgba(212,165,116,0.08);
+    border: 1px solid rgba(212,165,116,0.12);
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+  }
+  .type-card:hover .card-icon {
+    background: rgba(212,165,116,0.15);
+    border-color: rgba(212,165,116,0.25);
+  }
+  .card-icon svg {
+    width: 24px; height: 24px;
+    color: var(--accent-amber);
+  }
+
+  .card-body {
+    flex: 1;
+    position: relative;
+    z-index: 1;
+  }
+  .card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .card-title {
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
+  .badge-recommend {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 20px;
+    background: var(--accent-green-dim);
+    border: 1px solid rgba(63,185,80,0.2);
+    color: var(--accent-green);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    animation: pulse-badge 2.5s ease-in-out infinite;
+  }
+  @keyframes pulse-badge {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(63,185,80,0); }
+    50% { box-shadow: 0 0 12px 2px rgba(63,185,80,0.2); }
+  }
+  .badge-recommend svg { width: 12px; height: 12px; }
+
+  .card-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+  }
+
+  .card-arrow {
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: transparent;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+  }
+  .card-arrow svg {
+    width: 20px; height: 20px;
+    color: var(--text-tertiary);
+    transition: all 0.3s ease;
+  }
+  .type-card:hover .card-arrow {
+    background: var(--accent-amber-dim);
+  }
+  .type-card:hover .card-arrow svg {
+    color: var(--accent-amber);
+    transform: translateX(3px);
+  }
+
+  /* ── Back Button ── */
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 4px;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    cursor: pointer;
+    transition: color 0.2s;
+    text-decoration: none;
+  }
+  .back-btn svg { width: 16px; height: 16px; transition: transform 0.2s; }
+  .back-btn:hover { color: var(--accent-amber); }
+  .back-btn:hover svg { transform: translateX(-3px); }
+  .back-btn .back-text {
+    position: relative;
+  }
+  .back-btn .back-text::after {
+    content: '';
+    position: absolute;
+    left: 0; bottom: -2px;
+    width: 0; height: 1px;
+    background: var(--accent-amber);
+    transition: width 0.25s ease;
+  }
+  .back-btn:hover .back-text::after { width: 100%; }
+
+  /* ── Preview Panel (right side, wider screens) ── */
+  .preview-panel {
+    position: fixed;
+    top: 56px;
+    right: 0;
+    width: 320px;
+    height: calc(100vh - 56px - 40px);
+    padding: 24px 20px;
+    opacity: 0;
+    transform: translateX(20px);
+    pointer-events: none;
+    transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    z-index: 10;
+    overflow-y: auto;
+  }
+  .preview-panel.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+
+  .preview-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+  }
+  .preview-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 12px;
+  }
+  .preview-title {
+    font-family: var(--font-serif);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+  }
+  .preview-section { margin-bottom: 18px; }
+  .preview-section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-amber);
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+  .preview-tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .preview-tag {
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(212,165,116,0.08);
+    border: 1px solid rgba(212,165,116,0.12);
+    color: var(--text-secondary);
+    font-size: 12px;
+    transition: all 0.2s;
+  }
+  .preview-tag.green {
+    background: var(--accent-green-dim);
+    border-color: rgba(63,185,80,0.15);
+  }
+
+  /* ── Bottom Status Bar ── */
+  .status-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    background: rgba(13, 17, 23, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .status-left, .status-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 6px var(--accent-green-glow);
+  }
+  .status-dot.amber {
+    background: var(--accent-amber);
+    box-shadow: 0 0 6px var(--accent-amber-glow);
+  }
+
+  /* ── Decorative line ── */
+  .divider-line {
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-amber), transparent);
+    border-radius: 2px;
+    margin: 0 0 32px;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 1100px) {
+    .preview-panel { display: none; }
+  }
+  @media (max-width: 640px) {
+    .main-content { padding: 24px 16px 100px; }
+    .page-title { font-size: 32px; }
+    .type-card { padding: 18px 20px; gap: 14px; }
+    .card-icon { width: 44px; height: 44px; }
+    .card-icon svg { width: 20px; height: 20px; }
+    .card-title { font-size: 17px; }
+    .card-desc { font-size: 13px; }
+    .nav-btn span { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ Top Navigation ═══ -->
+<nav class="top-nav">
+  <a href="#" class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="4" width="18" height="22" rx="2" stroke="#D4A574" stroke-width="1.5" fill="none"/>
+        <rect x="8" y="2" width="18" height="22" rx="2" stroke="#D4A574" stroke-width="1.5" fill="rgba(212,165,116,0.08)"/>
+        <line x1="12" y1="8" x2="22" y2="8" stroke="#D4A574" stroke-width="1.2" stroke-linecap="round"/>
+        <line x1="12" y1="12" x2="20" y2="12" stroke="#D4A574" stroke-width="1.2" stroke-linecap="round" opacity="0.6"/>
+        <line x1="12" y1="16" x2="18" y2="16" stroke="#D4A574" stroke-width="1.2" stroke-linecap="round" opacity="0.4"/>
+        <circle cx="6" cy="10" r="1.2" fill="#3FB950"/>
+      </svg>
+    </div>
+    <span class="logo-text">ScholarMind</span>
+  </a>
+  <div class="nav-actions">
+    <button class="nav-btn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <circle cx="8" cy="8" r="2.5"/><path d="M13.3 10a1.2 1.2 0 0 0 .2 1.3l.1.1a1.45 1.45 0 1 1-2.05 2.05l-.1-.1a1.2 1.2 0 0 0-1.3-.2 1.2 1.2 0 0 0-.73 1.1v.3a1.45 1.45 0 1 1-2.9 0v-.15A1.2 1.2 0 0 0 5.7 13.3a1.2 1.2 0 0 0-1.3.2l-.1.1a1.45 1.45 0 1 1-2.05-2.05l.1-.1a1.2 1.2 0 0 0 .2-1.3 1.2 1.2 0 0 0-1.1-.73h-.3a1.45 1.45 0 1 1 0-2.9h.15a1.2 1.2 0 0 0 1.1-.73 1.2 1.2 0 0 0-.2-1.3l-.1-.1A1.45 1.45 0 1 1 4.3 2.7l.1.1a1.2 1.2 0 0 0 1.3.2h.06a1.2 1.2 0 0 0 .73-1.1v-.3a1.45 1.45 0 0 1 2.9 0v.15a1.2 1.2 0 0 0 .73 1.1 1.2 1.2 0 0 0 1.3-.2l.1-.1a1.45 1.45 0 1 1 2.05 2.05l-.1.1a1.2 1.2 0 0 0-.2 1.3v.06a1.2 1.2 0 0 0 1.1.73h.3a1.45 1.45 0 0 1 0 2.9h-.15a1.2 1.2 0 0 0-1.1.73z"/>
+      </svg>
+      <span>设置</span>
+    </button>
+    <button class="nav-btn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 1v2M8 13v2M1 8h2M13 8h2"/><rect x="4" y="4" width="8" height="8" rx="1.5"/>
+        <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none"/>
+      </svg>
+      <span>自定义 Agent</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══ Page Wrapper ═══ -->
+<div class="page-wrapper">
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+      <a href="#">首页</a>
+      <span class="sep">›</span>
+      <span class="current">人文社科</span>
+    </nav>
+
+    <!-- Title -->
+    <section class="title-section">
+      <h1 class="page-title">人文社科</h1>
+      <p class="page-subtitle">选择你的研究类型</p>
+    </section>
+
+    <div class="divider-line"></div>
+
+    <!-- Research Type Cards -->
+    <div class="cards-container">
+
+      <!-- Card 1: 调查报告 -->
+      <a href="#" class="type-card" data-type="survey"
+         onmouseenter="showPreview('survey')" onmouseleave="hidePreview()">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+            <rect x="9" y="3" width="6" height="4" rx="1"/>
+            <line x1="9" y1="12" x2="15" y2="12"/>
+            <line x1="9" y1="16" x2="13" y2="16"/>
+            <path d="M9 9h1" stroke-width="2"/>
+          </svg>
+        </div>
+        <div class="card-body">
+          <div class="card-title-row">
+            <span class="card-title">调查报告</span>
+          </div>
+          <p class="card-desc">基于实地调研与数据采集的系统性报告</p>
+        </div>
+        <div class="card-arrow">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 4l6 6-6 6"/>
+          </svg>
+        </div>
+      </a>
+
+      <!-- Card 2: 质化研究 -->
+      <a href="#" class="type-card" data-type="qualitative"
+         onmouseenter="showPreview('qualitative')" onmouseleave="hidePreview()">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 6c0-1.1.9-2 2-2h2l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6z"/>
+            <path d="M10 11c.5-.7 1.2-1 2-1s1.5.3 2 1"/>
+            <path d="M8 14c.8 1 2 1.5 4 1.5s3.2-.5 4-1.5"/>
+            <circle cx="9.5" cy="10" r="0.5" fill="currentColor" stroke="none"/>
+          </svg>
+        </div>
+        <div class="card-body">
+          <div class="card-title-row">
+            <span class="card-title">质化研究</span>
+            <span class="badge-recommend">
+              <svg viewBox="0 0 12 12" fill="currentColor"><path d="M6 1l1.2 3.5H11l-3 2.2 1.2 3.5L6 8l-3.2 2.2L4 6.7 1 4.5h3.8z"/></svg>
+              推荐
+            </span>
+          </div>
+          <p class="card-desc">通过深度访谈、文本分析等方法探索社会现象</p>
+        </div>
+        <div class="card-arrow">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 4l6 6-6 6"/>
+          </svg>
+        </div>
+      </a>
+
+      <!-- Card 3: 量化研究 -->
+      <a href="#" class="type-card" data-type="quantitative"
+         onmouseenter="showPreview('quantitative')" onmouseleave="hidePreview()">
+        <div class="card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="12" width="4" height="9" rx="1"/>
+            <rect x="10" y="7" width="4" height="14" rx="1"/>
+            <rect x="17" y="3" width="4" height="18" rx="1"/>
+            <line x1="3" y1="3" x2="21" y2="3" opacity="0.3"/>
+          </svg>
+        </div>
+        <div class="card-body">
+          <div class="card-title-row">
+            <span class="card-title">量化研究</span>
+          </div>
+          <p class="card-desc">运用统计方法与数值模型验证研究假设</p>
+        </div>
+        <div class="card-arrow">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 4l6 6-6 6"/>
+          </svg>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- Back Button -->
+    <a href="#" class="back-btn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 3L5 8l5 5"/>
+      </svg>
+      <span class="back-text">返回</span>
+    </a>
+
+  </main>
+
+  <!-- Preview Panel -->
+  <aside class="preview-panel" id="previewPanel">
+    <div class="preview-card" id="previewContent">
+      <!-- Dynamically filled -->
+    </div>
+  </aside>
+
+</div>
+
+<!-- ═══ Bottom Status Bar ═══ -->
+<footer class="status-bar">
+  <div class="status-left">
+    <div class="status-item">
+      <span class="status-dot"></span>
+      <span>RAG 已连接</span>
+    </div>
+    <div class="status-item">
+      <span class="status-dot amber"></span>
+      <span>Langgraph 运行中</span>
+    </div>
+  </div>
+  <div class="status-right">
+    <div class="status-item">
+      <span>模型: GLM-5.1</span>
+    </div>
+    <div class="status-item">
+      <span>延迟: 42ms</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+const previewData = {
+  survey: {
+    title: '调查报告',
+    sections: [
+      {
+        label: '典型选题',
+        tags: ['城乡教育差距', '社区治理模式', '消费行为调查', '公共服务满意度']
+      },
+      {
+        label: '常用方法',
+        tags: ['问卷调查', '实地访谈', '焦点小组', '文献梳理'],
+        green: true
+      },
+      {
+        label: '相关技能',
+        tags: ['SPSS 分析', '数据可视化', '报告撰写', '抽样设计']
+      }
+    ]
+  },
+  qualitative: {
+    title: '质化研究',
+    sections: [
+      {
+        label: '典型选题',
+        tags: ['身份认同叙事', '组织文化建构', '数字鸿沟现象', '社会运动话语']
+      },
+      {
+        label: '常用方法',
+        tags: ['深度访谈', '参与观察', '扎根理论', '话语分析'],
+        green: true
+      },
+      {
+        label: '相关技能',
+        tags: ['NVivo 编码', '主题分析', '三角验证', '田野笔记']
+      }
+    ]
+  },
+  quantitative: {
+    title: '量化研究',
+    sections: [
+      {
+        label: '典型选题',
+        tags: ['经济增长因素', '教育回报率', '人口迁移模型', '政策效果评估']
+      },
+      {
+        label: '常用方法',
+        tags: ['回归分析', '实验设计', '结构方程', '面板数据'],
+        green: true
+      },
+      {
+        label: '相关技能',
+        tags: ['Stata / R', '假设检验', '因果推断', 'Python 建模']
+      }
+    ]
+  }
+};
+
+function showPreview(type) {
+  const panel = document.getElementById('previewPanel');
+  const content = document.getElementById('previewContent');
+  const data = previewData[type];
+  if (!data) return;
+
+  let html = `<div class="preview-label">研究预览</div>`;
+  html += `<div class="preview-title">${data.title}</div>`;
+  data.sections.forEach(s => {
+    html += `<div class="preview-section">`;
+    html += `<div class="preview-section-title">${s.label}</div>`;
+    html += `<div class="preview-tag-list">`;
+    s.tags.forEach(t => {
+      html += `<span class="preview-tag${s.green ? ' green' : ''}">${t}</span>`;
+    });
+    html += `</div></div>`;
+  });
+  content.innerHTML = html;
+  panel.classList.add('active');
+}
+
+function hidePreview() {
+  document.getElementById('previewPanel').classList.remove('active');
+}
+</script>
+
+</body>
+</html>

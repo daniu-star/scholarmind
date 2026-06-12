@@ -1,0 +1,1 @@
+"""ScholarMind Pydantic DTO Schema"""

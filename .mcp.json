@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "modao-proto-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modao-mcp/modao-proto-mcp",
+        "--token=a766805314bc8234cdee771ac14421f6",
+        "--url=https://modao.cc"
+      ]
+    }
+  }
+}

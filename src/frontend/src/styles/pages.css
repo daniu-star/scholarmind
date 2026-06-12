@@ -1,0 +1,107 @@
+/* ========== HOMEPAGE HERO ========== */
+.hero-section {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 60px 24px 30px;
+  text-align: center;
+}
+.hero-title {
+  font-family: 'Source Serif 4', serif;
+  font-size: 2.6rem; font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.02em; line-height: 1.2;
+  margin-bottom: 12px;
+}
+.hero-subtitle { font-size: 1rem; color: var(--text-secondary); margin-bottom: 40px; }
+
+/* ========== DISCIPLINE CARDS CONTAINER ========== */
+.discipline-cards {
+  display: flex; gap: 16px; justify-content: center;
+  padding: 0 24px; margin-bottom: 30px; flex-wrap: wrap;
+}
+
+/* ========== CHAT WELCOME ========== */
+.chat-welcome {
+  max-width: 680px; margin: 0 auto; padding: 20px;
+}
+
+/* ========== REVIEW DIMENSION ========== */
+.review-dimension {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; font-size: 0.88rem;
+}
+.dimension-icon { width: 20px; text-align: center; }
+
+/* ========== MEMORY ITEM ========== */
+.memory-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid var(--border-subtle);
+}
+.memory-info { flex: 1; }
+.memory-title { font-size: 0.9rem; font-weight: 500; }
+.memory-meta { font-size: 0.78rem; color: var(--text-secondary); }
+
+/* ========== THEME CARD ========== */
+.theme-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px;
+  cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.theme-card:hover { border-color: var(--border-hover); }
+.theme-card.selected { border-color: var(--accent-amber); }
+.theme-preview {
+  width: 100%; height: 60px; border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+/* ========== CUSTOM AGENT FORM ========== */
+.custom-agent-container {
+  max-width: 700px; margin: 0 auto;
+  padding: 24px;
+}
+.form-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px; margin-bottom: 16px;
+}
+.form-card-title {
+  font-family: 'Source Serif 4', serif;
+  font-size: 1.05rem; font-weight: 600;
+  margin-bottom: 16px; color: #B8956A;
+}
+.form-actions {
+  display: flex; gap: 12px; justify-content: flex-end;
+  margin-top: 24px;
+}
+
+/* ========== VERTICAL CARDS ========== */
+.vertical-cards { display: flex; flex-direction: column; gap: 12px; }
+.vertical-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px 24px;
+  display: flex; align-items: center; gap: 16px;
+  cursor: pointer; transition: all 0.25s;
+}
+.vertical-card:hover { border-color: var(--accent-amber); box-shadow: 0 2px 8px rgba(196,150,104,0.06); }
+.vertical-card-icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; flex-shrink: 0;
+}
+.vertical-card-content { flex: 1; }
+.vertical-card-title { font-weight: 600; font-size: 1rem; margin-bottom: 2px; }
+.vertical-card-desc { font-size: 0.82rem; color: var(--text-secondary); }
+
+/* ========== GRID CARDS ========== */
+.grid-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.grid-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 12px; padding: 20px;
+  cursor: pointer; transition: all 0.25s; text-align: center;
+}
+.grid-card:hover { border-color: var(--accent-amber); box-shadow: 0 2px 12px rgba(196,150,104,0.08); }
+.grid-card-icon {
+  width: 48px; height: 48px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem; margin: 0 auto 10px;
+}
+.grid-card-title { font-weight: 600; font-size: 1.05rem; line-height: 1.4; margin-bottom: 2px; }
+.grid-card-desc { font-size: 0.82rem; color: var(--text-secondary); }

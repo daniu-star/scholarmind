@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>工科 - 学术研究AI产品</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #0D1117;
+    --bg-card: #161B22;
+    --border: #30363D;
+    --accent-gold: #D4A574;
+    --accent-green: #3FB950;
+    --text-primary: #E6EDF3;
+    --text-secondary: #8B949E;
+    --font-heading: 'Source Serif Pro', 'Noto Serif SC', serif;
+    --font-body: 'Inter', 'Noto Sans SC', sans-serif;
+  }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* ===== TOP NAV BAR ===== */
+  .top-nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    height: 56px;
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+  }
+
+  .nav-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+
+  .nav-logo-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent-gold), #c4956a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--bg-primary);
+  }
+
+  .nav-logo-text {
+    font-family: var(--font-heading);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
+  }
+
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .nav-btn:hover {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+    background: rgba(212, 165, 116, 0.06);
+  }
+
+  .nav-btn svg {
+    width: 16px; height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+  }
+
+  .nav-btn--agent {
+    border-color: rgba(212, 165, 116, 0.3);
+    color: var(--accent-gold);
+  }
+
+  .nav-btn--agent:hover {
+    border-color: var(--accent-gold);
+    background: rgba(212, 165, 116, 0.1);
+  }
+
+  /* ===== BREADCRUMB ===== */
+  .breadcrumb-bar {
+    margin-top: 56px;
+    padding: 16px 24px;
+    border-bottom: 1px solid rgba(48, 54, 61, 0.5);
+  }
+
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 800px;
+    margin: 0 auto;
+    font-size: 13px;
+  }
+
+  .breadcrumb a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .breadcrumb a:hover {
+    color: var(--accent-gold);
+  }
+
+  .breadcrumb .sep {
+    color: var(--border);
+    font-size: 11px;
+  }
+
+  .breadcrumb .current {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  /* ===== MAIN CONTENT ===== */
+  .main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 48px 24px 32px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .page-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .page-title {
+    font-family: var(--font-heading);
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: 0.04em;
+    margin-bottom: 12px;
+    position: relative;
+  }
+
+  .page-title::after {
+    content: '';
+    display: block;
+    width: 48px;
+    height: 3px;
+    background: var(--accent-gold);
+    margin: 16px auto 0;
+    border-radius: 2px;
+  }
+
+  .page-subtitle {
+    font-size: 16px;
+    color: var(--text-secondary);
+    font-weight: 400;
+    margin-top: 16px;
+  }
+
+  /* ===== CARD GRID ===== */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    width: 100%;
+    margin-bottom: 48px;
+  }
+
+  .type-card {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px 28px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+
+  .type-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .type-card:hover {
+    border-color: var(--accent-gold);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(212, 165, 116, 0.08), 0 0 0 1px rgba(212, 165, 116, 0.15);
+  }
+
+  .type-card:hover::before {
+    opacity: 1;
+  }
+
+  .type-card:active {
+    transform: translateY(-2px);
+  }
+
+  .card-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    background: rgba(212, 165, 116, 0.08);
+    border: 1px solid rgba(212, 165, 116, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+  }
+
+  .type-card:hover .card-icon {
+    background: rgba(212, 165, 116, 0.14);
+    border-color: rgba(212, 165, 116, 0.3);
+    box-shadow: 0 0 20px rgba(212, 165, 116, 0.1);
+  }
+
+  .card-icon svg {
+    width: 26px;
+    height: 26px;
+    stroke: var(--accent-gold);
+    fill: none;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .card-title {
+    font-family: var(--font-heading);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .card-title-en {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 14px;
+  }
+
+  .card-desc {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+
+  .card-arrow {
+    position: absolute;
+    bottom: 28px;
+    right: 28px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(212, 165, 116, 0.06);
+    border: 1px solid rgba(212, 165, 116, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: all 0.3s ease;
+  }
+
+  .type-card:hover .card-arrow {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .card-arrow svg {
+    width: 14px;
+    height: 14px;
+    stroke: var(--accent-gold);
+    fill: none;
+    stroke-width: 2;
+  }
+
+  /* ===== BACK BUTTON ===== */
+  .back-section {
+    width: 100%;
+    padding-top: 8px;
+  }
+
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .back-btn:hover {
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+    background: rgba(139, 148, 158, 0.06);
+  }
+
+  .back-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 2;
+  }
+
+  /* ===== BOTTOM STATUS BAR ===== */
+  .bottom-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 100;
+    height: 40px;
+    background: rgba(13, 17, 23, 0.9);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    font-size: 12px;
+  }
+
+  .status-group {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 6px rgba(63, 185, 80, 0.4);
+  }
+
+  .status-dot--inactive {
+    background: #F85149;
+    box-shadow: 0 0 6px rgba(248, 81, 73, 0.3);
+  }
+
+  .status-label {
+    font-weight: 500;
+  }
+
+  .status-detail {
+    color: var(--text-secondary);
+    opacity: 0.7;
+  }
+
+  .langgraph-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: rgba(63, 185, 80, 0.08);
+    border: 1px solid rgba(63, 185, 80, 0.15);
+    color: var(--accent-green);
+    font-weight: 500;
+  }
+
+  .langgraph-badge svg {
+    width: 14px;
+    height: 14px;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.8;
+  }
+
+  /* ===== ANIMATIONS ===== */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-header {
+    animation: fadeInUp 0.5s ease both;
+  }
+
+  .type-card:nth-child(1) { animation: fadeInUp 0.5s ease 0.1s both; }
+  .type-card:nth-child(2) { animation: fadeInUp 0.5s ease 0.18s both; }
+  .type-card:nth-child(3) { animation: fadeInUp 0.5s ease 0.26s both; }
+  .type-card:nth-child(4) { animation: fadeInUp 0.5s ease 0.34s both; }
+
+  .back-section {
+    animation: fadeInUp 0.5s ease 0.42s both;
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 640px) {
+    .card-grid {
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+    .page-title {
+      font-size: 32px;
+    }
+    .type-card {
+      padding: 24px 22px;
+    }
+    .main-content {
+      padding: 32px 16px 24px;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== TOP NAV BAR ===== -->
+<nav class="top-nav">
+  <div class="nav-left">
+    <a href="01-home.html" class="nav-logo">
+      <div class="nav-logo-icon">研</div>
+      <span class="nav-logo-text">学术研究AI</span>
+    </a>
+  </div>
+  <div class="nav-right">
+    <button class="nav-btn" title="设置">
+      <svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+      设置
+    </button>
+    <button class="nav-btn nav-btn--agent" title="自定义Agent">
+      <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 13v-1a7 7 0 0 0-14 0v1"/><path d="M12 18v4"/><path d="M8 22h8"/></svg>
+      自定义Agent
+    </button>
+  </div>
+</nav>
+
+<!-- ===== BREADCRUMB ===== -->
+<div class="breadcrumb-bar">
+  <div class="breadcrumb">
+    <a href="01-home.html">首页</a>
+    <span class="sep">›</span>
+    <span class="current">工科</span>
+  </div>
+</div>
+
+<!-- ===== MAIN CONTENT ===== -->
+<main class="main-content">
+  <div class="page-header">
+    <h1 class="page-title">工科</h1>
+    <p class="page-subtitle">选择你的研究类型</p>
+  </div>
+
+  <div class="card-grid">
+    <!-- Card 1: 实验研究 -->
+    <div class="type-card" onclick="location.href='03-engineering-experimental.html'">
+      <div class="card-icon">
+        <!-- Flask icon -->
+        <svg viewBox="0 0 24 24">
+          <path d="M9 3h6"/>
+          <path d="M10 3v5.5L4.2 18.4A2 2 0 0 0 6 21h12a2 2 0 0 0 1.8-2.6L14 8.5V3"/>
+          <path d="M7.5 15h9"/>
+          <path d="M8.5 17h7"/>
+        </svg>
+      </div>
+      <div class="card-title">实验研究</div>
+      <div class="card-title-en">Experimental Research</div>
+      <div class="card-desc">通过控制变量与实验设计验证工程假设</div>
+      <div class="card-arrow">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+
+    <!-- Card 2: 仿真模拟 -->
+    <div class="type-card" onclick="location.href='03-engineering-simulation.html'">
+      <div class="card-icon">
+        <!-- Chip / Computer icon -->
+        <svg viewBox="0 0 24 24">
+          <rect x="4" y="4" width="16" height="16" rx="2"/>
+          <rect x="9" y="9" width="6" height="6" rx="1"/>
+          <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/>
+        </svg>
+      </div>
+      <div class="card-title">仿真模拟</div>
+      <div class="card-title-en">Simulation</div>
+      <div class="card-desc">利用计算模型模拟工程系统与过程</div>
+      <div class="card-arrow">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+
+    <!-- Card 3: 工程设计 -->
+    <div class="type-card" onclick="location.href='03-engineering-design.html'">
+      <div class="card-icon">
+        <!-- Blueprint icon -->
+        <svg viewBox="0 0 24 24">
+          <path d="M3 3h18v18H3z"/>
+          <path d="M3 9h18"/>
+          <path d="M3 15h18"/>
+          <path d="M9 3v18"/>
+          <path d="M15 3v18"/>
+          <circle cx="12" cy="6" r="1.5"/>
+        </svg>
+      </div>
+      <div class="card-title">工程设计</div>
+      <div class="card-title-en">Engineering Design</div>
+      <div class="card-desc">面向实际工程问题的创新设计方案</div>
+      <div class="card-arrow">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+
+    <!-- Card 4: 综述研究 -->
+    <div class="type-card" onclick="location.href='03-engineering-review.html'">
+      <div class="card-icon">
+        <!-- Document icon -->
+        <svg viewBox="0 0 24 24">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 2v6h6"/>
+          <path d="M16 13H8"/>
+          <path d="M16 17H8"/>
+          <path d="M10 9H8"/>
+        </svg>
+      </div>
+      <div class="card-title">综述研究</div>
+      <div class="card-title-en">Review Research</div>
+      <div class="card-desc">系统梳理工程领域的研究现状与趋势</div>
+      <div class="card-arrow">
+        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Back Button -->
+  <div class="back-section">
+    <button class="back-btn" onclick="location.href='01-home.html'">
+      <svg viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      返回
+    </button>
+  </div>
+</main>
+
+<!-- ===== BOTTOM STATUS BAR ===== -->
+<div class="bottom-bar">
+  <div class="status-group">
+    <div class="status-item">
+      <span class="status-dot"></span>
+      <span class="status-label">CNKI</span>
+      <span class="status-detail">已连接</span>
+    </div>
+    <div class="status-item">
+      <span class="status-dot"></span>
+      <span class="status-label">WoS</span>
+      <span class="status-detail">已连接</span>
+    </div>
+    <div class="status-item">
+      <span class="status-dot"></span>
+      <span class="status-label">Scopus</span>
+      <span class="status-detail">已连接</span>
+    </div>
+  </div>
+  <div class="status-group">
+    <div class="langgraph-badge">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Langgraph
+      <span style="opacity:0.7">运行中</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
