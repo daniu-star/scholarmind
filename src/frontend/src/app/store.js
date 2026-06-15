@@ -32,13 +32,13 @@ export const { state, watch } = createStore({
   researchType: storage.get('sm_researchType', null),
   readiness: storage.get('sm_readiness', null),
   uploadedFiles: storage.get('sm_uploads', {}),
-  currentSessionId: storage.get('sm_sessionId', ''),
-  cnkiResults: [],
-  skills: [],
-  messages: {},
+  currentSessionId: storage.get('sm_sessionId', crypto.randomUUID()),
+  cnkiResults: storage.get('sm_cnkiResults', []),
+  skills: storage.get('sm_skills', []),
+  messages: storage.get('sm_messages', {}),
   settings: {
     theme: storage.get('sm_theme', 'dark'),
-    apiBase: storage.get('sm_apiBase', 'http://localhost:8000'),
+    apiBase: storage.get('sm_apiBase', ''),
   },
 });
 
@@ -46,4 +46,8 @@ export const { state, watch } = createStore({
 watch('discipline', v => storage.set('sm_discipline', v));
 watch('researchType', v => storage.set('sm_researchType', v));
 watch('readiness', v => storage.set('sm_readiness', v));
-watch('settings', v => { storage.set('sm_theme', v?.theme || 'dark'); });
+watch('currentSessionId', v => storage.set('sm_sessionId', v));
+watch('settings', v => { storage.set('sm_theme', v?.theme || 'dark'); storage.set('sm_apiBase', v?.apiBase || ''); });
+watch('messages', v => storage.set('sm_messages', v));
+watch('cnkiResults', v => storage.set('sm_cnkiResults', v));
+watch('skills', v => storage.set('sm_skills', v));

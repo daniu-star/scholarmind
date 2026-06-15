@@ -8,12 +8,18 @@ import uuid
 from pathlib import Path
 from typing import Optional, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
 from ..services import chart_service
 from ..config import settings
+from ..core.exceptions import (
+    ChartGenerationError,
+    InvalidChartTypeError,
+    ValidationError,
+    NotFoundError,
+)
 
 router = APIRouter(prefix="/chart", tags=["chart"])
 
@@ -90,13 +96,10 @@ def _resolve_data(request: ChartRequest) -> Any:
         if not any(
             _is_subpath(file_path, allowed_dir) for allowed_dir in allowed_dirs
         ):
-            raise HTTPException(
-                status_code=403,
-                detail="数据文件路径必须在允许的目录内（上传目录或图表目录）",
-            )
+            raise ValidationError("数据文件路径必须在允许的目录内（上传目录或图表目录）")
 
         if not file_path.exists():
-            raise HTTPException(status_code=404, detail=f"数据文件不存在: {request.file_path}")
+            raise ValidationError(f"数据文件不存在: {request.file_path}")
 
         suffix = file_path.suffix.lower()
         try:
@@ -116,9 +119,9 @@ def _resolve_data(request: ChartRequest) -> Any:
                 with open(file_path, "r", encoding="utf-8") as f:
                     return f.read()
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"数据文件解析失败: {str(e)}")
+            raise ValidationError(f"数据文件解析失败: {str(e)}")
 
-    raise HTTPException(status_code=400, detail="必须提供 data 或 file_path 参数")
+    raise ValidationError("必须提供 data 或 file_path 参数")
 
 
 def _is_subpath(path: Path, parent: Path) -> bool:
@@ -163,7 +166,7 @@ async def generate_chart(request: ChartRequest):
             dpi=request.dpi,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"图表生成失败: {str(e)}")
+        raise ChartGenerationError(str(e), chart_type=request.chart_type)
 
     # 保存到文件
     chart_id = str(uuid.uuid4())
@@ -174,7 +177,7 @@ async def generate_chart(request: ChartRequest):
         with open(chart_path, "wb") as f:
             f.write(png_bytes)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"图表保存失败: {str(e)}")
+        raise ChartGenerationError(f"图表保存失败: {str(e)}")
 
     # 返回 PNG 图像
     return Response(
@@ -214,19 +217,19 @@ async def get_chart(chart_id: str):
     # 防止路径遍历攻击
     safe_id = chart_id.replace("/", "").replace("\\", "").replace("..", "")
     if not safe_id or safe_id != chart_id:
-        raise HTTPException(status_code=400, detail="无效的图表 ID")
+        raise ValidationError("无效的图表 ID")
 
     charts_dir = _ensure_charts_dir()
     chart_path = charts_dir / f"{safe_id}.png"
 
     if not chart_path.exists():
-        raise HTTPException(status_code=404, detail=f"图表不存在: {chart_id}")
+        raise NotFoundError("图表", chart_id)
 
     try:
         with open(chart_path, "rb") as f:
             png_bytes = f.read()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"图表读取失败: {str(e)}")
+        raise ChartGenerationError(f"图表读取失败: {str(e)}")
 
     return Response(
         content=png_bytes,

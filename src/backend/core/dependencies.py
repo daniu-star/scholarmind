@@ -10,6 +10,7 @@ from fastapi import Request, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
+from ..core.exceptions import AgentChatFailedError
 from ..db.session import get_db as _get_db
 from ..db.unit_of_work import UnitOfWork
 from ..services.interfaces import IAgentService
@@ -31,35 +32,32 @@ async def get_agent_service(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> IAgentService:
-    """获取 AgentService 实例（注入 ConversationRepository + SkillsService + CNKIService + ChartRepository）"""
+    """获取 AgentService 实例（按请求创建，注入 ConversationRepository + SkillsService + CNKIService + ChartRepository）
+
+    注意：不再使用单例模式，每次请求创建新的 service 实例，
+    确保数据库 session 与请求生命周期一致，避免 closed session 错误。
+    """
     from ..services.agent_service import AgentService
     from ..db.repository.conversation import ConversationRepository
     from ..db.repository.skill import SkillRepository
     from ..db.repository.chart import ChartRepository
     from ..services.skills_service import SkillsService
 
-    # 延迟初始化单例（存储在 app.state）
-    if not hasattr(request.app.state, "agent_service"):
-        if not settings.DEEPSEEK_API_KEY:
-            raise RuntimeError("DEEPSEEK_API_KEY not configured")
+    # API Key check moved to agent_service.chat() — only needed for LLM calls
+    conversation_repo = ConversationRepository(db)
+    skills_service = SkillsService(repository=SkillRepository(db))
+    chart_repo = ChartRepository(db)
+    cnki_service = getattr(request.app.state, "cnki_service", None)
 
-        conversation_repo = ConversationRepository(db)
-        skills_service = SkillsService(repository=SkillRepository(db))
-        chart_repo = ChartRepository(db)
-
-        # 获取已注入的 cnki_service（如果已初始化）
-        cnki_service = getattr(request.app.state, "cnki_service", None)
-
-        request.app.state.agent_service = AgentService(
-            api_key=settings.DEEPSEEK_API_KEY,
-            base_url=settings.DEEPSEEK_BASE_URL,
-            model=settings.DEEPSEEK_MODEL,
-            conversation_repo=conversation_repo,
-            skills_service=skills_service,
-            cnki_service=cnki_service,
-            chart_repo=chart_repo,
-        )
-    return request.app.state.agent_service
+    return AgentService(
+        api_key=settings.DEEPSEEK_API_KEY,
+        base_url=settings.DEEPSEEK_BASE_URL,
+        model=settings.DEEPSEEK_MODEL,
+        conversation_repo=conversation_repo,
+        skills_service=skills_service,
+        cnki_service=cnki_service,
+        chart_repo=chart_repo,
+    )
 
 
 # ── CNKI 服务依赖 ───────────────────────────────────────────
@@ -84,14 +82,15 @@ async def get_skills_service(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """获取 SkillsService 实例（注入 repository）"""
+    """获取 SkillsService 实例（按请求创建，注入 repository）
+
+    注意：不再使用单例模式，每次请求创建新的 service 实例。
+    """
     from ..services.skills_service import SkillsService
     from ..db.repository.skill import SkillRepository
 
-    if not hasattr(request.app.state, "skills_service"):
-        repo = SkillRepository(db)
-        request.app.state.skills_service = SkillsService(repository=repo)
-    return request.app.state.skills_service
+    repo = SkillRepository(db)
+    return SkillsService(repository=repo)
 
 
 # ── 图表服务依赖 ────────────────────────────────────────────

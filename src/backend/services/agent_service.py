@@ -13,6 +13,7 @@ from ..services.skills_service import SkillsService
 from ..services import chart_service
 from ..config import settings
 from ..utils.circuit_breaker import deepseek_circuit_breaker
+from ..core.exceptions import AgentChatFailedError
 from .interfaces import IAgentService
 
 if TYPE_CHECKING:
@@ -118,12 +119,14 @@ class AgentService(IAgentService):
         conversation_repo: ConversationRepository | None = None,
         skills_service: SkillsService | None = None,
         cnki_service: CNKIService | None = None,
+        chart_repo: ChartRepository | None = None,
     ):
-        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url) if api_key else None
         self.model = model
         self.conversation_repo = conversation_repo
         self.skills_service = skills_service or SkillsService()
         self.cnki_service = cnki_service
+        self.chart_repo = chart_repo
 
         # 文件模式回退：当无 repository 时使用内存字典 + 文件存储
         self.conversations: dict[str, list[dict]] = {}
@@ -192,6 +195,9 @@ class AgentService(IAgentService):
                 "skill_hint": None,
             }
 
+        if not settings.DEEPSEEK_API_KEY:
+            raise AgentChatFailedError("DeepSeek API key not configured")
+
         # Get or create conversation history
         if self._use_db:
             db_history = await self.conversation_repo.get_by_session(session_id)
@@ -205,6 +211,9 @@ class AgentService(IAgentService):
             history = self.conversations[session_id]
 
         # Build system prompt (with skills injection)
+        if context is None:
+            context = {}
+        context["last_message"] = message
         system_prompt = self._build_system_prompt(agent_id, context)
 
         # Load file upload context and append to user message
@@ -231,14 +240,7 @@ class AgentService(IAgentService):
             reply = response.choices[0].message.content
         except Exception as e:
             logger.error(f"DeepSeek API call failed: {e}")
-            return {
-                "reply": f"AI服务调用失败，请稍后重试。错误信息：{str(e)}",
-                "options": [],
-                "skills_used": [],
-                "chart_info": None,
-                "cnki_results": None,
-                "skill_hint": None,
-            }
+            raise AgentChatFailedError(f"AI服务调用失败: {str(e)}")
 
         # Update conversation history
         history.append({"role": "user", "content": message})
@@ -305,7 +307,14 @@ class AgentService(IAgentService):
             }
             return
 
-        # Get or create conversation history
+        if not settings.DEEPSEEK_API_KEY:
+            yield {
+                "type": "error",
+                "message": "DeepSeek API key not configured",
+            }
+            return
+
+        # Get or create conversation history (stream)
         if self._use_db:
             db_history = await self.conversation_repo.get_by_session(session_id)
             history = [
@@ -318,6 +327,9 @@ class AgentService(IAgentService):
             history = self.conversations[session_id]
 
         # Build system prompt
+        if context is None:
+            context = {}
+        context["last_message"] = message
         system_prompt = self._build_system_prompt(agent_id, context)
 
         # Load file upload context
@@ -554,12 +566,17 @@ AI回复：{reply}
 
             # Parse the JSON from the analysis
             # Try to extract JSON from the response (may be wrapped in markdown code block)
-            json_match = re.search(r'\{[^}]+\}', analysis_text, re.DOTALL)
+            json_match = re.search(r'\{[\s\S]*\}', analysis_text)
             if not json_match:
                 logger.warning("Failed to parse chart analysis response as JSON")
                 return None
 
-            chart_config = json.loads(json_match.group())
+            json_str = json_match.group()
+            try:
+                chart_config = json.loads(json_str)
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to decode chart analysis JSON: {json_str[:200]}")
+                return None
             chart_type = chart_config.get("chart_type", "")
             title = chart_config.get("title", "学术研究图表")
             x_label = chart_config.get("x_label", "")
@@ -590,7 +607,20 @@ AI回复：{reply}
             chart_filepath = charts_dir / chart_filename
             chart_filepath.write_bytes(chart_bytes)
 
-            chart_url = f"/api/charts/{chart_filename}"
+            chart_url = f"/api/v1/charts/{chart_filename}"
+
+            # 持久化图表记录到数据库
+            if self.chart_repo is not None:
+                try:
+                    await self.chart_repo.save_record(
+                        chart_id=chart_id,
+                        chart_type=chart_type,
+                        title=title,
+                        filepath=str(chart_filepath),
+                        session_id=session_id,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to persist chart record to DB: {e}")
 
             return {
                 "chart_id": chart_id,
@@ -684,12 +714,17 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
             keyword_text = keyword_response.choices[0].message.content.strip()
 
             # Parse JSON
-            json_match = re.search(r'\{[^}]+\}', keyword_text, re.DOTALL)
+            json_match = re.search(r'\{[\s\S]*\}', keyword_text)
             if not json_match:
                 logger.warning("Failed to parse keyword extraction response")
                 return None
 
-            keyword_config = json.loads(json_match.group())
+            json_str = json_match.group()
+            try:
+                keyword_config = json.loads(json_str)
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to decode keyword JSON: {json_str[:200]}")
+                return None
             keywords = keyword_config.get("keywords", "")
             year_filter = keyword_config.get("year_filter", "")
 

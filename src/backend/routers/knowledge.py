@@ -2,11 +2,12 @@
 ScholarMind 知识库 API 路由
 CNKI 检索、状态检查、配置管理
 """
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, Depends, Request
 
 from ..services.cnki_service import CNKIService
 from ..models.schemas.knowledge import CNKISearchRequest, CNKIConfigRequest
 from ..core.dependencies import get_cnki_service
+from ..core.exceptions import AppException, CNKISearchFailedError, CNKIConnectionError, ValidationError
 
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -22,6 +23,7 @@ async def search_cnki(
             query=request.query,
             year_filter=request.year_filter,
             count=request.count,
+            source_filter=request.source_filter,
         )
         return {
             "success": True,
@@ -29,8 +31,10 @@ async def search_cnki(
             "count": len(results),
             "results": [r.to_dict() for r in results],
         }
+    except AppException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"CNKI search failed: {str(e)}")
+        raise CNKISearchFailedError(str(e))
 
 
 @router.get("/status")
@@ -44,10 +48,10 @@ async def get_knowledge_status(
             "success": True,
             "services": status,
         }
+    except AppException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Status check failed: {str(e)}"
-        )
+        raise CNKIConnectionError(f"状态检查失败: {str(e)}")
 
 
 @router.post("/cnki/config")
@@ -71,7 +75,7 @@ async def configure_cnki(
             "api_key_configured": request.api_key is not None,
             "mcp_configured": request.mcp_tools is not None,
         }
+    except AppException:
+        raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Configuration failed: {str(e)}"
-        )
+        raise ValidationError(f"配置更新失败: {str(e)}")

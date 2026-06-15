@@ -14,6 +14,7 @@
   --border-subtle: #1E2430;
   /* 强调色 — 降低饱和度，更克制 */
   --accent-amber: #B8956A;
+  --accent-amber-hover: #9A6D3A;
   --accent-amber-dim: rgba(184, 149, 106, 0.10);
   --accent-amber-glow: rgba(184, 149, 106, 0.20);
   --accent-green: #4A8C50;
@@ -26,6 +27,21 @@
   --text-primary: #E8EEF4;
   --text-secondary: #8E98A2;
   --text-tertiary: #6A737D;
+  /* 渐变 */
+  --gradient-accent: linear-gradient(135deg, var(--accent-amber), var(--accent-amber-hover));
+  /* Toast 变量 (深色默认) */
+  --toast-success-bg: #1a3a2a;
+  --toast-success-border: rgba(63,185,80,0.4);
+  --toast-success-text: #3FB950;
+  --toast-error-bg: #3a1a1a;
+  --toast-error-border: rgba(248,81,73,0.4);
+  --toast-error-text: #F85149;
+  --toast-info-bg: #1a2a3a;
+  --toast-info-border: rgba(88,166,255,0.4);
+  --toast-info-text: #58A6FF;
+  --toast-warning-bg: #3a2a1a;
+  --toast-warning-border: var(--accent-amber-glow);
+  --toast-warning-text: var(--accent-amber);
   /* 字体 */
   --font-serif: 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
   --font-sans: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -36,6 +52,8 @@
   --radius-lg: 14px;
   --radius-xl: 18px;
   --radius-full: 9999px;
+  /* 导航栏 */
+  --nav-bg: rgba(13, 17, 23, 0.85);
   /* 间距系统 */
   --space-xs: 4px;
   --space-sm: 8px;
@@ -44,11 +62,62 @@
   --space-xl: 32px;
   --space-2xl: 48px;
   /* 阴影 — 增强层次 */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.25);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.35);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
   --shadow-lg: 0 8px 32px rgba(0,0,0,0.45);
   /* 过渡 */
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ========== CSS VARIABLES — 学术浅色主题 ========== */
+[data-theme="light"] {
+  /* 导航栏 */
+  --nav-bg: rgba(248, 246, 242, 0.92);
+  /* 背景层次 — 学术暖浅色主题 */
+  --bg-primary: #F8F6F2;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F5F2EC;
+  --bg-input: #F8F6F2;
+  --bg-elevated: #FFFFFF;
+  --bg-elevated-hover: #F5F2EC;
+  --bg-user-bubble: #E8E4DA;
+  /* 边框 */
+  --border: #D5CFC4;
+  --border-hover: #B8A88E;
+  --border-subtle: #E5DFD6;
+  /* 强调色 */
+  --accent-amber: #8B6914;
+  --accent-amber-hover: #7A5A0A;
+  --accent-amber-dim: rgba(139, 105, 20, 0.08);
+  --accent-amber-glow: rgba(139, 105, 20, 0.15);
+  --accent-green: #2E7D32;
+  --accent-green-dim: rgba(46, 125, 50, 0.10);
+  --accent-red: #C62828;
+  --accent-blue: #1565C0;
+  --accent-purple: #6A1B9A;
+  --accent-teal: #00695C;
+  /* 文字 */
+  --text-primary: #1A1A1A;
+  --text-secondary: #5F5A4F;
+  --text-tertiary: #8A8578;
+  /* 渐变 */
+  --gradient-accent: linear-gradient(135deg, var(--accent-amber), var(--accent-amber-hover));
+  /* Toast 变量 (浅色) */
+  --toast-success-bg: #E8F5E9;
+  --toast-success-border: rgba(46,125,50,0.3);
+  --toast-success-text: #2E7D32;
+  --toast-error-bg: #FFEBEE;
+  --toast-error-border: rgba(198,40,40,0.3);
+  --toast-error-text: #C62828;
+  --toast-info-bg: #E3F2FD;
+  --toast-info-border: rgba(21,101,192,0.3);
+  --toast-info-text: #1565C0;
+  --toast-warning-bg: #FFF8E1;
+  --toast-warning-border: var(--accent-amber-glow);
+  --toast-warning-text: #8B6914;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.15);
 }

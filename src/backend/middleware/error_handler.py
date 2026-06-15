@@ -105,19 +105,31 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def general_exception_handler(request: Request, exc: Exception):
-        """处理未捕获的通用异常"""
+        """处理未捕获的通用异常（含 asyncio.CancelledError 降级）"""
         request_id = getattr(request.state, "request_id", None)
+        # CancelledError 是 BaseException 子类，不会被此 handler 捕获
+        # 但某些框架包装后可能变为 Exception，需做类型检查
+        import asyncio as _asyncio
+        if isinstance(exc, _asyncio.CancelledError):
+            logger.debug("Request cancelled by client", extra={"request_id": request_id})
+            return  # 不返回响应，客户端已断开
         logger.exception(
             f"Unhandled exception: {exc}",
             extra={"request_id": request_id},
         )
+        from ...config import settings
+        is_dev = settings.DEBUG
+        details = {
+            "type": type(exc).__name__,
+            "message": str(exc),
+        } if is_dev else {"type": type(exc).__name__}
         return JSONResponse(
             status_code=500,
             content=error_response(
                 code=ErrorCode.INTERNAL_ERROR,
-                message="服务器内部错误，请稍后重试",
+                message=f"服务器内部错误: {exc}" if is_dev else "服务器内部错误，请稍后重试",
                 status_code=500,
-                details={"type": type(exc).__name__} if app.debug else None,
+                details=details,
                 request_id=request_id,
             ),
         )

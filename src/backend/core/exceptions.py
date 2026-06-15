@@ -69,7 +69,7 @@ class AgentNotFoundError(AppException):
     def __init__(self, agent_id: str):
         super().__init__(
             message=f"无效的Agent类型：{agent_id}",
-            code=ErrorCode.INVALID_AGENT_ID,
+            code=ErrorCode.AGENT_NOT_FOUND,
             status_code=400,
             details={"agent_id": agent_id},
         )
@@ -83,17 +83,6 @@ class AgentChatFailedError(AppException):
             code=ErrorCode.AGENT_CHAT_FAILED,
             status_code=500,
             details=details,
-        )
-
-
-class SessionNotFoundError(AppException):
-    """会话不存在"""
-    def __init__(self, session_id: str):
-        super().__init__(
-            message=f"会话 '{session_id}' 不存在",
-            code=ErrorCode.SESSION_NOT_FOUND,
-            status_code=404,
-            details={"session_id": session_id},
         )
 
 

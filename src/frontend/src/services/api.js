@@ -1,6 +1,7 @@
 import { state } from '../app/store.js';
 
-const getBaseUrl = () => state.settings.apiBase || 'http://localhost:8000';
+// 开发环境使用相对路径走 Vite 代理，用户可通过 settings.apiBase 覆盖
+const getBaseUrl = () => state.settings.apiBase || '';
 
 class ApiError extends Error {
   constructor(status, message, data = null) {
@@ -8,6 +9,13 @@ class ApiError extends Error {
     this.status = status;
     this.data = data;
     this.name = 'ApiError';
+  }
+}
+
+class NetworkError extends Error {
+  constructor(message = '网络连接失败，请检查后端是否启动') {
+    super(message);
+    this.name = 'NetworkError';
   }
 }
 
@@ -19,12 +27,20 @@ async function request(method, path, body = null, options = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(url, {
-    method,
-    headers,
-    body: body instanceof FormData ? body : (body ? JSON.stringify(body) : null),
-    signal: options.signal,
-  });
+  let res;
+  try {
+    res = await fetch(url, {
+      method,
+      headers,
+      body: body instanceof FormData ? body : (body ? JSON.stringify(body) : null),
+      signal: options.signal,
+    });
+  } catch (err) {
+    if (err instanceof TypeError) {
+      throw new NetworkError();
+    }
+    throw err;
+  }
 
   if (!res.ok) {
     let errData;
@@ -45,6 +61,23 @@ async function request(method, path, body = null, options = {}) {
   return res.json();
 }
 
+async function healthCheck() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/v1/health`, {
+      method: 'GET',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    return res.ok;
+  } catch {
+    clearTimeout(timeout);
+    throw new NetworkError();
+  }
+}
+
 export const api = {
   get: (path, opts) => request('GET', path, null, opts),
   post: (path, body, opts) => request('POST', path, body, opts),
@@ -53,4 +86,4 @@ export const api = {
   upload: (path, formData, opts) => request('POST', path, formData, opts),
 };
 
-export { ApiError };
+export { ApiError, NetworkError, healthCheck };

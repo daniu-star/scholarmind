@@ -42,9 +42,10 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="ScholarMind API",
         description="基于 RAG + Langgraph + 6层企业架构的智能学术研究助手",
-        version="2.0.0",
+        version="3.0.0",
         lifespan=lifespan,
     )
+    app.debug = settings.DEBUG
 
     # ── 中间件层（按优先级顺序注册） ──────────────────────────
     from src.backend.middleware.request_id import RequestIDMiddleware

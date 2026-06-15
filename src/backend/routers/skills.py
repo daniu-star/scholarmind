@@ -2,7 +2,7 @@
 ScholarMind 技能管理 API 路由
 技能 CRUD + 上传 + 模板
 """
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Request
+from fastapi import APIRouter, UploadFile, File, Depends, Request
 
 from ..services.skills_service import SkillsService
 from ..models.schemas.skills import (
@@ -11,6 +11,11 @@ from ..models.schemas.skills import (
     SkillToggleRequest,
 )
 from ..core.dependencies import get_skills_service
+from ..core.exceptions import (
+    SkillNotFoundError,
+    SkillAlreadyExistsError,
+    SkillValidationError,
+)
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -32,7 +37,7 @@ async def get_skill(
     """Get single skill by id"""
     skill = service.get_skill(skill_id)
     if skill is None:
-        raise HTTPException(status_code=404, detail=f"技能 '{skill_id}' 不存在")
+        raise SkillNotFoundError(skill_id)
     return skill
 
 
@@ -45,7 +50,7 @@ async def create_skill(
     try:
         skill = service.create_skill(req.model_dump())
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise SkillValidationError(str(e))
     return skill
 
 
@@ -60,7 +65,7 @@ async def update_skill(
     try:
         skill = service.update_skill(skill_id, data)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise SkillValidationError(str(e))
     return skill
 
 
@@ -73,9 +78,9 @@ async def delete_skill(
     try:
         success = service.delete_skill(skill_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise SkillValidationError(str(e))
     if not success:
-        raise HTTPException(status_code=404, detail=f"技能 '{skill_id}' 不存在")
+        raise SkillNotFoundError(skill_id)
     return {"id": skill_id, "deleted": True}
 
 
@@ -89,7 +94,7 @@ async def toggle_skill(
     try:
         skill = service.toggle_skill(skill_id, req.enabled)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise SkillValidationError(str(e))
     return skill
 
 
@@ -100,13 +105,13 @@ async def upload_skill_file(
 ):
     """Upload .md skill file"""
     if not file.filename.endswith(".md"):
-        raise HTTPException(status_code=400, detail="仅支持 .md 格式的技能文件")
+        raise SkillValidationError("仅支持 .md 格式的技能文件")
 
     content = await file.read()
     try:
         skill = service.upload_skill_file(content, file.filename)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise SkillValidationError(str(e))
     return skill
 
 

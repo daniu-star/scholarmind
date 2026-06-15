@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, Depends
 from typing import Optional, Dict, Any
 
 from ..config import settings
-from ..services.agent_service import AgentService
+from ..services.agent_service import AgentService, VALID_AGENTS
+from ..core.exceptions import AppException, AgentNotFoundError, AgentChatFailedError, ValidationError
+from ..services.interfaces import IAgentService
 from ..models.schemas.agent import (
     ChatRequest,
     ChatResponse,
@@ -19,25 +21,14 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_agent(
     request: ChatRequest,
-    service: AgentService = Depends(get_agent_service),
+    service: IAgentService = Depends(get_agent_service),
 ):
     """Chat with an AI agent"""
-    try:
-        _validate_agent_service(service)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent service init failed: {str(e)}")
-
-    if request.agent_id not in {"researcher", "reviewer", "architect", "synthesizer", "polisher"}:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid agent_id: {request.agent_id}. "
-                   f"Valid options: researcher, reviewer, architect, synthesizer, polisher",
-        )
-
     if not request.message.strip():
-        raise HTTPException(status_code=400, detail="Message cannot be empty")
+        raise ValidationError("消息不能为空")
+
+    if request.agent_id not in VALID_AGENTS:
+        raise AgentNotFoundError(request.agent_id)
 
     try:
         result = await service.chat(
@@ -47,14 +38,16 @@ async def chat_with_agent(
             context=request.context,
         )
         return ChatResponse(**result)
+    except AppException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+        raise AgentChatFailedError(str(e))
 
 
-@router.delete("/conversation/{session_id}")
+@router.delete("/conversation/{session_id}", response_model=ClearConversationResponse)
 async def clear_conversation(
     session_id: str,
-    service: AgentService = Depends(get_agent_service),
+    service: IAgentService = Depends(get_agent_service),
 ):
     """Clear conversation history"""
     cleared = await service.clear_conversation(session_id)
@@ -65,9 +58,9 @@ async def clear_conversation(
     }
 
 
-@router.get("/agents")
+@router.get("/agents", response_model=AgentListResponse)
 async def list_agents(
-    service: AgentService = Depends(get_agent_service),
+    service: IAgentService = Depends(get_agent_service),
 ):
     """List all available agents"""
     agents = service.list_agents()
@@ -77,10 +70,10 @@ async def list_agents(
     }
 
 
-@router.get("/conversation/{session_id}")
+@router.get("/conversation/{session_id}", response_model=ConversationHistoryResponse)
 async def get_conversation(
     session_id: str,
-    service: AgentService = Depends(get_agent_service),
+    service: IAgentService = Depends(get_agent_service),
 ):
     """Get conversation history for a session"""
     history = await service.get_conversation_history(session_id)
@@ -90,12 +83,3 @@ async def get_conversation(
         "message_count": len(history),
         "history": history,
     }
-
-
-def _validate_agent_service(service: AgentService) -> None:
-    """验证 agent service 可用"""
-    if not settings.DEEPSEEK_API_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="DeepSeek API key not configured. Set DEEPSEEK_API_KEY in .env",
-        )

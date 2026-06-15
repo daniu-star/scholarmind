@@ -235,10 +235,18 @@ class CNKIService:
         """Direct HTTP search on CNKI"""
         session = await self._get_session()
 
+        # Use a shorter timeout specifically for CNKI direct connection
+        cnki_timeout = aiohttp.ClientTimeout(total=10, connect=5)
+
         # Step 1: Get a session cookie by visiting the homepage
-        async with session.get(self.base_url) as resp:
-            if resp.status != 200:
-                raise ConnectionError(f"CNKI homepage returned status {resp.status}")
+        try:
+            async with session.get(self.base_url, timeout=cnki_timeout) as resp:
+                if resp.status != 200:
+                    raise ConnectionError(f"CNKI homepage returned status {resp.status}")
+        except asyncio.TimeoutError:
+            raise ConnectionError("CNKI homepage connection timed out (10s)")
+        except Exception as e:
+            raise ConnectionError(f"CNKI homepage connection failed: {e}")
 
         # Step 2: POST search request
         search_params = {
@@ -261,6 +269,7 @@ class CNKIService:
             f"{self.base_url}/kns8s/search",
             data=search_params,
             allow_redirects=True,
+            timeout=cnki_timeout,
         ) as resp:
             if resp.status != 200:
                 raise ConnectionError(f"CNKI search returned status {resp.status}")

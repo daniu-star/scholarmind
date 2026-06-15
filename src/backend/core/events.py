@@ -28,7 +28,7 @@ async def startup(app: FastAPI) -> None:
             await shutdown(app)
     """
     configure_logging()
-    logger.info("ScholarMind API starting up", version="2.0.0")
+    logger.info("ScholarMind API starting up", version="3.0.0")
 
     # 确保目录存在
     settings.ensure_dirs()
