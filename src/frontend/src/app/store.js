@@ -26,6 +26,18 @@ export function createStore(initialState) {
   };
 }
 
+// Debounce utility for localStorage writes
+function debouncedStore(fn, delay = 300) {
+  let timers = {};
+  return function(key, value) {
+    if (timers[key]) clearTimeout(timers[key]);
+    timers[key] = setTimeout(() => {
+      fn(key, value);
+      delete timers[key];
+    }, delay);
+  };
+}
+
 export const { state, watch } = createStore({
   currentPage: window.location.hash.slice(1) || 'homepage',
   discipline: storage.get('sm_discipline', null),
@@ -40,14 +52,28 @@ export const { state, watch } = createStore({
     theme: storage.get('sm_theme', 'dark'),
     apiBase: storage.get('sm_apiBase', ''),
   },
+  auth: {
+    user: storage.get('sm_user', null),
+    token: storage.get('sm_token', null),
+    isAuthenticated: Boolean(storage.get('sm_token', null)),
+    entitlements: storage.get('sm_entitlements', null),
+  },
 });
 
-// Auto-persist key state to localStorage
-watch('discipline', v => storage.set('sm_discipline', v));
-watch('researchType', v => storage.set('sm_researchType', v));
-watch('readiness', v => storage.set('sm_readiness', v));
-watch('currentSessionId', v => storage.set('sm_sessionId', v));
-watch('settings', v => { storage.set('sm_theme', v?.theme || 'dark'); storage.set('sm_apiBase', v?.apiBase || ''); });
-watch('messages', v => storage.set('sm_messages', v));
-watch('cnkiResults', v => storage.set('sm_cnkiResults', v));
-watch('skills', v => storage.set('sm_skills', v));
+// Debounced persist — prevents main-thread blocking from sync localStorage I/O
+const setDebounced = debouncedStore((key, value) => storage.set(key, value), 300);
+
+// Auto-persist key state to localStorage (debounced)
+watch('discipline', v => setDebounced('sm_discipline', v));
+watch('researchType', v => setDebounced('sm_researchType', v));
+watch('readiness', v => setDebounced('sm_readiness', v));
+watch('currentSessionId', v => setDebounced('sm_sessionId', v));
+watch('settings', v => { setDebounced('sm_theme', v?.theme || 'dark'); setDebounced('sm_apiBase', v?.apiBase || ''); });
+watch('messages', v => setDebounced('sm_messages', v));
+watch('cnkiResults', v => setDebounced('sm_cnkiResults', v));
+watch('skills', v => setDebounced('sm_skills', v));
+watch('auth', v => {
+  storage.set('sm_user', v?.user || null);
+  storage.set('sm_token', v?.token || null);
+  storage.set('sm_entitlements', v?.entitlements || null);
+});

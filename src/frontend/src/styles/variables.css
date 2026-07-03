@@ -1,112 +1,242 @@
-/* ========== CSS VARIABLES — 学术暖暗色主题 ========== */
+/* ========== CSS VARIABLES — 学术暖暗色主题 (UI/UX Pro Max 优化) ========== */
 :root {
-  /* 背景层次 — 学术暖暗色主题 */
+  /* 背景层次 — 暖色基底，营造学术沉稳氛围 */
+  --bg-base: #0B0F14;
   --bg-primary: #0F1419;
-  --bg-card: #1A1F26;
-  --bg-card-hover: #1F252C;
-  --bg-input: #0F1419;
-  --bg-elevated: #1E242C;
-  --bg-elevated-hover: #242B34;
-  --bg-user-bubble: #1E252C;
-  /* 边框 */
-  --border: #2A3038;
-  --border-hover: #3A414A;
-  --border-subtle: #1E2430;
-  /* 强调色 — 降低饱和度，更克制 */
-  --accent-amber: #B8956A;
-  --accent-amber-hover: #9A6D3A;
-  --accent-amber-dim: rgba(184, 149, 106, 0.10);
-  --accent-amber-glow: rgba(184, 149, 106, 0.20);
-  --accent-green: #4A8C50;
-  --accent-green-dim: rgba(74, 140, 80, 0.12);
+  --bg-card: #151B22;
+  --bg-card-hover: #1A2129;
+  --bg-input: #11171E;
+  --bg-elevated: #181F28;
+  --bg-elevated-hover: #1E2630;
+  --bg-user-bubble: #19212A;
+  /* 边框 — 降低不透明度，减少"框格感" */
+  --border: rgba(255, 255, 255, 0.06);
+  --border-hover: rgba(255, 255, 255, 0.10);
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  /* 品牌色（学术绿 — 微调饱和度与亮度，更显沉稳专业） */
+  --accent-brand: #4D9168;
+  --accent-brand-hover: #3D7A54;
+  --accent-brand-dim: rgba(77, 145, 104, 0.10);
+  --accent-brand-glow: rgba(77, 145, 104, 0.18);
+  /* 向后兼容别名 */
+  --accent-amber: var(--accent-brand);
+  --accent-amber-hover: var(--accent-brand-hover);
+  --accent-amber-dim: var(--accent-brand-dim);
+  --accent-amber-glow: var(--accent-brand-glow);
+  /* 独立翠绿 — 成功状态 */
+  --accent-green: #3FB950;
+  --accent-green-dim: rgba(63, 185, 80, 0.10);
   --accent-red: #D05A52;
   --accent-blue: #5C9CE6;
   --accent-purple: #9B85C8;
   --accent-teal: #52B8AE;
-  /* 文字 */
-  --text-primary: #E8EEF4;
-  --text-secondary: #8E98A2;
-  --text-tertiary: #6A737D;
-  /* 渐变 */
-  --gradient-accent: linear-gradient(135deg, var(--accent-amber), var(--accent-amber-hover));
-  /* Toast 变量 (深色默认) */
-  --toast-success-bg: #1a3a2a;
-  --toast-success-border: rgba(63,185,80,0.4);
+  /* 语义消费层 */
+  --color-brand: var(--accent-brand);
+  --color-brand-hover: var(--accent-brand-hover);
+  --color-success: var(--accent-green);
+  --color-warning: #D29922;
+  --color-danger: var(--accent-red);
+  --color-info: var(--accent-blue);
+  /* 辅助强调色 dim 背景 */
+  --accent-blue-dim: rgba(92, 156, 230, 0.10);
+  --accent-purple-dim: rgba(155, 133, 200, 0.10);
+  --accent-red-dim: rgba(208, 90, 82, 0.10);
+  /* 辅助强调色 glow 边框 */
+  --accent-green-glow: rgba(63, 185, 80, 0.35);
+  --accent-red-glow: rgba(208, 90, 82, 0.25);
+  /* 灰色辅助色 */
+  --accent-gray: #8B949E;
+  --accent-gray-dim: rgba(139, 148, 158, 0.12);
+  /* 渐变 — 更细微的过渡（仅用于大尺寸元素） */
+  --gradient-accent: linear-gradient(135deg, #4D9168, #3D7A54);
+  --accent-blue-gradient: linear-gradient(135deg, #58A6FF, #1F6FEB);
+  --accent-green-gradient: linear-gradient(135deg, #3FB950, #238636);
+  --accent-red-gradient: linear-gradient(135deg, #D05A52, #B8443C);
+  --accent-purple-gradient: linear-gradient(135deg, #9B85C8, #7B68AE);
+  --accent-teal-gradient: linear-gradient(135deg, #52B8AE, #3A9B91);
+  /* 文字 — 微调对比度与暖度 */
+  --text-primary: #E6EDF3;
+  --text-secondary: #96A0AD;
+  --text-tertiary: #6E7A8A;
+  --text-on-accent: #FFFFFF;
+  /* 交互叠加层 */
+  --hover-overlay: rgba(255, 255, 255, 0.05);
+  --bg-overlay: rgba(15, 20, 28, 0.92);
+  --overlay-bg: rgba(0, 0, 0, 0.65);
+  /* 滚动条 */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.08);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.14);
+  /* toggle / disabled */
+  --toggle-knob: #E6EDF3;
+  --disabled-bg: rgba(139, 148, 158, 0.25);
+  --disabled-text: rgba(139, 148, 158, 0.5);
+  --code-bg: rgba(0, 0, 0, 0.25);
+  --ring-blue: 0 0 0 2px rgba(92, 156, 230, 0.2);
+  /* 内容宽度 */
+  --content-narrow: 680px;
+  --content-normal: 880px;
+  --content-wide: 1100px;
+  /* Toast */
+  --toast-success-bg: #12261E;
+  --toast-success-border: rgba(63,185,80,0.35);
   --toast-success-text: #3FB950;
-  --toast-error-bg: #3a1a1a;
-  --toast-error-border: rgba(248,81,73,0.4);
+  --toast-error-bg: #261515;
+  --toast-error-border: rgba(248,81,73,0.35);
   --toast-error-text: #F85149;
-  --toast-info-bg: #1a2a3a;
-  --toast-info-border: rgba(88,166,255,0.4);
+  --toast-info-bg: #121E2A;
+  --toast-info-border: rgba(88,166,255,0.35);
   --toast-info-text: #58A6FF;
-  --toast-warning-bg: #3a2a1a;
-  --toast-warning-border: var(--accent-amber-glow);
-  --toast-warning-text: var(--accent-amber);
+  --toast-warning-bg: #261F10;
+  --toast-warning-border: rgba(210, 153, 34, 0.35);
+  --toast-warning-text: #D29922;
   /* 字体 */
   --font-serif: 'Source Serif 4', 'Noto Serif SC', Georgia, serif;
   --font-sans: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
-  /* 圆角系统 — 更克制 */
-  --radius-xs: 3px;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', 'Monaco', monospace;
+  /* 字号阶梯 */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.25rem;
+  /* 标题阶梯 */
+  --text-h4: 1.125rem;
+  --text-h3: 1.375rem;
+  --text-h2: 1.75rem;
+  --text-h1: 2.25rem;
+  --text-display: 3rem;
+  /* 字间距 */
+  --tracking-tight: -0.015em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  /* 行高 — 中文优化 */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.65;
+  --line-height-loose: 1.8;
+  --leading-tight: 1.2;
+  --leading-normal: 1.6;
+  --leading-relaxed: 1.8;
+  /* 字重 */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  /* 图标尺寸 */
+  --icon-sm: 32px;
+  --icon-md: 48px;
+  --icon-lg: 56px;
+  --icon-xl: 64px;
+  /* 卡片层级 */
+  --card-primary-bg: var(--bg-elevated);
+  --card-primary-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.2);
+  --card-primary-border: rgba(255,255,255,0.07);
+  --card-secondary-bg: var(--bg-card);
+  --card-secondary-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  --card-secondary-border: rgba(255,255,255,0.05);
+  --card-tertiary-bg: transparent;
+  --card-tertiary-shadow: none;
+  --card-tertiary-border: rgba(255,255,255,0.03);
+  /* 圆角系统 — 更柔和 */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
-  /* 导航栏 */
-  --nav-bg: rgba(13, 17, 23, 0.85);
-  /* 间距系统 */
-  --space-xs: 4px;
-  --space-sm: 8px;
+  /* 导航栏 — 玻璃效果 */
+  --nav-bg: rgba(11, 15, 20, 0.82);
+  /* 间距系统 — 严格 8pt 栅格 */
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
   --space-md: 16px;
   --space-lg: 24px;
   --space-xl: 32px;
   --space-2xl: 48px;
-  /* 阴影 — 增强层次 */
-  --shadow-sm: 0 1px 4px rgba(0,0,0,0.35);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.35);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.45);
+  --space-3xl: 64px;
+  --grid-gutter: 24px;
+  --grid-col-count: 12;
+  --grid-col-width: 1fr;
+  /* 阴影 — 纯色深阴影，无 inset（更自然的光影） */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.15);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.25);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.5), 0 8px 32px rgba(0,0,0,0.3);
+  --shadow-xl: 0 8px 32px rgba(0,0,0,0.55), 0 16px 48px rgba(0,0,0,0.2);
   /* 过渡 */
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Z-index */
+  --z-sidebar: 100;
+  --z-overlay: 500;
+  --z-modal: 1000;
+  --z-toast: 2000;
+  --z-skip-link: 3000;
+  /* 响应式断点 */
+  --bp-sm: 640px;
+  --bp-md: 768px;
+  --bp-lg: 1024px;
+  --bp-xl: 1200px;
 }
 
-/* ========== CSS VARIABLES — 学术浅色主题 ========== */
+/* ========== CSS VARIABLES — 学术浅色主题 (UI/UX Pro Max 优化) ========== */
 [data-theme="light"] {
-  /* 导航栏 */
-  --nav-bg: rgba(248, 246, 242, 0.92);
-  /* 背景层次 — 学术暖浅色主题 */
-  --bg-primary: #F8F6F2;
+  --nav-bg: rgba(250, 248, 244, 0.88);
+  --bg-base: #F2EFE8;
+  --bg-primary: #FAF8F4;
   --bg-card: #FFFFFF;
-  --bg-card-hover: #F5F2EC;
-  --bg-input: #F8F6F2;
+  --bg-card-hover: #F6F3ED;
+  --bg-input: #FAF8F4;
   --bg-elevated: #FFFFFF;
-  --bg-elevated-hover: #F5F2EC;
-  --bg-user-bubble: #E8E4DA;
-  /* 边框 */
-  --border: #D5CFC4;
-  --border-hover: #B8A88E;
-  --border-subtle: #E5DFD6;
-  /* 强调色 */
-  --accent-amber: #8B6914;
-  --accent-amber-hover: #7A5A0A;
-  --accent-amber-dim: rgba(139, 105, 20, 0.08);
-  --accent-amber-glow: rgba(139, 105, 20, 0.15);
-  --accent-green: #2E7D32;
-  --accent-green-dim: rgba(46, 125, 50, 0.10);
+  --bg-elevated-hover: #F6F3ED;
+  --bg-user-bubble: #EDE9E0;
+  --border: rgba(0, 0, 0, 0.06);
+  --border-hover: rgba(0, 0, 0, 0.10);
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --accent-brand: #3D6B4A;
+  --accent-brand-hover: #2F553B;
+  --accent-brand-dim: rgba(61, 107, 74, 0.08);
+  --accent-brand-glow: rgba(61, 107, 74, 0.15);
+  --accent-amber: var(--accent-brand);
+  --accent-amber-hover: var(--accent-brand-hover);
+  --accent-amber-dim: var(--accent-brand-dim);
+  --accent-amber-glow: var(--accent-brand-glow);
+  --accent-green: #3D8B40;
+  --accent-green-dim: rgba(61, 139, 64, 0.10);
   --accent-red: #C62828;
   --accent-blue: #1565C0;
   --accent-purple: #6A1B9A;
   --accent-teal: #00695C;
-  /* 文字 */
-  --text-primary: #1A1A1A;
-  --text-secondary: #5F5A4F;
-  --text-tertiary: #8A8578;
-  /* 渐变 */
-  --gradient-accent: linear-gradient(135deg, var(--accent-amber), var(--accent-amber-hover));
-  /* Toast 变量 (浅色) */
+  --accent-blue-dim: rgba(21, 101, 192, 0.08);
+  --accent-purple-dim: rgba(106, 27, 154, 0.08);
+  --accent-red-dim: rgba(198, 40, 40, 0.08);
+  --accent-green-glow: rgba(61, 139, 64, 0.35);
+  --accent-red-glow: rgba(198, 40, 40, 0.25);
+  --accent-gray: #6E7681;
+  --accent-gray-dim: rgba(110, 118, 129, 0.12);
+  --gradient-accent: linear-gradient(135deg, #3D6B4A, #2F553B);
+  --accent-blue-gradient: linear-gradient(135deg, #4A90D9, #1565C0);
+  --accent-green-gradient: linear-gradient(135deg, #4CAF50, #3D8B40);
+  --accent-red-gradient: linear-gradient(135deg, #E57373, #C62828);
+  --accent-purple-gradient: linear-gradient(135deg, #9B7BCC, #6A1B9A);
+  --accent-teal-gradient: linear-gradient(135deg, #4DB6AC, #00695C);
+  --text-primary: #1A1C1E;
+  --text-secondary: #5A5650;
+  --text-tertiary: #8A8478;
+  --text-on-accent: #FFFFFF;
+  --hover-overlay: rgba(0, 0, 0, 0.04);
+  --bg-overlay: rgba(255, 252, 246, 0.94);
+  --overlay-bg: rgba(0, 0, 0, 0.45);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.10);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.18);
+  --toggle-knob: #FFFFFF;
+  --disabled-bg: rgba(0, 0, 0, 0.08);
+  --disabled-text: rgba(0, 0, 0, 0.3);
+  --code-bg: rgba(0, 0, 0, 0.04);
+  --ring-blue: 0 0 0 2px rgba(21, 101, 192, 0.2);
   --toast-success-bg: #E8F5E9;
-  --toast-success-border: rgba(46,125,50,0.3);
+  --toast-success-border: rgba(61,139,64,0.3);
   --toast-success-text: #2E7D32;
   --toast-error-bg: #FFEBEE;
   --toast-error-border: rgba(198,40,40,0.3);
@@ -115,9 +245,163 @@
   --toast-info-border: rgba(21,101,192,0.3);
   --toast-info-text: #1565C0;
   --toast-warning-bg: #FFF8E1;
-  --toast-warning-border: var(--accent-amber-glow);
+  --toast-warning-border: rgba(210,153,34,0.3);
   --toast-warning-text: #8B6914;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.10);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.15);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.10), 0 8px 32px rgba(0,0,0,0.06);
+  --shadow-xl: 0 8px 32px rgba(0,0,0,0.10), 0 16px 48px rgba(0,0,0,0.06);
 }
+
+/* ========== CSS VARIABLES — 洁白风主题 ========== */
+[data-theme="pure"] {
+  --bg-base: #F0F2F5;
+  --bg-primary: #FFFFFF;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F7F8FA;
+  --bg-input: #FFFFFF;
+  --bg-elevated: #F9FAFB;
+  --bg-elevated-hover: #F3F4F6;
+  --bg-user-bubble: #F3F4F6;
+  --border: rgba(0, 0, 0, 0.05);
+  --border-hover: rgba(0, 0, 0, 0.09);
+  --border-subtle: rgba(0, 0, 0, 0.03);
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --text-on-accent: #FFFFFF;
+  --accent-brand: #4D9168;
+  --accent-brand-hover: #3D7A54;
+  --accent-brand-dim: rgba(77, 145, 104, 0.08);
+  --accent-brand-glow: rgba(77, 145, 104, 0.15);
+  --accent-amber: var(--accent-brand);
+  --accent-amber-hover: var(--accent-brand-hover);
+  --accent-amber-dim: var(--accent-brand-dim);
+  --accent-amber-glow: var(--accent-brand-glow);
+  --accent-green: #10B981;
+  --accent-green-dim: rgba(16, 185, 129, 0.10);
+  --accent-red: #DC2626;
+  --accent-blue: #2563EB;
+  --accent-purple: #7C3AED;
+  --accent-teal: #0D9488;
+  --accent-blue-dim: rgba(37, 99, 235, 0.08);
+  --accent-purple-dim: rgba(124, 58, 237, 0.08);
+  --accent-red-dim: rgba(220, 38, 38, 0.08);
+  --accent-green-glow: rgba(16, 185, 129, 0.35);
+  --accent-red-glow: rgba(220, 38, 38, 0.25);
+  --accent-gray: #6B7280;
+  --accent-gray-dim: rgba(107, 114, 128, 0.12);
+  --gradient-accent: linear-gradient(135deg, #4D9168, #3D7A54);
+  --accent-blue-gradient: linear-gradient(135deg, #3B82F6, #1D4ED8);
+  --accent-green-gradient: linear-gradient(135deg, #10B981, #059669);
+  --accent-red-gradient: linear-gradient(135deg, #EF4444, #DC2626);
+  --accent-purple-gradient: linear-gradient(135deg, #8B5CF6, #7C3AED);
+  --accent-teal-gradient: linear-gradient(135deg, #14B8A6, #0D9488);
+  --hover-overlay: rgba(0, 0, 0, 0.04);
+  --bg-overlay: rgba(255, 255, 255, 0.94);
+  --overlay-bg: rgba(0, 0, 0, 0.4);
+  --nav-bg: rgba(255, 255, 255, 0.88);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.08);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.15);
+  --toggle-knob: #FFFFFF;
+  --disabled-bg: rgba(0, 0, 0, 0.06);
+  --disabled-text: rgba(0, 0, 0, 0.3);
+  --code-bg: rgba(0, 0, 0, 0.04);
+  --ring-blue: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 2px 8px rgba(0,0,0,0.03);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.05);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.05);
+  --shadow-xl: 0 8px 32px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.04);
+  --chat-bubble-ai: #F9FAFB;
+  --toast-success-bg: #ECFDF5;
+  --toast-success-border: rgba(77,145,104,0.3);
+  --toast-success-text: #4D9168;
+  --toast-error-bg: #FEF2F2;
+  --toast-error-border: rgba(220,38,38,0.3);
+  --toast-error-text: #DC2626;
+  --toast-info-bg: #EFF6FF;
+  --toast-info-border: rgba(37,99,235,0.3);
+  --toast-info-text: #2563EB;
+  --toast-warning-bg: #FFFBEB;
+  --toast-warning-border: rgba(210,153,34,0.3);
+  --toast-warning-text: #B45309;
+}
+
+/* ========== CSS VARIABLES — 温暖风主题 ========== */
+[data-theme="warm"] {
+  --bg-base: #F5E0C8;
+  --bg-primary: #FFF8F0;
+  --bg-card: #FFFAF5;
+  --bg-card-hover: #FFF4E8;
+  --bg-input: #FFFAF5;
+  --bg-elevated: #FFF4E8;
+  --bg-elevated-hover: #F5E0C8;
+  --bg-user-bubble: #F5E0C8;
+  --border: rgba(139, 111, 71, 0.12);
+  --border-hover: rgba(139, 111, 71, 0.20);
+  --border-subtle: rgba(139, 111, 71, 0.06);
+  --text-primary: #3D2817;
+  --text-secondary: #8B6F47;
+  --text-tertiary: #B0987A;
+  --text-on-accent: #FFFFFF;
+  --accent-brand: #5D9A3E;
+  --accent-brand-hover: #4A7D31;
+  --accent-brand-dim: rgba(93, 154, 62, 0.10);
+  --accent-brand-glow: rgba(93, 154, 62, 0.18);
+  --accent-amber: var(--accent-brand);
+  --accent-amber-hover: var(--accent-brand-hover);
+  --accent-amber-dim: var(--accent-brand-dim);
+  --accent-amber-glow: var(--accent-brand-glow);
+  --accent-green: #84CC16;
+  --accent-green-dim: rgba(132, 204, 22, 0.10);
+  --accent-red: #B91C1C;
+  --accent-blue: #1D4ED8;
+  --accent-purple: #7E22CE;
+  --accent-teal: #0F766E;
+  --accent-blue-dim: rgba(29, 78, 216, 0.08);
+  --accent-purple-dim: rgba(126, 34, 206, 0.08);
+  --accent-red-dim: rgba(185, 28, 28, 0.08);
+  --accent-green-glow: rgba(132, 204, 22, 0.35);
+  --accent-red-glow: rgba(185, 28, 28, 0.25);
+  --accent-gray: #8B6F47;
+  --accent-gray-dim: rgba(139, 111, 71, 0.12);
+  --gradient-accent: linear-gradient(135deg, #5D9A3E, #4A7D31);
+  --accent-blue-gradient: linear-gradient(135deg, #3B82F6, #1D4ED8);
+  --accent-green-gradient: linear-gradient(135deg, #84CC16, #5D9A3E);
+  --accent-red-gradient: linear-gradient(135deg, #EF4444, #B91C1C);
+  --accent-purple-gradient: linear-gradient(135deg, #A855F7, #7E22CE);
+  --accent-teal-gradient: linear-gradient(135deg, #14B8A6, #0F766E);
+  --hover-overlay: rgba(139, 111, 71, 0.06);
+  --bg-overlay: rgba(255, 248, 240, 0.94);
+  --overlay-bg: rgba(61, 40, 23, 0.4);
+  --nav-bg: rgba(255, 248, 240, 0.88);
+  --scrollbar-thumb: rgba(139, 111, 71, 0.12);
+  --scrollbar-thumb-hover: rgba(139, 111, 71, 0.22);
+  --toggle-knob: #FFFFFF;
+  --disabled-bg: rgba(139, 111, 71, 0.15);
+  --disabled-text: rgba(139, 111, 71, 0.45);
+  --code-bg: rgba(61, 40, 23, 0.05);
+  --ring-blue: 0 0 0 2px rgba(29, 78, 216, 0.2);
+  --shadow-xs: 0 1px 2px rgba(139,111,71,0.06);
+  --shadow-sm: 0 1px 3px rgba(139,111,71,0.08), 0 2px 8px rgba(139,111,71,0.04);
+  --shadow-md: 0 2px 8px rgba(139,111,71,0.10), 0 4px 16px rgba(139,111,71,0.06);
+  --shadow-lg: 0 4px 16px rgba(139,111,71,0.10), 0 8px 32px rgba(139,111,71,0.06);
+  --shadow-xl: 0 8px 32px rgba(139,111,71,0.10), 0 16px 48px rgba(139,111,71,0.06);
+  --chat-bubble-ai: #FFF4E8;
+  --toast-success-bg: #F0F9E8;
+  --toast-success-border: rgba(93,154,62,0.3);
+  --toast-success-text: #5D9A3E;
+  --toast-error-bg: #FEF2F2;
+  --toast-error-border: rgba(185,28,28,0.3);
+  --toast-error-text: #B91C1C;
+  --toast-info-bg: #EFF6FF;
+  --toast-info-border: rgba(29,78,216,0.3);
+  --toast-info-text: #1D4ED8;
+  --toast-warning-bg: #FFF7ED;
+  --toast-warning-border: rgba(210,153,34,0.3);
+  --toast-warning-text: #9A3412;
+}
+
+

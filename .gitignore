@@ -1,9 +1,64 @@
+# ========== Secrets (P0-T10 补全) ==========
+.env
+.env.local
+.env.*.local
+src/backend/.env
+.mcp.json
+cookies.json
+*.pem
+*.key
+
+# ========== Data ==========
+data/
+src/backend/data/
+*.db
+*.sqlite
+*.sqlite3
+chroma_data/
+
+# ========== Logs ==========
+*.log
+logs/
+
+# ========== Python ==========
 __pycache__/
 *.pyc
-.env
-*.db
-chroma_data/
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# ========== Node ==========
 node_modules/
 dist/
-.venv/
-*.log
+build/
+.npm/
+
+# ========== OS ==========
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ========== IDE ==========
+.trae/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ========== 临时文件 ==========
+临时/
+*.tmp
+*.bak
+
+# ========== 大文件 & 非源码资源 ==========
+数据库/
+screenshots/
+test-results/
+问题/
+ScholarMind-*.md
+*审计报告*.md
+*审计*.md
+AI产品.docx
+prototypes/

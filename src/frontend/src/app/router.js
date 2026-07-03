@@ -1,45 +1,83 @@
 import { state, watch } from './store.js';
 import { createElement } from '../utils/dom.js';
-import { HomePage } from '../pages/HomePage.js';
-import { ResearchTypePage } from '../pages/ResearchTypePage.js';
-import { ReadinessPage } from '../pages/ReadinessPage.js';
-import { AgentPage } from '../pages/AgentPage.js';
-import { SettingsPage } from '../pages/SettingsPage.js';
+import { iconGraduationCap } from '../utils/icons.js';
 
 function NotFoundPage() {
-  const page = createElement('div', { className: 'page active', style: 'text-align:center;padding:60px 20px;' });
-  page.appendChild(createElement('h1', { style: 'font-size:4rem;color:var(--text-tertiary);margin-bottom:16px;' }, '404'));
-  page.appendChild(createElement('p', { style: 'font-size:1.1rem;color:var(--text-secondary);margin-bottom:8px;' }, '页面未找到'));
-  page.appendChild(createElement('p', { style: 'font-size:0.85rem;color:var(--text-tertiary);margin-bottom:24px;' }, '您访问的页面不存在，请检查URL是否正确'));
-  const homeBtn = createElement('button', { className: 'btn btn-primary', style: 'font-size:0.9rem;' }, '返回首页');
+  const page = createElement('div', { className: 'page active not-found-page' });
+  const wrap = createElement('div', { className: 'not-found-wrap' });
+  wrap.innerHTML =
+    '<div class="not-found-icon">' + iconGraduationCap(64) + '</div>' +
+    '<h1 class="not-found-code">404</h1>' +
+    '<p class="not-found-title">页面未找到</p>' +
+    '<p class="not-found-desc">您访问的页面不存在，可能已被移除或链接错误</p>';
+  const homeBtn = createElement('button', { className: 'btn btn-primary not-found-btn' }, '返回首页');
   homeBtn.addEventListener('click', () => navigateTo('homepage'));
-  page.appendChild(homeBtn);
+  wrap.appendChild(homeBtn);
+  page.appendChild(wrap);
   return page;
 }
 
-const routes = {
-  'homepage':       { title: 'ScholarMind', render: HomePage },
-  'engineering':    { title: '工科',   render: ResearchTypePage, props: { discipline: 'engineering' } },
-  'science':        { title: '理科',   render: ResearchTypePage, props: { discipline: 'science' } },
-  'humanities':     { title: '人文社科', render: ResearchTypePage, props: { discipline: 'humanities' } },
-  'readiness':      { title: '研究准备度',              render: ReadinessPage },
-  'researcher':     { title: '研究员对话',              render: AgentPage, props: { agentId: 'researcher' } },
-  'reviewer':       { title: '审查员对话',              render: AgentPage, props: { agentId: 'reviewer' } },
-  'architect':      { title: '架构师对话',              render: AgentPage, props: { agentId: 'architect' } },
-  'synthesizer':    { title: '综述员对话',              render: AgentPage, props: { agentId: 'synthesizer' } },
-  'polisher':       { title: '润色员对话',              render: AgentPage, props: { agentId: 'polisher' } },
-  'custom-agent':   { title: '自定义Agent',            render: AgentPage, props: { agentId: 'custom' } },
-  'settings':       { title: '设置',                  render: SettingsPage },
+// Code-split page loaders — each page dynamically imported
+const pageLoaders = {
+  'homepage':       () => import('../pages/HomePage.js').then(m => m.HomePage),
+  'engineering':    () => import('../pages/ResearchTypePage.js').then(m => m.ResearchTypePage),
+  'science':        () => import('../pages/ResearchTypePage.js').then(m => m.ResearchTypePage),
+  'humanities':     () => import('../pages/ResearchTypePage.js').then(m => m.ResearchTypePage),
+  'interdisciplinary': () => import('../pages/ResearchTypePage.js').then(m => m.ResearchTypePage),
+  'readiness':      () => import('../pages/ReadinessPage.js').then(m => m.ReadinessPage),
+  'researcher':     () => import('../pages/AgentPage.js').then(m => m.AgentPage),
+  'reviewer':       () => import('../pages/AgentPage.js').then(m => m.AgentPage),
+  'architect':      () => import('../pages/AgentPage.js').then(m => m.AgentPage),
+  'synthesizer':    () => import('../pages/AgentPage.js').then(m => m.AgentPage),
+  'polisher':       () => import('../pages/AgentPage.js').then(m => m.AgentPage),
+  'custom-agent':   () => import('../pages/AgentPage.js').then(m => m.AgentPage),
+  'external-reviewer': () => import('../pages/AgentPage.js').then(m => m.AgentPage),
+  'settings':       () => import('../pages/SettingsPage.js').then(m => m.SettingsPage),
+  'auth':           () => import('../pages/AuthPage.js').then(m => m.AuthPage),
+  'pricing':        () => import('../pages/PricingPage.js').then(m => m.PricingPage),
+  'writing':        () => import('../pages/WritingWorkspace.js').then(m => m.WritingWorkspace),
+  'computational':  () => import('../pages/ComputationalPage.js').then(m => m.ComputationalPage),
 };
 
+const routes = {
+  'homepage':       { title: 'ScholarMind', props: {} },
+  'engineering':    { title: '工科',     props: { discipline: 'engineering' } },
+  'science':        { title: '理科',     props: { discipline: 'science' } },
+  'humanities':     { title: '人文社科', props: { discipline: 'humanities' } },
+  'interdisciplinary': { title: '交叉学科', props: { discipline: 'interdisciplinary' } },
+  'readiness':      { title: '研究准备度', props: {} },
+  'researcher':     { title: '研究员对话', props: { agentId: 'researcher' } },
+  'reviewer':       { title: '审查员对话', props: { agentId: 'reviewer' } },
+  'architect':      { title: '架构师对话', props: { agentId: 'architect' } },
+  'synthesizer':    { title: '综述员对话', props: { agentId: 'synthesizer' } },
+  'polisher':       { title: '润色员对话', props: { agentId: 'polisher' } },
+  'custom-agent':   { title: '自定义Agent', props: { agentId: 'custom' } },
+  'external-reviewer': { title: '外审专家对话', props: { agentId: 'external_reviewer' } },
+  'settings':       { title: '设置', props: {} },
+  'auth':           { title: '登录', props: {} },
+  'pricing':        { title: '套餐', props: {} },
+  'writing':        { title: '写作工作台', props: {} },
+  'computational':  { title: '计算社会科学', props: {} },
+};
+
+// Track navigation direction for transitions
+let navDirection = 0; // -1=backward, 0=same, 1=forward
+let prevPageId = 'homepage';
+
 export function navigateTo(pageId, extraState = {}) {
-  // 先将额外状态写入 state（不触发页面切换）
   Object.assign(state, extraState);
-  // 仅通过 hash 驱动导航，让 hashchange 事件统一驱动渲染
+  // Determine navigation direction for transition
+  const pageOrder = Object.keys(routes);
+  const prevIdx = pageOrder.indexOf(prevPageId);
+  const newIdx = pageOrder.indexOf(pageId);
+  navDirection = (newIdx > prevIdx) ? 1 : (newIdx < prevIdx) ? -1 : 0;
+  prevPageId = pageId;
   window.location.hash = pageId;
 }
 
 export function initRouter(container) {
+  let currentCleanup = null;
+
   const renderCurrent = () => {
     const pageId = state.currentPage;
     const route = routes[pageId];
@@ -52,30 +90,93 @@ export function initRouter(container) {
     document.title = route.title === 'ScholarMind' ? 'ScholarMind' : route.title + ' · ScholarMind';
 
     const currentPage = container.querySelector('.page.active');
-    if (currentPage) {
-      currentPage.style.opacity = '0';
-      currentPage.style.transition = 'opacity 0.15s ease';
-      setTimeout(() => {
-        container.innerHTML = '';
-        const newPage = route.render(route.props || {});
-        newPage.style.opacity = '0';
-        container.appendChild(newPage);
-        requestAnimationFrame(() => {
-          newPage.style.transition = 'opacity 0.2s ease';
-          newPage.style.opacity = '1';
-        });
-      }, 150);
-    } else {
+    // Cleanup previous page
+    if (currentCleanup) { try { currentCleanup(); } catch(e) {}; currentCleanup = null; }
+
+    const loader = pageLoaders[pageId];
+    if (!loader) {
       container.innerHTML = '';
-      container.appendChild(route.render(route.props || {}));
+      container.appendChild(NotFoundPage());
+      return;
     }
+
+    // Show loading indicator for slow pages
+    let loadingEl = null;
+    const loadingTimer = setTimeout(() => {
+      loadingEl = createElement('div', { className: 'page-loading' });
+      loadingEl.innerHTML = '<div class="page-loading-spinner"></div><p>加载中...</p>';
+      container.appendChild(loadingEl);
+    }, 150);
+
+    loader().then(renderFn => {
+      clearTimeout(loadingTimer);
+      if (loadingEl && loadingEl.parentNode) loadingEl.remove();
+
+      const newPage = renderFn(route.props || {});
+      newPage.style.opacity = '0';
+      newPage.style.transition = 'opacity 0.2s ease, transform 0.25s ease';
+
+      // Directional transition
+      if (navDirection !== 0 && currentPage) {
+        const slideX = navDirection > 0 ? '24px' : '-24px';
+        newPage.style.transform = 'translateX(' + slideX + ')';
+      }
+
+      container.appendChild(newPage);
+
+      if (currentPage) {
+        currentPage.style.transition = 'opacity 0.18s ease, transform 0.22s ease';
+        currentPage.style.opacity = '0';
+        if (navDirection !== 0) {
+          const slideX = navDirection > 0 ? '-24px' : '24px';
+          currentPage.style.transform = 'translateX(' + slideX + ')';
+        }
+
+        const onTransitionEnd = (e) => {
+          if (e.target !== currentPage) return;
+          currentPage.removeEventListener('transitionend', onTransitionEnd);
+          if (currentPage.parentNode) currentPage.remove();
+        };
+        currentPage.addEventListener('transitionend', onTransitionEnd);
+
+        // Safety timeout in case transitionend never fires
+        setTimeout(() => {
+          currentPage.removeEventListener('transitionend', onTransitionEnd);
+          if (currentPage.parentNode) currentPage.remove();
+        }, 500);
+
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            newPage.style.opacity = '1';
+            newPage.style.transform = 'translateX(0)';
+          });
+        });
+      } else {
+        requestAnimationFrame(() => {
+          newPage.style.opacity = '1';
+          newPage.style.transform = 'translateX(0)';
+        });
+      }
+
+      // Store cleanup function
+      if (newPage._cleanup) {
+        currentCleanup = newPage._cleanup;
+      }
+    }).catch(err => {
+      clearTimeout(loadingTimer);
+      if (loadingEl && loadingEl.parentNode) loadingEl.remove();
+      console.error('Page load failed:', pageId, err);
+      if (currentPage) currentPage.remove();
+      container.innerHTML = '';
+      container.appendChild(NotFoundPage());
+    });
   };
 
   renderCurrent();
 
   window.addEventListener('hashchange', () => {
     const pageId = window.location.hash.slice(1) || 'homepage';
-    state.currentPage = pageId;  // watch('currentPage') 会自动触发 renderCurrent()
+    state.currentPage = pageId;
   });
 
   watch('currentPage', () => renderCurrent());

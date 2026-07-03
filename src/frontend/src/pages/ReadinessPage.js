@@ -2,12 +2,13 @@ import { createElement } from '../utils/dom.js';
 import { state } from '../app/store.js';
 import { navigateTo } from '../app/router.js';
 import { AGENTS } from '../utils/constants.js';
+import { renderIcon, iconArrowLeft } from '../utils/icons.js';
 
 const levels = [
-  { id: 'exploring', emoji: '🔍', label: '探索阶段', desc: '刚确定研究方向，正在寻找选题' },
-  { id: 'planning', emoji: '✍️', label: '规划阶段', desc: '已有研究方向，正在设计研究方案' },
-  { id: 'writing', emoji: '📝', label: '写作阶段', desc: '已完成研究，正在撰写论文' },
-  { id: 'revising', emoji: '🔄', label: '修改阶段', desc: '论文初稿完成，需要进行修改润色' },
+  { id: 'exploring', icon: 'search', label: '探索阶段', desc: '刚确定研究方向，正在寻找选题' },
+  { id: 'planning', icon: 'edit', label: '规划阶段', desc: '已有研究方向，正在设计研究方案' },
+  { id: 'writing', icon: 'pen', label: '写作阶段', desc: '已完成研究，正在撰写论文' },
+  { id: 'revising', icon: 'refresh', label: '修改阶段', desc: '论文初稿完成，需要进行修改润色' },
 ];
 
 const agentShortDescs = {
@@ -21,52 +22,62 @@ const agentShortDescs = {
 export function ReadinessPage() {
   const page = createElement('div', { className: 'page active' });
 
-  const header = createElement('div', { className: 'hero-section', style: 'padding-top:30px;padding-bottom:10px;' },
-    createElement('h2', { className: 'hero-title', style: 'font-size:1.6rem;' }, '研究准备度'),
-    createElement('p', { className: 'hero-subtitle' }, '你目前处于研究的哪个阶段？'),
-  );
-  page.appendChild(header);
-
-  // Back to research type selection
-  const backLink = createElement('div', { style: 'text-align:center;padding-bottom:16px;' },
-    createElement('button', {
-      className: 'btn btn-outline',
-      style: 'font-size:0.82rem;',
-    }, '← 返回选择研究类型'),
-  );
-  backLink.querySelector('button').addEventListener('click', () => {
+  // 返回按钮移至 header 左侧
+  const backBtn = createElement('button', { className: 'btn btn-outline btn-back', 'aria-label': '返回选择研究类型' });
+  backBtn.innerHTML = iconArrowLeft(16) + ' 返回选择研究类型';
+  backBtn.addEventListener('click', () => {
     navigateTo(state.discipline || 'homepage');
   });
-  page.appendChild(backLink);
 
-  const levelCards = createElement('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:420px;margin:0 auto;padding:0 24px;' });
+  const header = createElement('div', { className: 'page-header' },
+    backBtn,
+    createElement('h2', { className: 'page-header-title' }, '研究准备度'),
+    createElement('p', { className: 'page-header-subtitle' }, '你目前处于研究的哪个阶段？'),
+  );
+  // P1-2: 步骤进度指示器
+  const steps = createElement('div', { className: 'step-progress' },
+    createElement('span', { className: 'step-progress-item done' }, '① 学科'),
+    createElement('span', { className: 'step-progress-sep' }, '▸'),
+    createElement('span', { className: 'step-progress-item done' }, '② 研究类型'),
+    createElement('span', { className: 'step-progress-sep' }, '▸'),
+    createElement('span', { className: 'step-progress-item current' }, '③ 准备度'),
+    createElement('span', { className: 'step-progress-sep' }, '▸'),
+    createElement('span', { className: 'step-progress-item' }, '④ 开始研究'),
+  );
+  page.appendChild(header);
+  page.appendChild(steps);
+
+  const levelCards = createElement('div', { className: 'level-cards-grid' });
   levels.forEach(l => {
-    const card = createElement('div', { className: 'theme-card' },
-      createElement('div', { style: 'font-size:1.4rem;margin-bottom:8px;' }, l.emoji),
+    const card = createElement('div', { className: 'radio-card level-card', role: 'button', tabindex: '0', 'aria-label': l.label },
+      createElement('div', { className: 'level-card-icon', innerHTML: renderIcon(l.icon, 28) }),
       createElement('div', { className: 'memory-title' }, l.label),
       createElement('div', { className: 'memory-meta' }, l.desc),
     );
-    card.addEventListener('click', () => {
+    const select = () => {
       state.readiness = l.id;
       if (state.researchType) {
         navigateTo('researcher');
       } else {
         navigateTo(state.discipline || 'homepage');
       }
-    });
+    };
+    card.addEventListener('click', select);
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); } });
     levelCards.appendChild(card);
   });
   page.appendChild(levelCards);
 
-  const agentSection = createElement('div', { style: 'text-align:center;padding:16px 24px 30px;' },
-    createElement('p', { style: 'color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px;' },
-      '或直接选择一位AI助手开始对话'),
+  // 过渡分隔区
+  const agentSection = createElement('div', { className: 'agent-quick-section' },
+    createElement('div', { className: 'agent-quick-divider' }),
+    createElement('p', { className: 'agent-quick-hint' }, '或直接选择一位AI助手开始对话'),
   );
-  const agentGrid = createElement('div', { style: 'display:flex;gap:10px;justify-content:center;flex-wrap:wrap;' });
+  const agentGrid = createElement('div', { className: 'agent-quick-grid' });
   AGENTS.forEach(a => {
-    const btn = createElement('button', { className: 'btn btn-outline', style: 'font-size:0.8rem;line-height:1.3;text-align:center;' },
-      createElement('div', {}, a.name),
-      createElement('div', { style: 'font-size:0.7rem;color:var(--text-tertiary);' }, agentShortDescs[a.id] || a.desc),
+    const btn = createElement('button', { className: 'btn btn-outline agent-quick-btn', 'aria-label': a.name },
+      createElement('div', { className: 'agent-quick-name' }, a.name),
+      createElement('div', { className: 'agent-quick-desc' }, agentShortDescs[a.id] || a.desc),
     );
     btn.addEventListener('click', () => navigateTo(a.id));
     agentGrid.appendChild(btn);

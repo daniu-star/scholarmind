@@ -1,11 +1,14 @@
 import { createElement } from '../utils/dom.js';
 import { state } from '../app/store.js';
 import { navigateTo } from '../app/router.js';
+import { RESEARCH_TYPE_ICONS, iconArrowLeft, iconClipboardCheck } from '../utils/icons.js';
+import { showPaperWorkbenchDialog } from '../components/PaperWorkbenchDialog.js';
 
 const disciplineLabels = {
   engineering: '工科',
   science: '理科',
   humanities: '人文社科',
+  interdisciplinary: '交叉学科',
 };
 
 const researchTypes = {
@@ -27,43 +30,76 @@ const researchTypes = {
     { id: 'historical', name: '历史研究', desc: '文献考据、历史比较分析' },
     { id: 'critical', name: '批判研究', desc: '理论批判、话语分析、文化研究' },
   ],
+  interdisciplinary: [
+    { id: 'computational_social', name: '计算社科', desc: '计算方法研究社会现象' },
+    { id: 'multi_method', name: '多方法融合', desc: '整合质性量化与计算方法' },
+    { id: 'computational_modeling', name: '计算建模', desc: '构建跨学科计算模型' },
+    { id: 'mixed_methods', name: '混合方法', desc: '融合不同学科方法体系' },
+  ],
 };
 
 export function ResearchTypePage({ discipline } = {}) {
   const page = createElement('div', { className: 'page active' });
 
-  const header = createElement('div', { className: 'hero-section', style: 'padding-top:30px;padding-bottom:10px;' },
-    createElement('h2', { className: 'hero-title', style: 'font-size:1.6rem;' },
+  // 返回按钮移至 header 左侧
+  const backBtn = createElement('button', { className: 'btn btn-outline btn-back', 'aria-label': '返回首页' });
+  backBtn.innerHTML = iconArrowLeft(16) + ' 返回首页';
+  backBtn.addEventListener('click', () => navigateTo('homepage'));
+
+  const header = createElement('div', { className: 'page-header' },
+    backBtn,
+    createElement('h2', { className: 'page-header-title' },
       disciplineLabels[discipline] || '选择学科'),
-    createElement('p', { className: 'hero-subtitle' }, '选择你的研究类型，以便ScholarMind提供更精准的引导'),
+    createElement('p', { className: 'page-header-subtitle' }, '选择你的研究类型，以便ScholarMind提供更精准的引导'),
+  );
+  // P1-2: 步骤进度指示器
+  const steps = createElement('div', { className: 'step-progress' },
+    createElement('span', { className: 'step-progress-item done' }, '① 学科'),
+    createElement('span', { className: 'step-progress-sep' }, '▸'),
+    createElement('span', { className: 'step-progress-item current' }, '② 研究类型'),
+    createElement('span', { className: 'step-progress-sep' }, '▸'),
+    createElement('span', { className: 'step-progress-item' }, '③ 准备度'),
+    createElement('span', { className: 'step-progress-sep' }, '▸'),
+    createElement('span', { className: 'step-progress-item' }, '④ 开始研究'),
   );
   page.appendChild(header);
+  page.appendChild(steps);
 
   const types = researchTypes[discipline] || [];
-  const grid = createElement('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:12px;justify-content:center;padding:0 24px;max-width:960px;margin:0 auto;' });
+  const grid = createElement('div', { className: 'research-type-grid' });
 
   types.forEach(t => {
-    const card = createElement('div', { className: 'card', style: 'text-align:left;' },
+    const iconFn = RESEARCH_TYPE_ICONS[t.id];
+    const iconWrap = createElement('div', { className: 'card-icon', innerHTML: iconFn ? iconFn(24) : '' });
+    const card = createElement('div', { className: 'card research-type-card', role: 'button', tabindex: '0', 'aria-label': t.name },
+      iconWrap,
       createElement('div', { className: 'card-title' }, t.name),
       createElement('div', { className: 'card-desc' }, t.desc),
     );
-    card.addEventListener('click', () => {
+    const select = () => {
       state.researchType = t.id;
       navigateTo('readiness');
-    });
+    };
+    card.addEventListener('click', select);
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); } });
     grid.appendChild(card);
   });
 
   page.appendChild(grid);
 
-  const backLink = createElement('div', { style: 'text-align:center;padding:20px 24px 40px;' },
-    createElement('button', {
-      className: 'btn btn-outline',
-      style: 'font-size:0.85rem;',
-    }, '← 返回首页'),
+  // ── 底部工具栏：论文工作台 ──
+  const toolbar = createElement('div', { className: 'home-bottom-toolbar' });
+  const wbBtn = createElement('div', { className: 'home-toolbar-btn accent-teal' },
+    createElement('div', { className: 'home-toolbar-btn-icon', innerHTML: iconClipboardCheck(24) }),
+    createElement('div', { className: 'home-toolbar-btn-body' },
+      createElement('div', { className: 'home-toolbar-btn-name' }, '论文工作台'),
+      createElement('div', { className: 'home-toolbar-btn-desc' }, '上传审稿 · 一键生成 · Pipeline 驱动'),
+    ),
+    createElement('div', { className: 'home-toolbar-btn-arrow' }, '→'),
   );
-  backLink.querySelector('button').addEventListener('click', () => navigateTo('homepage'));
-  page.appendChild(backLink);
+  wbBtn.addEventListener('click', () => showPaperWorkbenchDialog());
+  toolbar.appendChild(wbBtn);
+  page.appendChild(toolbar);
 
   return page;
 }
