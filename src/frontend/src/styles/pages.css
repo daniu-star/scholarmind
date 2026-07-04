@@ -12,7 +12,7 @@
   color: var(--text-on-accent);
   font-family: var(--font-serif); font-size: 1.5rem; font-weight: 700;
   margin-bottom: 24px;
-  box-shadow: 0 4px 24px rgba(77, 145, 104, 0.25);
+  box-shadow: 0 4px 24px var(--accent-brand-glow);
   transition: transform var(--transition-normal);
 }
 .hero-logo:hover { transform: scale(1.05); }

@@ -1,64 +1,64 @@
-/* ========== CSS VARIABLES — 学术暖暗色主题 (UI/UX Pro Max 优化) ========== */
+/* ========== CSS VARIABLES — 学术暖暗色主题 (对齐原型 interactive-prototype.html) ========== */
 :root {
-  /* 背景层次 — 暖色基底，营造学术沉稳氛围 */
-  --bg-base: #0B0F14;
+  /* 背景层次 — 使用原型 gray 阶梯，暖灰色基调 */
+  --bg-base: #0D1117;
   --bg-primary: #0F1419;
-  --bg-card: #151B22;
-  --bg-card-hover: #1A2129;
-  --bg-input: #11171E;
-  --bg-elevated: #181F28;
-  --bg-elevated-hover: #1E2630;
-  --bg-user-bubble: #19212A;
-  /* 边框 — 降低不透明度，减少"框格感" */
-  --border: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.10);
-  --border-subtle: rgba(255, 255, 255, 0.04);
-  /* 品牌色（学术绿 — 微调饱和度与亮度，更显沉稳专业） */
-  --accent-brand: #4D9168;
-  --accent-brand-hover: #3D7A54;
-  --accent-brand-dim: rgba(77, 145, 104, 0.10);
-  --accent-brand-glow: rgba(77, 145, 104, 0.18);
-  /* 向后兼容别名 */
+  --bg-card: #1A1F26;
+  --bg-card-hover: #1E242C;
+  --bg-input: #0F1419;
+  --bg-elevated: #1E242C;
+  --bg-elevated-hover: #2A3038;
+  --bg-user-bubble: #1E242C;
+  /* 边框 */
+  --border: #2A3038;
+  --border-hover: #3A414A;
+  --border-subtle: #1E242C;
+  /* 品牌色（Task 3.1：深色主题品牌色为琥珀黄 #F59E0B，与浅色主题绿色区分） */
+  --accent-brand: #F59E0B;
+  --accent-brand-hover: #D97706;
+  --accent-brand-dim: rgba(245, 158, 11, 0.12);
+  --accent-brand-glow: rgba(245, 158, 11, 0.20);
+  /* 向后兼容别名 — 现在真正指向琥珀色 */
   --accent-amber: var(--accent-brand);
   --accent-amber-hover: var(--accent-brand-hover);
   --accent-amber-dim: var(--accent-brand-dim);
   --accent-amber-glow: var(--accent-brand-glow);
-  /* 独立翠绿 — 成功状态 */
+  /* 独立翠绿 — 成功状态（保留，与原型一致） */
   --accent-green: #3FB950;
   --accent-green-dim: rgba(63, 185, 80, 0.10);
   --accent-red: #D05A52;
-  --accent-blue: #5C9CE6;
+  --accent-blue: #4A8AD4;
   --accent-purple: #9B85C8;
   --accent-teal: #52B8AE;
   /* 语义消费层 */
   --color-brand: var(--accent-brand);
   --color-brand-hover: var(--accent-brand-hover);
   --color-success: var(--accent-green);
-  --color-warning: #D29922;
+  --color-warning: #F59E0B;
   --color-danger: var(--accent-red);
   --color-info: var(--accent-blue);
   /* 辅助强调色 dim 背景 */
-  --accent-blue-dim: rgba(92, 156, 230, 0.10);
+  --accent-blue-dim: rgba(74, 138, 212, 0.10);
   --accent-purple-dim: rgba(155, 133, 200, 0.10);
   --accent-red-dim: rgba(208, 90, 82, 0.10);
   /* 辅助强调色 glow 边框 */
   --accent-green-glow: rgba(63, 185, 80, 0.35);
   --accent-red-glow: rgba(208, 90, 82, 0.25);
   /* 灰色辅助色 */
-  --accent-gray: #8B949E;
-  --accent-gray-dim: rgba(139, 148, 158, 0.12);
-  /* 渐变 — 更细微的过渡（仅用于大尺寸元素） */
-  --gradient-accent: linear-gradient(135deg, #4D9168, #3D7A54);
-  --accent-blue-gradient: linear-gradient(135deg, #58A6FF, #1F6FEB);
+  --accent-gray: #8E98A2;
+  --accent-gray-dim: rgba(142, 152, 162, 0.12);
+  /* 渐变 — 使用琥珀色系 */
+  --gradient-accent: linear-gradient(135deg, #F59E0B, #D97706);
+  --accent-blue-gradient: linear-gradient(135deg, #4A8AD4, #1976D2);
   --accent-green-gradient: linear-gradient(135deg, #3FB950, #238636);
   --accent-red-gradient: linear-gradient(135deg, #D05A52, #B8443C);
   --accent-purple-gradient: linear-gradient(135deg, #9B85C8, #7B68AE);
   --accent-teal-gradient: linear-gradient(135deg, #52B8AE, #3A9B91);
-  /* 文字 — 微调对比度与暖度 */
-  --text-primary: #E6EDF3;
-  --text-secondary: #96A0AD;
-  --text-tertiary: #6E7A8A;
-  --text-on-accent: #FFFFFF;
+  /* 文字 — 使用原型 gray 阶梯 */
+  --text-primary: #E8EEF4;
+  --text-secondary: #8E98A2;
+  --text-tertiary: #8B939D;
+  --text-on-accent: #0F1419;
   /* 交互叠加层 */
   --hover-overlay: rgba(255, 255, 255, 0.05);
   --bg-overlay: rgba(15, 20, 28, 0.92);
@@ -67,11 +67,11 @@
   --scrollbar-thumb: rgba(255, 255, 255, 0.08);
   --scrollbar-thumb-hover: rgba(255, 255, 255, 0.14);
   /* toggle / disabled */
-  --toggle-knob: #E6EDF3;
-  --disabled-bg: rgba(139, 148, 158, 0.25);
-  --disabled-text: rgba(139, 148, 158, 0.5);
+  --toggle-knob: #E8EEF4;
+  --disabled-bg: rgba(142, 152, 162, 0.25);
+  --disabled-text: rgba(142, 152, 162, 0.5);
   --code-bg: rgba(0, 0, 0, 0.25);
-  --ring-blue: 0 0 0 2px rgba(92, 156, 230, 0.2);
+  --ring-blue: 0 0 0 2px rgba(74, 138, 212, 0.2);
   /* 内容宽度 */
   --content-narrow: 680px;
   --content-normal: 880px;
