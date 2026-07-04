@@ -1,5 +1,5 @@
 {
-  "buildCommand": "mkdir -p dist && cp prototypes/interactive-prototype.html dist/index.html && cp prototypes/icons.browser.js dist/ && cp -r prototypes/assets dist/",
+  "buildCommand": "rm -rf dist && mkdir -p dist && cp prototypes/interactive-prototype.html dist/index.html && cp prototypes/icons.browser.js dist/ && cp -r prototypes/assets dist/",
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
