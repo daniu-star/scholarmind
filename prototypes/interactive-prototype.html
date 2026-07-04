@@ -10236,8 +10236,8 @@ window.addEventListener('DOMContentLoaded', () => {
     currentResearchType = savedState.researchType || currentResearchType;
     currentResearchTypeName = savedState.researchTypeName || currentResearchTypeName;
   }
-  // 默认首屏改为 landing（产品介绍页）；保留对 savedState.currentPage 的兼容
-  const pageId = hashPageId || (savedState && savedState.currentPage) || 'landing';
+  // 默认首屏强制为 landing（产品介绍页）；忽略 savedState 中的旧页面
+  const pageId = hashPageId || 'landing';
   navigateTo(pageId);
 });
 
