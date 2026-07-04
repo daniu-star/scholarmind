@@ -1,8 +1,8 @@
 """RAG index builder task — rebuilds ChromaDB from SQLite."""
 
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def rebuild_rag_index() -> dict:
@@ -11,8 +11,8 @@ def rebuild_rag_index() -> dict:
     This is a synchronous function called from Celery tasks.
     """
     try:
-        from ..services.db_service import get_db_service
-        from ..services.vector_service import VectorService
+        from src.backend.services.db_service import get_db_service
+        from src.backend.services.vector_service import VectorService
 
         db = get_db_service()
         vector = VectorService()

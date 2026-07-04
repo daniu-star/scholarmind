@@ -1,0 +1,44 @@
+{
+  "extends": "stylelint-config-recommended",
+  "rules": {
+    "color-no-hex": [true, { "severity": "warning" }],
+    "declaration-property-value-disallowed-list": {
+      "/.*/": ["initial", "unset"]
+    },
+    "declaration-property-value-allowed-list": {
+      "color": ["var(--*)", "currentColor", "inherit", "transparent"],
+      "background-color": ["var(--*)", "currentColor", "inherit", "transparent"],
+      "border-color": ["var(--*)", "currentColor", "inherit", "transparent"],
+      "border-top-color": ["var(--*)", "currentColor", "inherit", "transparent"],
+      "border-right-color": ["var(--*)", "currentColor", "inherit", "transparent"],
+      "border-bottom-color": ["var(--*)", "currentColor", "inherit", "transparent"],
+      "border-left-color": ["var(--*)", "currentColor", "inherit", "transparent"],
+      "fill": ["var(--*)", "currentColor", "inherit", "transparent"],
+      "stroke": ["var(--*)", "currentColor", "inherit", "transparent"],
+      "border-radius": ["var(--*)", "inherit", "0", "50%", "9999px"],
+      "padding": ["var(--*)", "inherit", "0"],
+      "margin": ["var(--*)", "inherit", "0", "auto"],
+      "gap": ["var(--*)", "inherit", "0"]
+    },
+    "length-zero-no-unit": true,
+    "declaration-block-no-duplicate-properties": true,
+    "no-duplicate-selectors": true,
+    "no-empty-source": true,
+    "comment-no-empty": true,
+    "block-no-empty": true,
+    "selector-pseudo-class-no-unknown": true,
+    "selector-pseudo-element-no-unknown": true,
+    "selector-type-no-unknown": [true, { "ignoreTypes": ["custom-elements"] }],
+    "string-no-newline": true,
+    "unit-no-unknown": true,
+    "property-no-unknown": true,
+    "keyframe-declaration-no-important": true,
+    "at-rule-no-unknown": [true, { "ignoreAtRules": ["font-face", "keyframes", "media", "supports", "import", "charset", "namespace", "page", "mixin", "include", "extend"] }]
+  },
+  "ignoreFiles": [
+    "node_modules/**",
+    "**/*.min.css",
+    "**/*.min.js",
+    "src/frontend/node_modules/**"
+  ]
+}

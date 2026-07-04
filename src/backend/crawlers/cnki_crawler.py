@@ -1,11 +1,11 @@
 """CNKI crawler adapter — reuses CNKIService search logic."""
 
-import logging
+import structlog
 from typing import Optional
 
 from .base import BaseCrawler
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Default hot keywords for CNKI crawling
 DEFAULT_HOT_KEYWORDS = [

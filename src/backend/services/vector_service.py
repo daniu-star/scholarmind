@@ -1,11 +1,11 @@
 """ChromaDB vector database service for semantic search over academic papers."""
 
-import logging
+import structlog
 from typing import Optional
 
 from ..config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class VectorService:
@@ -18,6 +18,8 @@ class VectorService:
         self._client = None
         self._collection = None
         self._embedding_fn = None
+        # 降级标记：嵌入模型加载失败时置为 True，检索质量可能下降
+        self.degraded = False
 
     def init(self):
         """Initialize ChromaDB client, embedding function, and collection."""
@@ -38,8 +40,10 @@ class VectorService:
                 )
             except Exception as e:
                 logger.warning(f"Failed to load sentence-transformers model: {e}")
+                logger.error("嵌入模型加载失败,ChromaDB 将使用默认嵌入,检索质量可能下降")
                 logger.info("Falling back to ChromaDB default embedding function")
                 self._embedding_fn = None
+                self.degraded = True
 
             # Get or create collection
             self._collection = self._client.get_or_create_collection(
@@ -57,7 +61,8 @@ class VectorService:
 
     @property
     def is_ready(self) -> bool:
-        return self._collection is not None
+        # 嵌入模型降级时视为未就绪，触发 RAG 关键词搜索回退
+        return self._collection is not None and not self.degraded
 
     def add_documents(self, documents: list[dict]):
         """Add documents to the vector collection.

@@ -5,12 +5,15 @@ ScholarMind 工作单元（Unit of Work）
 """
 from __future__ import annotations
 
+import structlog
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from .repository.conversation import ConversationRepository
 from .repository.skill import SkillRepository
 from .repository.chart import ChartRepository
+
+logger = structlog.get_logger(__name__)
 
 
 class UnitOfWork:
@@ -83,6 +86,4 @@ class UnitOfWork:
     @staticmethod
     def _report_rollback(exc_name: str) -> None:
         """记录回滚事件"""
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.debug("UnitOfWork rolled back due to exception", exception=exc_name)
+        logger.debug(f"UnitOfWork rolled back due to exception exception={exc_name}")

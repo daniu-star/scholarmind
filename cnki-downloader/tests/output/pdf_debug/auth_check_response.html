@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>知网研学 - 中转中...</title>
+  <style>
+    <style>html,
+    body {
+      margin: 0;
+      height: 100%;
+    }
+
+    .param-error-wrap {
+      min-height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      /* 先居中 */
+      padding-top: 8vh;
+      /* 再整体往上提一点 */
+      box-sizing: border-box;
+      background: #f5f7fb;
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #1f2a37;
+    }
+
+    .param-error-card {
+      width: min(680px, 88vw);
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      padding: 28px 32px;
+    }
+
+    .param-error-title {
+      margin: 0 0 16px;
+      font-size: 30px;
+      font-weight: 700;
+    }
+
+    .param-error-text {
+      margin: 0 0 12px;
+      font-size: 22px;
+      line-height: 1.8;
+    }
+
+    .param-error-missing {
+      color: #c81e1e;
+      font-weight: 600;
+    }
+  </style>
+  </style>
+</head>
+
+<body>
+  <script src="https://piccachex.cnki.net/dynamic/js/auth-check.js"></script>
+
+  <!-- <script>
+    // ✅ 获取 URL 参数
+    function getQueryString(url) {
+      return url.includes('?') ? url.split('?')[1] : '';
+    }
+
+    // ✅ 获取 cookie
+    function getCookie(name) {
+      return document.cookie
+        .split('; ')
+        .map(v => v.split('='))
+        .reduce((acc, [key, ...val]) => {
+          acc[key] = decodeURIComponent(val.join('='));
+          return acc;
+        }, {})[name] || null;
+    }
+    // https://xtest.cnki.net/web/page/auth-check?dbcode=CAPJ&tablename=CAPJLASTDAY&filename=HXQX20251117008&filesourcetype=1
+
+    // 先判断当前环境（防止 xDomain 未定义）
+    function getEnvConfig() {
+      const isXtest = window.location.host.includes('xtest.cnki');
+
+      return isXtest
+        ? {
+          gatewayDomain: 'https://xtest.cnki.net',
+          xDomain: 'https://xtest.cnki.net',
+          appid: 'REDIRECT_YX_RELEASE'
+        }
+        : {
+          gatewayDomain: 'https://gateway.cnki.net',
+          xDomain: 'https://x.cnki.net',
+          appid: 'REDIRECT_YX'
+        };
+    }
+
+    // 页面跳转封装
+    function redirect(url) {
+      window.location.href = url;
+    }
+
+    // 跳转逻辑
+    (async function init() {
+      const { gatewayDomain, xDomain, appid } = getEnvConfig();
+      const searchParams = new URLSearchParams(window.location.search);
+      const uid = searchParams.get('uid');
+      const redirecturl = searchParams.get('redirecturl');
+      const cookieToken = getCookie('LID');
+      const token = cookieToken || uid;
+      const params = searchParams.toString();
+      const loginUrl = `/web/page/redirect-yx?islogin=gologin&${params}`
+
+      // 🚫 未登录
+      if (!token) {
+        redirecturl ? redirect(redirecturl) : redirect(loginUrl)
+        return;
+      }
+
+      try {
+        // ✅ 请求登录类型
+        const res = await fetch(
+          `${gatewayDomain}/coreapi/api/credential/type?accesstoken=${token}&api-version=1&appid=${appid}`
+        );
+        const data = await res.json();
+        debugger
+        if (!data?.Success) {
+          redirect(loginUrl);
+          return;
+        }
+
+        const loginType = data?.Content?.LoginType;
+
+        // ❌ 非个人用户
+        if (['Organization', 'Unknown'].includes(loginType)) {
+          redirect(loginUrl);
+          return;
+        }
+
+        // ✅ 外部 uid 注入登录态
+        if (!cookieToken && uid) {
+          const target = redirecturl || encodeURIComponent(`${xDomain}/web/psmc`);
+          redirect(`${gatewayDomain}/coreapi/redirect?accesstoken=${token}&target=${target}&removeQuery=1`);
+          return;
+        }
+
+        // ✅ 正常跳转
+        redirect(`/web/page/redirect-yx?${params}`);
+      } catch (err) {
+        console.error('请求异常:', err);
+        redirect(loginUrl);
+      }
+    })()
+
+  </script> -->
+</body>
+
+</html>

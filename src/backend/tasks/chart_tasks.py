@@ -5,14 +5,14 @@ ScholarMind 异步图表生成任务
 from __future__ import annotations
 
 import uuid
-import logging
+import structlog
 from pathlib import Path
 from typing import Any
 
 from .celery_app import celery_app
 from ..config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)

@@ -1,0 +1,177 @@
+version: "3.9"
+
+services:
+  # ── Redis ────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cnki-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - cnki-net
+    restart: unless-stopped
+
+  # ── Master Node ──────────────────────────────────────
+  master:
+    build:
+      context: .
+      dockerfile: Dockerfile.master
+    container_name: cnki-master
+    ports:
+      - "8100:8100"
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - MASTER_PORT=8100
+      - MASTER_HOST=0.0.0.0
+      - STORAGE_BASE=/app/data
+      - LOG_LEVEL=INFO
+    volumes:
+      - cnki-pdfs:/app/data
+      - ./config:/app/config:ro
+    networks:
+      - cnki-net
+    restart: unless-stopped
+
+  # ── Worker: 新闻传播学 ────────────────────────────────
+  worker-news:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: cnki-worker-news
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DISCIPLINE=新闻传播学
+      - THREAD_COUNT=3
+      - PROXY_URL=http://host.docker.internal:7890
+      - PROXY_ENABLED=true
+      - STORAGE_BASE=/app/data
+      - LOG_LEVEL=INFO
+    volumes:
+      - cnki-pdfs:/app/data
+      - ./models:/app/models:ro
+      - ./sessions:/app/sessions
+    depends_on:
+      - redis
+      - master
+    networks:
+      - cnki-net
+    restart: unless-stopped
+
+  # ── Worker: 人工智能 ──────────────────────────────────
+  worker-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: cnki-worker-ai
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DISCIPLINE=人工智能
+      - THREAD_COUNT=3
+      - PROXY_URL=http://host.docker.internal:7890
+      - PROXY_ENABLED=true
+      - STORAGE_BASE=/app/data
+      - LOG_LEVEL=INFO
+    volumes:
+      - cnki-pdfs:/app/data
+      - ./models:/app/models:ro
+      - ./sessions:/app/sessions
+    depends_on:
+      - redis
+      - master
+    networks:
+      - cnki-net
+    restart: unless-stopped
+
+  # ── Worker: 人类学 ────────────────────────────────────
+  worker-anthropology:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: cnki-worker-anthropology
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DISCIPLINE=人类学
+      - THREAD_COUNT=3
+      - PROXY_URL=http://host.docker.internal:7890
+      - PROXY_ENABLED=true
+      - STORAGE_BASE=/app/data
+      - LOG_LEVEL=INFO
+    volumes:
+      - cnki-pdfs:/app/data
+      - ./models:/app/models:ro
+      - ./sessions:/app/sessions
+    depends_on:
+      - redis
+      - master
+    networks:
+      - cnki-net
+    restart: unless-stopped
+
+  # ── Worker: 计算机科学 ────────────────────────────────
+  worker-cs:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: cnki-worker-cs
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DISCIPLINE=计算机科学
+      - THREAD_COUNT=3
+      - PROXY_URL=http://host.docker.internal:7890
+      - PROXY_ENABLED=true
+      - STORAGE_BASE=/app/data
+      - LOG_LEVEL=INFO
+    volumes:
+      - cnki-pdfs:/app/data
+      - ./models:/app/models:ro
+      - ./sessions:/app/sessions
+    depends_on:
+      - redis
+      - master
+    networks:
+      - cnki-net
+    restart: unless-stopped
+
+  # ── Worker: 化学 ──────────────────────────────────────
+  worker-chemistry:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: cnki-worker-chemistry
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - DISCIPLINE=化学
+      - THREAD_COUNT=3
+      - PROXY_URL=http://host.docker.internal:7890
+      - PROXY_ENABLED=true
+      - STORAGE_BASE=/app/data
+      - LOG_LEVEL=INFO
+    volumes:
+      - cnki-pdfs:/app/data
+      - ./models:/app/models:ro
+      - ./sessions:/app/sessions
+    depends_on:
+      - redis
+      - master
+    networks:
+      - cnki-net
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  cnki-pdfs:
+
+networks:
+  cnki-net:
+    driver: bridge

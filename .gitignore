@@ -7,13 +7,21 @@ src/backend/.env
 cookies.json
 *.pem
 *.key
+*.p12
+*.pfx
+id_rsa*
+.netrc
+.npmrc
 
 # ========== Data ==========
 data/
 src/backend/data/
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
+*.sqlite-journal
 chroma_data/
 
 # ========== Logs ==========

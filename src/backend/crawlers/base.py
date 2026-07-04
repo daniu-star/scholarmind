@@ -3,7 +3,7 @@
 import asyncio
 import hashlib
 import json
-import logging
+import structlog
 import uuid
 import random
 from abc import ABC, abstractmethod
@@ -12,7 +12,7 @@ from typing import Optional
 
 from ..config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Common User-Agent strings for rotation
 USER_AGENTS = [

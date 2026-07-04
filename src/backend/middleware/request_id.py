@@ -15,7 +15,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
     功能：
     1. 从 X-Request-ID 请求头读取（透传）
-    2. 不存在则生成 UUID7
+    2. 不存在则生成 UUID4
     3. 注入到响应头 X-Request-ID
     4. 存储到 request.state.request_id
     """

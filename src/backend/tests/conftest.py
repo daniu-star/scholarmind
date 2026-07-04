@@ -4,6 +4,17 @@ ScholarMind 测试夹具
 """
 from __future__ import annotations
 
+import os
+
+# 测试环境: 禁用速率限制, 避免测试间互相触发 429
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+# P0 Task 3.9: 测试环境注入 JWT_SECRET_KEY（>=32 字符），避免 PyJWT 抛
+# InvalidKeyError("HMAC key must not be empty")。settings 在模块导入时读取该 env var。
+os.environ.setdefault(
+    "JWT_SECRET_KEY",
+    "test-secret-key-for-scholarmind-tests-min-32-characters-long",
+)
+
 import pytest
 import pytest_asyncio
 from typing import AsyncGenerator

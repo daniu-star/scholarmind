@@ -1,13 +1,14 @@
 """Celery scheduled tasks for academic resource crawling and maintenance."""
 
 import asyncio
-import logging
+import structlog
 import uuid
 from datetime import datetime
 
 from .celery_app import celery_app
+from ..models.orm import Order  # noqa: F401 — used in expire_stale_orders
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def _run_async(coro):
@@ -28,7 +29,7 @@ def _run_async(coro):
 
 def _get_crawler(source_db: str):
     """Get a crawler instance by source_db name."""
-    from ..crawlers import CRAWLERS
+    from src.backend.crawlers import CRAWLERS
     crawler_cls = CRAWLERS.get(source_db)
     if not crawler_cls:
         raise ValueError(f"Unknown source_db: {source_db}")
@@ -37,7 +38,7 @@ def _get_crawler(source_db: str):
 
 def _get_db_service():
     """Get the database service instance."""
-    from ..services.db_service import get_db_service
+    from src.backend.services.db_service import get_db_service
     return get_db_service()
 
 
@@ -154,7 +155,7 @@ def update_hot_keywords():
 @celery_app.task(name="src.backend.scheduler.tasks.cleanup_old_data")
 def cleanup_old_data():
     """Clean up resources older than the configured retention period."""
-    from ..config import settings
+    from src.backend.config import settings
     db = _get_db_service()
     deleted = db.cleanup_old_data(days=settings.CRAWL_DATA_RETENTION_DAYS)
     return {"deleted": deleted}
@@ -175,3 +176,34 @@ def crawl_by_keyword(source_db: str, keyword: str, count: int = 20):
         "items_found": len(results),
         "items_saved": items_saved,
     }
+
+
+@celery_app.task(name="src.backend.scheduler.tasks.expire_stale_orders")
+def expire_stale_orders():
+    """将超时的待支付订单标记为 expired，释放用户下单额度。
+
+    每小时运行一次，处理官方 API 和个人 QR 两种模式的过期订单。
+    """
+    async def _expire():
+        from src.backend.db.session import create_async_engine_from_url, create_async_sessionmaker_from_engine
+        from sqlalchemy import update
+        from datetime import datetime, timezone
+
+        engine = create_async_engine_from_url()
+        session_factory = create_async_sessionmaker_from_engine(engine)
+        async with session_factory() as db:
+            now = datetime.now(timezone.utc)
+            result = await db.execute(
+                update(Order)
+                .where(
+                    Order.status == "pending",
+                    Order.expires_at < now,
+                )
+                .values(status="expired")
+            )
+            await db.commit()
+            return result.rowcount
+
+    expired_count = _run_async(_expire())
+    logger.info(f"expire_stale_orders done expired_count={expired_count}")
+    return {"expired_count": expired_count}

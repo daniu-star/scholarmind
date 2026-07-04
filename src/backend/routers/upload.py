@@ -1,233 +1,379 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from fastapi.responses import PlainTextResponse
-from typing import List, Optional
+"""
+文件上传路由
+
+提供两个端点：
+- POST /upload/{session_id}  Agent 对话附件上传（多文件，字段名 files）
+- POST /upload                论文生成/修改链条文件上传（单文件，字段名 file）
+
+历史：
+P2-T2 死路由清理时误删了 upload 路由，但前端仍在调用，导致 404 被前端
+统一报为"后端未启动"。本文件恢复该路由，并对 docx/pdf 做文本解析，
+返回 text 字段供论文修改链条/外审专家卡片填充 paper_text。
+
+P0 Task 5.3-5.6 安全加固：
+- session_id 强校验（SESSION_ID_PATTERN），拒绝 ../、绝对路径、URL 编码穿越
+- 保存前 containment 检查（resolve().relative_to）
+- 原子落盘：先写 .part 再 rename，异常 finally 清理
+- 写入前检查 MAX_FILES_PER_SESSION，超限返回 413
+"""
+from __future__ import annotations
+
 import uuid
+import structlog
 from pathlib import Path
+from typing import Optional
+
+import magic
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, status
 
 from ..config import settings
+# P1 Task 12：上传端点改为强制鉴权（原 get_optional_user_id 允许匿名上传持久化文件）
+from ..core.dependencies import get_current_user
+from ..core.path_safety import validate_session_id, safe_session_path
+# Task 27: PDF/DOCX 文本抽取改用 utils/file_parser.py 公共实现
+from ..utils.file_parser import extract_pdf, extract_docx
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/upload", tags=["upload"])
 
-# File type to tag mapping
-TYPE_LABELS = {
-    'csv': '原始数据', 'xlsx': '数据表格', 'json': '数据文件',
-    'pdf': '研究文档', 'docx': '研究计划', 'md': '研究笔记',
-    'txt': '文本文件', 'r': 'R脚本', 'py': 'Python脚本',
-    'ipynb': 'Jupyter', 'tex': 'LaTeX', 'bib': '参考文献'
+# ── 文件扩展名分类（从 config.py ALLOWED_EXTENSIONS 派生）─────
+# 文本类：可直接 UTF-8 读取
+_TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".py", ".r", ".bib", ".tex"}
+# 二进制需解析
+_BINARY_EXTENSIONS = {".pdf", ".docx"}
+# 注: 新增格式需同步更新 config.py 的 ALLOWED_EXTENSIONS 白名单
+assert _TEXT_EXTENSIONS | _BINARY_EXTENSIONS <= {f".{e}" for e in settings.ALLOWED_EXTENSIONS}, \
+    "upload.py extension sets must be a subset of config.ALLOWED_EXTENSIONS"
+
+# 单文件大小上限（字节），对齐前端 20MB 限制
+_MAX_FILE_BYTES = settings.MAX_FILE_SIZE_MB * 1024 * 1024
+
+# ── 扩展名 → 预期 MIME 映射（Task 21 magic byte 校验）─────
+_EXT_TO_MIME: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".csv": "text/csv",
+    ".json": "application/json",
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".py": "text/x-python",
+    ".r": "text/x-r",
+    ".bib": "application/x-bibtex",
+    ".tex": "application/x-tex",
+    ".ipynb": "application/x-ipynb+json",
 }
 
-# 从全局配置读取参数
-ALLOWED_EXTENSIONS = settings.ALLOWED_EXTENSIONS
-MAX_FILE_SIZE = settings.MAX_FILE_SIZE_MB * 1024 * 1024
-MAX_FILES = settings.MAX_FILES_PER_SESSION
-MIN_FILES = 1  # 允许上传1个文件，不再强制5个
 
-UPLOAD_BASE = Path(settings.UPLOAD_DIR)
+def _validate_magic_byte(file_path: str, expected_ext: str) -> bool:
+    """通过 magic byte 校验文件实际类型与扩展名是否匹配（Task 21）
+
+    Args:
+        file_path: 落盘后的文件绝对路径
+        expected_ext: 期望扩展名（含点，小写，如 ".pdf"）
+
+    Returns:
+        True 表示匹配或允许通过；False 表示类型不匹配（疑似伪装）
+    """
+    expected_ext = (expected_ext or "").lower()
+    expected_mime = _EXT_TO_MIME.get(expected_ext)
+    if expected_mime is None:
+        # 未在映射表中登记的扩展名，跳过 magic 校验（不阻断已知白名单扩展名）
+        return True
+    try:
+        actual_mime = magic.from_file(file_path, mime=True) or ""
+    except Exception as e:
+        # magic 库不可用或读取失败：保守放行（已通过扩展名白名单 + 大小校验）
+        logger.warning(f"magic_check_unavailable file={file_path} error={e}")
+        return True
+
+    # text/* 灵活匹配（不同 OS/库对文本类返回 charset 差异大，统一前缀匹配）
+    if expected_mime.startswith("text/") and actual_mime.startswith("text/"):
+        return True
+    # application/json 兼容 text/plain（部分系统对 .json 返回 text/plain）
+    if expected_mime == "application/json" and actual_mime in {"application/json", "text/plain", "application/x-json"}:
+        return True
+    if expected_mime == actual_mime:
+        return True
+    # 部分系统对 .docx/.xlsx 等 ZIP 容器返回 application/zip，视为兼容
+    if expected_ext in {".docx", ".xlsx"} and actual_mime == "application/zip":
+        return True
+    return False
 
 
-def get_file_tag(filename: str, ext: str) -> str:
-    """Auto-classify file tag based on name and extension"""
-    lower = filename.lower()
-    if any(kw in lower for kw in ['计划', 'proposal', 'plan']):
-        return '研究计划'
-    if any(kw in lower for kw in ['设计', 'design']):
-        return '研究设计'
-    if ext in ['csv', 'xlsx', 'json']:
-        return '原始数据'
-    if ext == 'bib':
-        return '参考文献'
-    return '文档'
+def _sanitize_filename_for_log(filename: str) -> str:
+    """过滤文件名中的 CRLF，防止日志注入（Task 21）"""
+    return (filename or "").replace("\r", "").replace("\n", "")
 
 
-def _safe_session_path(session_id: str) -> Path:
-    """Validate session_id and return the upload directory path."""
-    if not session_id.replace("-", "").replace("_", "").isalnum():
-        raise HTTPException(status_code=400, detail="无效的 session_id")
-    return UPLOAD_BASE / session_id
+def _upload_root() -> Path:
+    """返回上传根目录（绝对路径，自动创建）"""
+    root = Path(settings.UPLOAD_DIR)
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _extract_text(fp: Path) -> str:
+    """从文件提取文本内容（文本类直接读，pdf/docx 调对应解析器）"""
+    ext = fp.suffix.lower()
+    try:
+        if ext in _TEXT_EXTENSIONS:
+            return fp.read_text(encoding="utf-8", errors="replace")
+        if ext == ".pdf":
+            # Task 27: 改用 utils/file_parser.py 公共实现
+            return extract_pdf(fp)
+        if ext == ".docx":
+            # Task 27: 改用 utils/file_parser.py 公共实现
+            return extract_docx(fp)
+    except Exception as e:
+        logger.warning(f"extract_text_failed file={fp.name} error={e}")
+        return ""
+    return ""
+
+
+def _validate_extension(filename: str) -> str:
+    """校验扩展名白名单，返回小写扩展名（含点），非法则抛 400"""
+    ext = Path(filename).suffix.lower()
+    if ext.lstrip(".") not in settings.ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "invalid_file_type",
+                "message": f"不支持的文件类型：{filename}",
+                "allowed_extensions": sorted(settings.ALLOWED_EXTENSIONS),
+            },
+        )
+    return ext
+
+
+def _validate_size(file_size: int) -> None:
+    """校验文件大小，超限抛 413"""
+    if file_size > _MAX_FILE_BYTES:
+        actual_mb = file_size / (1024 * 1024)
+        raise HTTPException(
+            # HTTP_413_CONTENT_TOO_LARGE (starlette 新名，旧名 REQUEST_ENTITY_TOO_LARGE 已弃用)
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "error": "file_too_large",
+                "message": f"文件大小 {actual_mb:.1f}MB 超过限制 {settings.MAX_FILE_SIZE_MB}MB",
+                "max_size_mb": settings.MAX_FILE_SIZE_MB,
+                "actual_size_mb": round(actual_mb, 2),
+            },
+        )
+
+
+def _count_existing_files(target_dir: Path) -> int:
+    """统计 target_dir 中已存在的文件数（排除 .part 临时文件与 .meta 等元数据）"""
+    if not target_dir.exists():
+        return 0
+    count = 0
+    for fp in target_dir.iterdir():
+        if fp.is_file() and not fp.name.endswith(".part"):
+            count += 1
+    return count
+
+
+def _check_file_count_limit(target_dir: Path, incoming: int) -> None:
+    """P0 Task 5.6: 写入前检查文件数量限制，超限抛 413。
+
+    incoming 为本次请求将要写入的文件数（多文件上传时 >1）。
+    """
+    existing = _count_existing_files(target_dir)
+    limit = settings.MAX_FILES_PER_SESSION
+    if existing + incoming > limit:
+        raise HTTPException(
+            # HTTP_413_CONTENT_TOO_LARGE (starlette 新名，旧名 REQUEST_ENTITY_TOO_LARGE 已弃用)
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+            detail={
+                "error": "file_count_exceeded",
+                "message": (
+                    f"会话已有 {existing} 个文件，本次将新增 {incoming} 个，"
+                    f"超过上限 {limit}"
+                ),
+                "existing": existing,
+                "incoming": incoming,
+                "limit": limit,
+            },
+        )
+
+
+async def _save_upload(file: UploadFile, target_dir: Path) -> tuple[Path, int, str]:
+    """保存 UploadFile 到 target_dir，返回 (保存路径, 字节数, 扩展名)。
+
+    P0 Task 5.4/5.5 安全加固：
+    - target_dir 已由 safe_session_path() 做 containment 校验，此处直接 mkdir
+    - 原子落盘：先写 {stored_name}.part，校验通过后 rename 为 {stored_name}
+    - finally 块清理 .part 残留（覆盖写入异常 / 校验失败 / rename 失败）
+    """
+    target_dir.mkdir(parents=True, exist_ok=True)
+    # 用 uuid 防重名
+    ext = Path(file.filename or "").suffix.lower()
+    stored_name = f"{uuid.uuid4().hex}{ext}"
+    final_path = target_dir / stored_name
+    temp_path = target_dir / f"{stored_name}.part"
+
+    size = 0
+    # 标记是否成功 rename：用于 finally 决定是否清理 temp_path
+    renamed = False
+    try:
+        with temp_path.open("wb") as f:
+            while True:
+                chunk = await file.read(1024 * 1024)  # 1MB chunks
+                if not chunk:
+                    break
+                size += len(chunk)
+                _validate_size(size)  # 边读边校验，防止超大文件
+                f.write(chunk)
+        # 全部写入完成且大小校验通过，原子 rename 到最终路径
+        temp_path.rename(final_path)
+        renamed = True
+    finally:
+        # P0 Task 5.5: 异常时清理 .part 残留
+        # 成功 rename 后 temp_path 不再存在，exists() 为 False，无需清理
+        if not renamed and temp_path.exists():
+            try:
+                temp_path.unlink()
+                logger.info(f"cleaned_part_file path={temp_path}")
+            except Exception as e:
+                logger.warning(f"clean_part_file_failed path={temp_path} error={e}")
+    return final_path, size, ext
 
 
 @router.post("/{session_id}")
-async def upload_files(session_id: str, files: List[UploadFile] = File(...)):
-    """Upload files (1-15 per session)"""
-    if len(files) < MIN_FILES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"至少需要上传 {MIN_FILES} 个文件，当前 {len(files)} 个"
-        )
-    if len(files) > MAX_FILES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"最多上传 {MAX_FILES} 个文件，当前 {len(files)} 个"
-        )
+async def upload_session_files(
+    session_id: str,
+    files: list[UploadFile] = File(...),
+    user_id: int = Depends(get_current_user),
+):
+    """Agent 对话附件上传（多文件）
 
-    session_dir = _safe_session_path(session_id)
-    session_dir.mkdir(parents=True, exist_ok=True)
+    P1 Task 12：强制鉴权，匿名上传返回 401（原无鉴权可持久化文件到服务器）。
 
-    # Count existing files
-    existing = list(session_dir.iterdir()) if session_dir.exists() else []
-    if len(existing) + len(files) > MAX_FILES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"会话文件总数不能超过 {MAX_FILES} 个（已有 {len(existing)} 个，本次上传 {len(files)} 个）"
-        )
+    前端 handleFileUpload 调用，字段名 files，期望响应：
+    {session_id, uploaded:[{filename, file_id, size, text_preview}], count, skipped:[{filename, reason}]}
+    """
+    # P0 Task 5.3: session_id 强校验（拒绝 ../、绝对路径、URL 编码穿越）
+    safe_session_id = validate_session_id(session_id)
+    # P0 Task 5.4: containment 检查 + 计算 session 目录绝对路径
+    upload_root = _upload_root()
+    session_dir = safe_session_path(upload_root, safe_session_id)
+
+    # P0 Task 5.6: 写入前检查文件数量限制（按本次请求的文件数预算）
+    _check_file_count_limit(session_dir, len(files))
 
     uploaded = []
-    for f in files:
-        ext = f.filename.rsplit(".", 1)[-1].lower() if "." in f.filename else ""
-        if ext not in ALLOWED_EXTENSIONS:
-            raise HTTPException(
-                status_code=400,
-                detail=f"不支持的文件类型: .{ext}，允许的类型: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
-            )
+    skipped = []
 
-        # Read content to check size
-        content = await f.read()
-        if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=400,
-                detail=f"文件 {f.filename} 超过大小限制 ({settings.MAX_FILE_SIZE_MB}MB)"
-            )
+    for file in files:
+        filename = file.filename or "unknown"
+        # Task 21: 文件名进 logger 前过滤 CRLF，防止日志注入
+        safe_filename = _sanitize_filename_for_log(filename)
+        try:
+            ext = _validate_extension(filename)
+            saved_path, size, saved_ext = await _save_upload(file, session_dir)
+            # Task 21: 落盘后 magic byte 校验，不匹配则删除文件并返回 400
+            if not _validate_magic_byte(str(saved_path), saved_ext):
+                try:
+                    saved_path.unlink()
+                except Exception:
+                    pass
+                logger.warning(
+                    f"magic_byte_mismatch filename={safe_filename} "
+                    f"ext={saved_ext}"
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "error": "file_type_mismatch",
+                        "message": f"文件类型与扩展名不匹配：{filename}",
+                    },
+                )
+            # 保留原始文件名映射（写入一个 .meta 同名文件便于 _load_upload_context 读取）
+            text = _extract_text(saved_path)
+            file_id = uuid.uuid4().hex
+            uploaded.append({
+                "filename": filename,
+                "file_id": file_id,
+                "stored_name": saved_path.name,
+                "extension": ext.lstrip("."),
+                "size": size,
+                "text_preview": text[:500] if text else "",
+            })
+        except HTTPException as e:
+            skipped.append({"filename": filename, "reason": e.detail.get("message", str(e.detail)) if isinstance(e.detail, dict) else str(e.detail)})
+        except Exception as e:
+            logger.warning(f"upload_file_failed file={safe_filename} error={e}")
+            skipped.append({"filename": filename, "reason": f"上传失败：{e}"})
 
-        # Generate unique filename to avoid collision
-        file_id = uuid.uuid4().hex[:8]
-        safe_name = f"{file_id}_{f.filename}"
-        dest = session_dir / safe_name
-
-        with open(dest, "wb") as out:
-            out.write(content)
-
-        tag = get_file_tag(f.filename, ext)
-        uploaded.append({
-            "file_id": file_id,
-            "filename": f.filename,
-            "stored_name": safe_name,
-            "extension": ext,
-            "size": len(content),
-            "tag": tag,
-            "type_label": TYPE_LABELS.get(ext, "文档"),
-        })
-
-    return {"session_id": session_id, "uploaded": uploaded, "count": len(uploaded)}
-
-
-@router.get("/{session_id}")
-async def list_files(session_id: str):
-    """List uploaded files for a session"""
-    session_dir = _safe_session_path(session_id)
-
-    if not session_dir.exists():
-        return {"session_id": session_id, "files": [], "count": 0}
-
-    files = []
-    for fp in sorted(session_dir.iterdir()):
-        if not fp.is_file():
-            continue
-        ext = fp.suffix.lstrip(".").lower()
-        parts = fp.name.split("_", 1)
-        original_name = parts[1] if len(parts) > 1 else fp.name
-        file_id = parts[0] if len(parts) > 1 else ""
-
-        tag = get_file_tag(original_name, ext)
-        files.append({
-            "file_id": file_id,
-            "filename": original_name,
-            "stored_name": fp.name,
-            "extension": ext,
-            "size": fp.stat().st_size,
-            "tag": tag,
-            "type_label": TYPE_LABELS.get(ext, "文档"),
-        })
-
-    return {"session_id": session_id, "files": files, "count": len(files)}
+    return {
+        "session_id": safe_session_id,
+        "uploaded": uploaded,
+        "count": len(uploaded),
+        "skipped": skipped,
+    }
 
 
-@router.get("/{session_id}/{file_name}/content")
-async def get_file_content(session_id: str, file_name: str):
-    """Extract and return text content of an uploaded file"""
-    session_dir = _safe_session_path(session_id)
+@router.post("")
+async def upload_single_file(
+    file: UploadFile = File(...),
+    purpose: Optional[str] = Form(default=None),
+    user_id: int = Depends(get_current_user),
+):
+    """单文件上传（论文生成/修改链条/外审专家卡片用）
 
-    # Prevent path traversal in file_name
-    if "/" in file_name or "\\" in file_name or ".." in file_name:
-        raise HTTPException(status_code=400, detail="无效的文件名")
+    P1 Task 12：强制鉴权（原 get_optional_user_id 允许匿名上传以兼容旧前端，
+    存在持久化未授权文件风险），匿名上传返回 401。
 
-    target = session_dir / file_name
+    前端 showPaperGenerationDialog 等调用，字段名 file，期望响应：
+    {file_id, filename, text, ...}
+    返回的 text 字段为解析后的全文，前端用于填充 paper_text。
+    """
+    filename = file.filename or "unknown"
+    # Task 21: 文件名进 logger 前过滤 CRLF，防止日志注入
+    safe_filename = _sanitize_filename_for_log(filename)
+    ext = _validate_extension(filename)
 
-    try:
-        target.resolve().relative_to(session_dir.resolve())
-    except ValueError:
-        raise HTTPException(status_code=400, detail="无效的文件路径")
+    # 单文件统一存到 single_uploads/ 子目录（标识需满足 SESSION_ID_PATTERN 长度 8-64）
+    upload_root = _upload_root()
+    single_dir = safe_session_path(upload_root, "single_uploads")
 
-    if not target.exists() or not target.is_file():
-        raise HTTPException(status_code=404, detail="文件不存在")
+    # P0 Task 5.6: 单文件上传也检查数量限制（按 1 计）
+    _check_file_count_limit(single_dir, 1)
 
-    ext = target.suffix.lstrip(".").lower()
-    content = _extract_text_content(target, ext)
+    saved_path, size, saved_ext = await _save_upload(file, single_dir)
 
-    if content is None:
+    # Task 21: 落盘后 magic byte 校验，不匹配则删除文件并返回 400
+    if not _validate_magic_byte(str(saved_path), saved_ext):
+        try:
+            saved_path.unlink()
+        except Exception:
+            pass
+        logger.warning(
+            f"magic_byte_mismatch filename={safe_filename} ext={saved_ext}"
+        )
         raise HTTPException(
-            status_code=422,
-            detail=f"无法提取 .{ext} 文件的文本内容"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error": "file_type_mismatch",
+                "message": f"文件类型与扩展名不匹配：{filename}",
+            },
         )
 
-    return PlainTextResponse(content=content)
+    text = _extract_text(saved_path)
+    file_id = uuid.uuid4().hex
 
-
-def _extract_text_content(filepath: Path, ext: str) -> Optional[str]:
-    """Extract text content from various file types"""
-    try:
-        if ext in ("txt", "md", "csv", "json", "py", "r", "bib", "tex", "ipynb"):
-            with open(filepath, "r", encoding="utf-8", errors="replace") as f:
-                return f.read()
-
-        if ext == "pdf":
-            try:
-                from pypdf import PdfReader
-                reader = PdfReader(str(filepath))
-                pages = []
-                for page in reader.pages:
-                    text = page.extract_text()
-                    if text:
-                        pages.append(text)
-                return "\n\n".join(pages)
-            except ImportError:
-                return None
-
-        if ext == "docx":
-            try:
-                from docx import Document
-                doc = Document(str(filepath))
-                return "\n".join(p.text for p in doc.paragraphs if p.text.strip())
-            except ImportError:
-                return None
-
-        if ext in ("xlsx", "xls"):
-            import pandas as pd
-            df = pd.read_excel(filepath)
-            return df.to_string()
-
-    except Exception:
-        return None
-
-    return None
-
-
-@router.delete("/{session_id}/{file_name}")
-async def delete_file(session_id: str, file_name: str):
-    """Delete a specific file"""
-    session_dir = _safe_session_path(session_id)
-
-    if "/" in file_name or "\\" in file_name or ".." in file_name:
-        raise HTTPException(status_code=400, detail="无效的文件名")
-
-    target = session_dir / file_name
-
-    try:
-        target.resolve().relative_to(session_dir.resolve())
-    except ValueError:
-        raise HTTPException(status_code=400, detail="无效的文件路径")
-
-    if not target.exists() or not target.is_file():
-        raise HTTPException(status_code=404, detail="文件不存在")
-
-    target.unlink()
-    return {"session_id": session_id, "deleted": file_name, "success": True}
+    return {
+        "file_id": file_id,
+        "id": file_id,  # 兼容前端读取 id 字段
+        "filename": filename,
+        "stored_name": saved_path.name,
+        "extension": ext.lstrip("."),
+        "size": size,
+        "text": text,
+        "text_preview": text[:500] if text else "",
+        "purpose": purpose,
+    }

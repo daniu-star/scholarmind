@@ -5,16 +5,16 @@ ScholarMind 统一异常处理
 """
 from __future__ import annotations
 
-import logging
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 
 from ..core.exceptions import AppException
+from ..core.logging_config import get_logger
 from ..models.error_codes import ErrorCode
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def error_response(
@@ -90,15 +90,29 @@ def register_error_handlers(app: FastAPI) -> None:
             401: ErrorCode.AUTHENTICATION_FAILED,
             403: ErrorCode.PERMISSION_DENIED,
             429: ErrorCode.RATE_LIMITED,
+            402: ErrorCode.PAYMENT_REQUIRED,
         }
         code = code_map.get(exc.status_code, ErrorCode.INTERNAL_ERROR)
+        message = str(exc.detail)
+        details = None
+        if isinstance(exc.detail, dict):
+            requested_code = exc.detail.get("code")
+            if requested_code in ErrorCode._value2member_map_:
+                code = ErrorCode(requested_code)
+            message = exc.detail.get("message", message)
+            details = {
+                key: value
+                for key, value in exc.detail.items()
+                if key not in {"code", "message"}
+            } or None
 
         return JSONResponse(
             status_code=exc.status_code,
             content=error_response(
                 code=code,
-                message=str(exc.detail),
+                message=message,
                 status_code=exc.status_code,
+                details=details,
                 request_id=request_id,
             ),
         )
@@ -111,11 +125,12 @@ def register_error_handlers(app: FastAPI) -> None:
         # 但某些框架包装后可能变为 Exception，需做类型检查
         import asyncio as _asyncio
         if isinstance(exc, _asyncio.CancelledError):
-            logger.debug("Request cancelled by client", extra={"request_id": request_id})
-            return  # 不返回响应，客户端已断开
+            logger.debug(f"Request cancelled by client request_id={request_id}")
+            # P1 Task 10：客户端断开时返回 499 而非触发 500（原 return 不返回 Response
+            # 会导致 Starlette 抛 RuntimeError:Caught handled exception）
+            return PlainTextResponse("client disconnected", status_code=499)
         logger.exception(
-            f"Unhandled exception: {exc}",
-            extra={"request_id": request_id},
+            f"Unhandled exception: {exc} request_id={request_id}"
         )
         from ...config import settings
         is_dev = settings.DEBUG

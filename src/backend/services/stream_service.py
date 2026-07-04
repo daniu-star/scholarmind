@@ -6,14 +6,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-import logging
+import structlog
 from typing import Optional
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from .agent_service import AgentService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class StreamService:
@@ -26,9 +27,17 @@ class StreamService:
     # 最大消息大小（字节）
     MAX_MESSAGE_SIZE = 64 * 1024  # 64KB
 
-    def __init__(self, websocket: WebSocket, agent_service: AgentService):
+    def __init__(
+        self,
+        websocket: WebSocket,
+        agent_service: AgentService,
+        user_id: int,
+        db: AsyncSession,
+    ):
         self.ws = websocket
         self.agent_service = agent_service
+        self.user_id = user_id
+        self.db = db
         self._ping_task: Optional[asyncio.Task] = None
         self._stream_task: Optional[asyncio.Task] = None
         self._cancelled = False
@@ -36,7 +45,7 @@ class StreamService:
     async def handle(self, agent_id: str, session_id: str) -> None:
         """主处理循环：接受连接、处理消息、管理心跳"""
         await self.ws.accept()
-        logger.info("WebSocket connected", agent_id=agent_id, session_id=session_id)
+        logger.info(f"WebSocket connected agent_id={agent_id} session_id={session_id}")
 
         # 启动心跳
         self._ping_task = asyncio.create_task(self._ping_loop())
@@ -80,7 +89,7 @@ class StreamService:
                     await self._send_error(f"未知消息类型: {msg_type}")
 
         except WebSocketDisconnect:
-            logger.info("WebSocket disconnected", agent_id=agent_id)
+            logger.info(f"WebSocket disconnected agent_id={agent_id}")
         except Exception as e:
             logger.error(f"WebSocket error: {e}")
             await self._send_error(f"服务异常: {str(e)}")
@@ -97,7 +106,29 @@ class StreamService:
             return
 
         context = data.get("context")
-        logger.info("WebSocket chat", agent_id=agent_id, session_id=session_id)
+        from .entitlement_service import EntitlementError, EntitlementService
+        from .model_policy import ModelPolicyError, resolve_model
+
+        mode = data.get("mode")
+        try:
+            model = await resolve_model(self.db, self.user_id, mode)
+            if agent_id == "external_reviewer":
+                await EntitlementService.require_external_reviewer(
+                    self.db, self.user_id
+                )
+                reservation = {"consumed": "external_subscription"}
+            elif context and context.get("is_greeting") is True:
+                reservation = {"consumed": "greeting"}
+            else:
+                reservation = await EntitlementService.consume_chat(
+                    self.db, self.user_id
+                )
+            await self.db.commit()
+        except (EntitlementError, ModelPolicyError, ValueError) as exc:
+            await self._send_error(str(exc))
+            return
+
+        logger.info(f"WebSocket chat agent_id={agent_id} session_id={session_id}")
 
         try:
             # 调用流式接口
@@ -107,6 +138,8 @@ class StreamService:
                 agent_id=agent_id,
                 session_id=session_id,
                 context=context,
+                user_id=self.user_id,
+                model=model,
             ):
                 if self._cancelled:
                     break
@@ -132,6 +165,10 @@ class StreamService:
                     break
 
         except Exception as e:
+            await EntitlementService.refund_chat(
+                self.db, self.user_id, reservation.get("consumed", "")
+            )
+            await self.db.commit()
             logger.error(f"Stream chat error: {e}")
             await self._send_error(f"流式对话失败: {str(e)}")
 

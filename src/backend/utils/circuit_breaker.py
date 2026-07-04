@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import time
 import functools
-import logging
+import structlog
 from enum import Enum
 from typing import Callable, Optional
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class CircuitState(Enum):
@@ -141,19 +141,11 @@ class CircuitBreaker:
                 result = await func(*args, **kwargs)
                 self.record_success()
                 return result
-            except Exception:
-                self.record_failure()
-                raise
-
-        @functools.wraps(func)
-        def sync_wrapper(*args, **kwargs):
-            if not self.allow_request():
-                raise CircuitBreakerOpenError(self.name)
-            try:
-                result = func(*args, **kwargs)
-                self.record_success()
-                return result
-            except Exception:
+            except Exception as e:
+                # 排除自身抛出的 CircuitBreakerOpenError 被误记为失败：
+                # 若被装饰函数内部转发抛出该异常，应直接透传，不影响熔断状态计数。
+                if isinstance(e, CircuitBreakerOpenError):
+                    raise
                 self.record_failure()
                 raise
 

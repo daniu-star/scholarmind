@@ -233,6 +233,17 @@ class LLMAPIError(AppException):
         )
 
 
+class LLMTruncatedError(AppException):
+    """LLM 输出被截断（达到 max_tokens）"""
+    def __init__(self, message: str = "LLM output truncated due to max_tokens", details: Optional[dict] = None):
+        super().__init__(
+            message=message,
+            code=ErrorCode.LLM_API_FAILED,
+            status_code=502,
+            details=details,
+        )
+
+
 # ── 速率限制异常 ──
 
 class RateLimitError(AppException):

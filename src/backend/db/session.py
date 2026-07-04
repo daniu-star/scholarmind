@@ -56,6 +56,9 @@ async def get_db(
 ) -> AsyncGenerator[AsyncSession, None]:
     """FastAPI 依赖：获取数据库会话（上下文管理器）
 
+    优先使用传入的 engine/session_factory（来自 app.state），
+    避免每次请求创建新引擎。
+
     用法：
         @router.get("/items")
         async def list_items(db: AsyncSession = Depends(get_db)):
@@ -79,6 +82,22 @@ async def get_db(
 
 
 async def init_db(engine: AsyncEngine) -> None:
-    """创建所有 ORM 表（开发用，生产用 Alembic）"""
+    """创建所有 ORM 表（仅作为 Alembic 不可用时的兜底方案）。
+
+    P0 修复: 所有手动 _migrate_* 函数已转为正规 Alembic 迁移脚本:
+      - c4ddc7870a8f_init.py           → conversations, skills, chart_records
+      - e7b1a2c3d4f5_accounts_*.py     → users, user_quotas, orders, entitlement_grants
+      - m3_verification_email_qr.py    → verification_codes, email, payment QR
+
+    正常情况下 Alembic 在 startup 事件中运行。此函数仅在新安装且 Alembic 失败的
+    极端情况下兜底创建完整 schema。
+    """
+    # 确保所有 ORM 模型已加载到 Base.metadata
+    from ..models.orm import (  # noqa: F401
+        Conversation, Skill, ChartRecord,
+        User, UserQuota, Order, EntitlementGrant, VerificationCode,
+        AdminAuditLog, AgentExecutionLog, LoginAttempt,
+    )
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+

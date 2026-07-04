@@ -3,7 +3,7 @@ ScholarMind 12种高级学术图表实现
 Origin 风格（白底黑框、大字体、学术配色）
 """
 
-import logging
+import structlog
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -17,7 +17,7 @@ import pandas as pd
 from .chart_style import ACADEMIC_COLORS, _apply_origin_style
 from .chart_data import _safe_array, _make_figure, _finalize
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 # 1. 缎带图

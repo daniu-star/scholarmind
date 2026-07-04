@@ -23,8 +23,13 @@ class IAgentService(ABC):
         agent_id: str,
         session_id: str,
         context: Optional[dict] = None,
+        user_id: int = 0,
+        model: Optional[str] = None,
     ) -> dict:
-        """同步对话：发送消息并获取完整回复"""
+        """同步对话：发送消息并获取完整回复
+
+        P0 Task 4.4：model 由 Router 通过 model_policy.resolve_model() 解析后传入。
+        """
         ...
 
     @abstractmethod
@@ -34,17 +39,24 @@ class IAgentService(ABC):
         agent_id: str,
         session_id: str,
         context: Optional[dict] = None,
+        user_id: int = 0,
+        model: Optional[str] = None,
     ) -> AsyncGenerator[dict, None]:
-        """流式对话：逐token生成回复"""
+        """流式对话：逐token生成回复
+
+        P0 Task 4.4：model 由 Router 通过 model_policy.resolve_model() 解析后传入。
+        """
         ...
 
     @abstractmethod
-    async def clear_conversation(self, session_id: str) -> bool:
+    async def clear_conversation(self, session_id: str, user_id: int = 0) -> bool:
         """清空会话历史"""
         ...
 
     @abstractmethod
-    async def get_conversation_history(self, session_id: str) -> list[dict]:
+    async def get_conversation_history(
+        self, session_id: str, user_id: int = 0
+    ) -> list[dict]:
         """获取会话历史"""
         ...
 

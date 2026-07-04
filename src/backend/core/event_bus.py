@@ -22,11 +22,11 @@ ScholarMind 事件总线（EventBus）
 from __future__ import annotations
 
 import asyncio
-import logging
+import structlog
 from enum import Enum
 from typing import Any, Awaitable, Callable
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class EventType(str, Enum):
@@ -117,7 +117,7 @@ class EventBus:
             self._handlers[type_key].append(handler)
 
         if self._debug:
-            logger.debug("EventBus subscribed", event_type=type_key)
+            logger.debug(f"EventBus subscribed event_type={type_key}")
 
         # 返回取消订阅函数
         def unsubscribe():
@@ -182,9 +182,7 @@ class EventBus:
 
         if self._debug:
             logger.debug(
-                "EventBus publishing",
-                event_type=type_key,
-                handler_count=len(handlers),
+                f"EventBus publishing event_type={type_key} handler_count={len(handlers)}"
             )
 
         # 并发执行所有handler
@@ -225,9 +223,7 @@ class EventBus:
                 success_count += 1
             except Exception as e:
                 logger.error(
-                    f"EventBus handler error (sequential): {e}",
-                    event_type=type_key,
-                    handler=handler.__name__,
+                    f"EventBus handler error (sequential): {e} event_type={type_key} handler={handler.__name__}"
                 )
 
         return success_count
@@ -245,9 +241,7 @@ class EventBus:
             await handler(**event_data)
         except Exception as e:
             logger.error(
-                f"EventBus handler error: {e}",
-                event_type=event_type,
-                handler=getattr(handler, "__name__", str(handler)),
+                f"EventBus handler error: {e} event_type={event_type} handler={getattr(handler, '__name__', str(handler))}",
                 exc_info=True,
             )
 

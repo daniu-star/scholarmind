@@ -19,7 +19,12 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.backend.config import settings
 from src.backend.db.session import Base
 # 导入所有 ORM 模型以确保它们被注册到 Base.metadata
-from src.backend.models.orm import Conversation, Skill, ChartRecord  # noqa: F401
+# 导入所有 ORM 模型以确保 Alembic autogenerate 能检测到完整 schema
+from src.backend.models.orm import (  # noqa: F401
+    Conversation, Skill, ChartRecord,
+    User, UserQuota, Order, EntitlementGrant, VerificationCode,
+    AdminAuditLog, AgentExecutionLog, LoginAttempt,
+)
 
 # Alembic Config 对象
 config = context.config

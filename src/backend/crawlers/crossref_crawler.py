@@ -1,6 +1,6 @@
 """CrossRef crawler adapter — uses public REST API."""
 
-import logging
+import structlog
 from datetime import datetime, timedelta
 
 import aiohttp
@@ -8,7 +8,7 @@ import aiohttp
 from .base import BaseCrawler
 from ..config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class CrossRefCrawler(BaseCrawler):

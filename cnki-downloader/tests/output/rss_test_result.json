@@ -1,0 +1,326 @@
+{
+  "phase": "rss_discovery",
+  "journals_tested": [
+    {
+      "journal_code": "GJXW",
+      "journal_name": "国际新闻界",
+      "max_papers": 20,
+      "papers_found": 20,
+      "papers": [
+        {
+          "title": "情绪偏移：生育报道的情绪不一致性启动路径探究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjAf5BMdpIOEnnXVIRIipQgVjpaEEYtmddTFrY7F0acsrNj1_FHLrtQpPkq7xglFC1QH2Xqm5IRSxsEQtAWU8m5Dp5ObiIRGy-mmnmst0bt4RQEEc2Hd8yR9DNGiOp6JkkPWtp3Xhr6AGhyyt9VB2OLoMh_rXPN9K8ShR_Sv1N74Kg==&uniplatform=NZKPT&language=CHS",
+          "author": "周俊;张宇;陈科宇;余婉遥;",
+          "description": "在数字媒介环境中，新闻报道所携带的情绪越来越成为影响受众理解、评价与态度形成的重要因素，情绪传播机制逐渐成为新闻传播研究的重要议题。以往的情绪启动一般是指情绪在效价维度的一致性启动，即在处理后续信息时产生的情绪与先前信息所传达的情绪在效价维度一致。基于对女性阅读生育议题的调查实验，本研究从效价和唤醒两个维度入手，发现了“受众处理后续信息时的情绪会偏离前置文本”这一情绪不一致性启动现象，即“情绪偏移...",
+          "pub_date": "Sat, 14 Mar 2026 16:00:00 GMT"
+        },
+        {
+          "title": "拥抱与超越：媒介考古学的多维触角与再思考——与尤西·帕里卡（Jussi Parikka）教授对谈",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjDssjYZZFDymF6v8msMq2Jv8qDIBYOPxUYOwXnGBmV_sxOqwhSF0ds51xMcmMhQt8L31FFVhA75_uB_MolMNdBcX4rFPqqsClD7495-UjenSuJDf1KUEqYr1NIhTxdwZoAM1vShsgfgK7_WkbSfqQH9hILmsYZe8llwlFDcWFzNFA==&uniplatform=NZKPT&language=CHS",
+          "author": "曾哲扬;唐海江;",
+          "description": "尤西·帕里卡以“媒介自然”（media-nature）为理论支点，重新锚定媒介考古学的核心关切——技术的物质性与生态性。他强调，媒介不仅是文化产物，更是嵌入地球物质循环的“自然有机体”，其物质性既体现为硬件设备与基础设施，也指向非人类能动性（如昆虫媒介的感知模式与动物智能的启发）。面对欧洲中心主义的方法论局限，他提出延展齐林斯基（Siegfried Zielinski）的“变体学”（variant...",
+          "pub_date": "Sat, 14 Mar 2026 16:00:00 GMT"
+        },
+        {
+          "title": "“人生当行的道”：照护社群的网络叙事与自我技术实践",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjD2nZP5WURRAVHFWlR_1hWM0Fr-d6m_lufZIOEb8uKm4ZI0rBrqHp9rX0lVs3r4j37o4WYXc5o42N7YpYqTdm2VK48j06klYt1_QOhWCsGd9FUp6xefxHiCkLG8kMA1ACJa2pBb5STmFd_nxul26cYEfEGCGWBRq6O_4pdCJRI75g==&uniplatform=NZKPT&language=CHS",
+          "author": "黄月琴;王朝阳;",
+          "description": "与罹患疾病的人相较，照护者的苦痛与困境是一个被忽视的存在，这影响社会对照护的深层理解，遮蔽照护作为人类社会基石的意义。论文运用网络参与式观察、访谈与实地调研方法，对一个照护者群体及其关联处境展开深入考察。研究发现，以社交网络媒介为导引，照护者开展了多种层面的叙事，并构建跨个体/家庭的互惠关系。在此过程中，照护者竭力调用言语、文化、媒介与行动的自我技术，历经疗愈主体、互助主体到社会主体的“相变”，并...",
+          "pub_date": "Sat, 14 Mar 2026 16:00:00 GMT"
+        },
+        {
+          "title": "睡前讲故事：广告接收时间对品牌地位感知的影响研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjB0gi-hog0KmNqWL57tgL2U5b0aDaT75WWOD2BPMHEQWQT0Z3tnv5hKkcGcgV-2eVb_fwBwS-T7epBQ3lMwfoPolc99AR5BoOkUiSErTJrCb06GdC20uMEOYri-2pP2wPK6giFZdxzAIC1OcOzDRWvieyGyO1X7grW4rtW5ICP3Vg==&uniplatform=NZKPT&language=CHS",
+          "author": "王岑;赵文博;鲁柯彤;",
+          "description": "长期以来，受横断面研究范式的限制，“时间”因素在广告效果研究中往往被忽略。本文引入昼夜节律与叙事传输理论，通过六项递进实验（n=825），系统考察广告信息类型（故事型vs.非故事型）与接收时段（清晨vs.夜晚）对品牌地位感知的交互作用及其心理机制。研究发现，故事型广告在夜晚观看时，比在清晨观看更能显著提升消费者的品牌地位感知；而非故事型广告在不同时段的观看效果差异不显著。机制分析表明，该效应由情绪...",
+          "pub_date": "Sat, 14 Mar 2026 16:00:00 GMT"
+        },
+        {
+          "title": "差序性转译：墨海书馆与近代跨文化传播网络的非对称生成",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjDxreF_LK0NnbT56hyT9u5po4LHLAM7tI-pi0SeGw1iNMTOlvp3ReeObi0ZyOl075ebj9McREoYGvrahU41mJPa5PHYpj9RcOPydn0kQpfhNfRvi5eI-RH8ad96mrfhBEifPB54mp2dt3DD2FOoqMMULSkGm0y_TTrb8Q4OmtCaGQ==&uniplatform=NZKPT&language=CHS",
+          "author": "程丽红;王露璐;",
+          "description": "为突破技术决定论与文化帝国主义的传统阐释困境，本文提出“差序性转译”分析框架，将研究焦点转向跨文化传播中动态的、策略性的互动过程。本研究以墨海书馆为个案，通过批判性整合行动者网络理论与“差序格局”概念，揭示近代中西知识流通中的非对称传播网络由权力、技术与空间三重差序耦合形塑：权力差序通过规则制定与合法性争夺，奠定了网络非对称性的政治基础；技术差序通过物质效能的转化，构筑了网络扩张的结构性霸权；空间...",
+          "pub_date": "Sat, 14 Mar 2026 16:00:00 GMT"
+        },
+        {
+          "title": "流动中的新闻规范：基于非虚构写作实践的考察",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjD-dox8k71D_QL9DA0fpvSSdf_QCS85X3BIuomP0Fx2YxILWQ0IGHK_B_glNayYwFLweYKUARDxvDZ6eVpYrR9uSKW88PpknyANBu4bdXvZwMNtuPIW16l5lYIrcfEJ43DksBJEophIyyGNuThik2Ow333uwYMvEbMYgOODjSw7ow==&uniplatform=NZKPT&language=CHS",
+          "author": "姚舟怡;白红义;",
+          "description": "长期以来，新闻规范多以内隐、非制度化的形式存在于特定机构或实践社群中。数字时代多元主体入场、公众警觉性提升，对从业者行为正当性及新闻权威提出挑战，新闻规范的内涵亟待拆解。非虚构写作领域因“真实”与“文学”的内在张力，及其组织形态与从业群体的流动性，成为观察规范协商过程的理想实验室。本研究构建了涵盖“技术操作—认知价值”的规范内涵框架，并基于夏兹金的实践理论，通过深度访谈与参与式观察，探讨新闻规范的...",
+          "pub_date": "Sat, 14 Mar 2026 16:00:00 GMT"
+        },
+        {
+          "title": "虚实之间：基于社会化人机关系视角的虚拟影响者广告效果研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjA0pAFJv6Wz3rBJxCxxug_foWXvebHd6-dSginpL7MXOXZ9NvPbaUDffiThlD7Dh8WjZas3gb33_0XLqWMY07x6zbA8q3GLUFV11X9ngURpY-Sj7ALLfqzJleI409DosXyaNAmnBKFCEGjEHsw34sbWSNF2dYQQc7uIKROO-6K9AQ==&uniplatform=NZKPT&language=CHS",
+          "author": "汪让;刘璠珏;周颖;",
+          "description": "人工智能技术的发展带来了虚拟数字人影响者（VI）营销热潮，本研究关注超写实算法驱动型VI这一新型传播主体，聚焦于感知真实性这一触及其存在本质和影响力来源的概念，从社会化人机关系角度提出并检验了VI营销的说服机制。问卷结果显示，VI的拟人度、智能度和悦人度有助于塑造其感知真实性，从而影响消费者的广告态度和购买意愿；而即使对VI感到不安，消费者仍承认其真实性。心智感知在VI社会化特征和感知真实性间起调...",
+          "pub_date": "Sat, 14 Mar 2026 16:00:00 GMT"
+        },
+        {
+          "title": "从可见性的“武器化”到“诉求化”：数字义警模型的批判性审视与网暴治理启示",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjC6z8a85rINEOf_KsgWly5u6TI4F3KyTU0uzAc-sFpe13GxTtfsXzSBaz2pBybmJLxcOZX38MKULV2XaHtxcGaeyNmnwua8FBkvZ_Tj_Evaqs6SDivqrVbZqVwsXoq3Ce7r_yM1TiIyJEXXu2l6qeWeq_VAqdajkUVudT4RES84dQ==&uniplatform=NZKPT&language=CHS",
+          "author": "丁依然;",
+          "description": "网络暴力治理困境的深层原因，部分源于学界在面对本土实践时，缺乏解释其复杂动机的有效理论工具。本文认为，数字义警（digital vigilantism）模型正是被忽视的理论资源之一。该模型揭示了数字可见性实践的一体两面性：它既可能是旨在执行法外私刑的伤人之“矛”，也可能蕴含着激活国家权力以寻求秩序的“盾”。然而，既有研究多聚焦于其批判性诊断面向，忽视了其建设性潜力。本文旨在对DV模型进行一次功能性...",
+          "pub_date": "Sat, 14 Mar 2026 16:00:00 GMT"
+        },
+        {
+          "title": "嵌入“地理媒介”之中：“中国潮玩”空间传播的现实纹迹与学理可能——以泡泡玛特为个案与斯科特·麦夸尔（Scott McQuire）共谈",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBjLZMw4jyy6MYoPkJuxUaoBYS0IKQ6K3DRUxjBX2sTOTVF1sBOEboEfFHBmQ3fYJS7rlxpMJ_qmdqvn84-8iUWbzy1KHF_ljAtkZFN1jQZiqRg5UD2sKSXiaITv089zoH4gz-d5-52-OB6OX1MWEs5enaVjcqDezQvQwRmludipg==&uniplatform=NZKPT&language=CHS",
+          "author": "胡康;斯科特·麦夸尔;",
+          "description": "中国潮玩的全球传播为宣扬中华文化软实力开辟出了一条新赛道。在这条新赛道中，中国潮玩以地方性媒介的身份跨越国家空间，承载并诠释着国家地方文化，为思考文化传播、空间传播提供了全新的经验视角。有鉴于此，本研究“立足本土，放眼全球”，邀请了聚焦于地理媒介与空间传播的国际知名学者斯科特·麦夸尔教授进行面对面访谈，一同探讨国际知名的本土潮玩品牌——泡泡玛特在全球空间中的传播机理及其带来的理论启示，以期从经验与...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "照见“关系”之网:农村家庭监控社会实践与“情境主义技术信任”的生成",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBVzBERn7bcUyGbHXtRFbJymJbct67GROGgr9eFUMyZhJY3IyVH31WkXayoicGxnYd_GTUPQwPJkWpR7lZN8-XvxZK0OhW1eqBWmcLlT-sB-1CHVvo3rWyan6yI_x-F93nqtFDi0bV9darzAnrw2Gp1A3vcUp4VMVFKXH8oj8A4zg==&uniplatform=NZKPT&language=CHS",
+          "author": "李宁馨;熊慧;",
+          "description": "相较于监控对权力的塑造，个体的技术认知及其日常使用更为关键。本研究通过对四川B村个案的质性研究，以农村家庭监控的社会实践为切入点，考察监控作为媒介物如何影响乡土社会的信任格局。研究发现，家庭监控社会实践折射出熟人、半熟人和陌生人关系中的多重信任困境；监控的使用是村民改善困境的一种策略，但它并未彻底重塑乡土信任格局，而是被融入既有秩序中、发挥有限度的社会调节作用。村民的“情境主义技术信任”立场，即拥...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "母职何以赋能？数智技术环境下媒体妈妈的工作—家庭边界协商实践",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjCZH_YXxsPR4tPMajdxnYc5E8GRFGFmULLwMkDpNGt2Xca6LqDNMj1zxOb5iIIhkbIHdNKH-M73p3nI1Hvp5y7wADmFUQFwj4P5X7i_1p6Oou2tIh5vIjDR8tilS8RluLjrwnBk-nyX0IAUQDn9TlXaIvFMp0d7nBV2afqPe_-uMA==&uniplatform=NZKPT&language=CHS",
+          "author": "曾丽红;何镇辉;张尚沐;",
+          "description": "母职可否赋能职业发展？循此问题逻辑，本文聚焦考察媒体妈妈“工作—家庭”边界协商的技术实践。研究发现，媒体妈妈依托“专业禀赋+母职特质”的复合资源结构，在边界协商实践中培育“数智融合技能”，实现“时空套利”和母职身份的职业效能转化。“数智融合技能”是以数智媒介素养和创新思维基模为智识表征的具身技能，它进一步提升了数字资本与社会资源的耦合速率和渗透效率，并将媒体妈妈职业场域的专业技能转化为母职实践的创...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "腕间社会化：电话手表对儿童认知、角色与价值的双向调适",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBOyV_0-f2Unrf4cp3LLoztoRTvubKDf4Y1MfFmxgv2sZOW4UCZGXA_pQz1OJANE3Oaee_BpU79PAEAXr1rYLUiXezg2b7RXcDo0YpmCbQMbER0JtpFDOKhu7Dz0Q9P2Bd-zmHwk0PLfzTUBfaphywl8wRrVeFaGvvzfEcjT3DcdQ==&uniplatform=NZKPT&language=CHS",
+          "author": "王朝阳;牛凝;",
+          "description": "在数字时代，儿童电话手表作为深度嵌入日常生活的技术物，正在系统调适儿童社会化的路径。本研究基于功能主义视角，以中国9—12岁儿童为对象，通过混合研究方法探讨电话手表对儿童社会化中认知、角色与价值三个核心维度的调适作用。研究发现，电话手表带来“双刃剑”效应。一方面赋能儿童的社会连接与自主探索，另一方面也引入规训与控制风险。在认知层面，其定位、即时通讯和游戏化功能调适儿童对空间、时间与社交的感知，但也...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "新闻消费中的算法厌恶：有关推荐文本主观评价偏差的实验研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjDKFXtOmKrNeT1sbLM6QjFBICdamgjQhPLjMwyxK-N8jC76La1VrUCeV8Eads2JyiSCJnF7F6iF0pJnH1I9q41CxOuku85Dj55lTd1ABUMGeOa_SC-sGen8oJXSDnbhTMbx5TlvxfQZ9nebrm-IfiUsEE-CVZasQyICE2gZ1tXBIA==&uniplatform=NZKPT&language=CHS",
+          "author": "张萌;王靖凯;杨家明;",
+          "description": "本文聚焦新闻消费情境中“算法厌恶”，采用对照实验，系统考察新闻消费者对算法推荐与人工推荐文本的主观评价差异，并进一步探讨人口学特征与内容偏好对推荐偏好的调节作用。实验共有800名参与者，通过李克特量表度量推荐意愿、个性偏好和整体评价三个维度，采用独立样本t检验、多元线性回归及路径分析进行统计处理。结果显示，整体上人工推荐显著优于算法推荐，在用户整体评价维度上表现出更高的主观满意度，验证了“算法厌恶...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "“你有一条新消息”：青年移动社交中的互动规范及其影响",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjAFsh33JG54_sfH5NQkjkjFbf07Vyt4aXoyOPupldgF3ZfEzPJZj4bguT7ZYQ440oEu3ZfsBY0GTmEuYoBCLXt0LCsa2EOs-hOKAkj4TXLMyDI68djkdXAN3a4KhIghjrAzk2_gcmpDaQRCbk0Zj8SYISCxZR0RxR1DPBM0rt76vA==&uniplatform=NZKPT&language=CHS",
+          "author": "李雪晴;李耘耕;",
+          "description": "在智能手机深度嵌入日常交往的背景下，青年在移动社交中逐渐形成关于如何互动的共享规则，并由此影响媒介行为与心理福祉。基于社会技术视角与双过程模型，本文采用两阶段混合研究，首先通过6组焦点小组访谈（N=36）从日常经验中归纳出四类互动规范：响应性、干扰回避、公开互惠与临场感规范；随后用问卷调查（N=831）对规范结构进行量化验证，并检验“互动规范→目的性/习惯性手机查看→主观幸福感”的作用路径。结果显...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "再性别化还是去性别化：智能家居技术如何重塑家庭性别分工？",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBBCTMed1XwTH_8Mw8cdkLCQQsCVewSwArFSG6xasvUjR3swaf_E2dnZbx86STKS1VsBFG78w4q1phuNhFjmFGB5KeFICPj4m2qMbPfgkTK1YkINti4mOHrvB6n0ZbeOjX-o9mj_Z6S6-qwq4MRFKXqGaeDEUukyaq5AZzcZRNzWg==&uniplatform=NZKPT&language=CHS",
+          "author": "万旭婷;武靖宇;",
+          "description": "智能家居技术正在重塑家庭场域的劳动图景，是理解当代技术与性别关系互动的一个重要切入点。本文通过家庭参观和深度访谈的方法，结合性别气质理论，揭示数字化转型中的家务劳动是否以及如何成为性别分工重构的试验场？研究发现，智能家居的引入使家务呈现“去技能化”“链路化”与“分布式劳动”等新特征，过去被视为繁重与日常性的劳动转化为可管理的任务和触发式劳动，并为家务责任再分配提供了可能。在此基础上，智能家居亦成为...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "“湍流”不息：超表征视野下数字地图的媒介实践",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjDL6s8SCc5EoQbSMJoma13MAJPV_0gtqpP71TW7lKaqe5Otxi4pywe1r2B4_zTXf_CowjJG7b2kjnlb_5WbzfxJZZNtuB3r2cGe9AmBCjjIi-OfgBHUPK0LMnMLT6o2MXDS9LGsqvADfAjmdbZA3DBPNNFRt1RoRicBAFkc5MMsTw==&uniplatform=NZKPT&language=CHS",
+          "author": "姜红;徐梦丽;",
+          "description": "本文以“超表征理论”为入射角，以“湍流”为核心概念，选取了数字地图的三个非主流应用场景，即创意绘图中的身体展演、街景地图中的时空穿梭、交通实况中的临时交往，分别从经验流、生命流、行动流三个层面考察数字地图的媒介实践。研究发现，在特定情境和目的下，数字地图不仅更加精确地表征位置和空间，更在人、地、图等多重互动关系中生成充满生机的经验与行动，这些表征与非表征融合共生的实践正在重新塑造世界。数字地图的超...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "2025年中国的新闻学研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBa_wcB7jXrouZz3FqUs7GVaXZ3lMoBjpN8uHBaX4wwpmsVLPG9WSMFrIiTf1Eb5loQJi9N7n819iu8fKTxWhNA8-34R4quc1bEELMpt6oultxcK0hoXIEt7y_CE-pTljKVtvSThrOkdO-_ZKZHe2Me6okqJwq7deWOBf5R1oz2Vw==&uniplatform=NZKPT&language=CHS",
+          "author": "《国际新闻界》新闻学年度综述课题组;",
+          "description": "通过对23种中文新闻传播学核心期刊或综合期刊专栏论文的筛选和聚类，本文从新闻理论、主流媒体系统性变革、主流媒体效能评估、中国新闻业、新闻生产、新闻从业者、新闻消费、中国新闻史等八个话题，大致勾勒过去一年智能传播语境对中国新闻学研究重点和议题的影响与塑造图景",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "2025年中国的传播学研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBa_wcB7jXrouZz3FqUs7GVaXZ3lMoBjpN8uHBaX4wwpmsVLPG9WSMFdWr1jN3H2JowEK1lfuK90vx9rjvfEuXbcRxd_dfIJj33kh6gDPqT8JY0mIg-oBBSIqmwfO041-L1NdRsbQt2uLPHZzsPgFGygiFjE1EUM1d5rEdoI3oZRg==&uniplatform=NZKPT&language=CHS",
+          "author": "《国际新闻界》传播学年度综述课题组;",
+          "description": "本文以问题意识、方法规范、理论建构、现实关切为主要标准，从2025年18种中文学术期刊（包括港台地区）中遴选出148篇研究论文，以传播思想史、数字劳动、平台研究、用户的算法实践、人机传播、媒介文化实践、数字交往、媒介化治理、健康传播、媒介学与媒介技术哲学、互联网历史、经典理论的新发展共计十二个话题勾勒了过去一年中国传播研究的知识图景",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "直面“数智化生存”:2025年新媒体与智能传播研究综述",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjCYvdVVne9WUJ0KAaSZaq3tpaO0GOphXHt62s-vKTBJkBVDT5_XH7x7GC6_fAWURmIx0FiJc7W-a6AEAG51NRMcO3cD2xSXms0OP8yixNCnWcDxTLtKnQUlrT_AGHsLgWpPEw_vt6sWpWHOXfiqn_cwNvlEC79_bwUxlDl4lPPbfg==&uniplatform=NZKPT&language=CHS",
+          "author": "苏涛;彭兰;",
+          "description": "2025年，以Deep Seek为代表的开源大模型取得突破性进展，标志着生成式人工智能进入深化应用的新阶段，社会传播生态随之发生深刻变革。本年度，学界紧紧围绕人工智能时代的传播新生态和人类生存新境遇展开了系统而深入的研究。本文依据选题的前沿性、理论视角的新颖性和研究的深入程度等标准，从2025年发表于核心期刊的新媒体与智能传播研究论文中提炼出六大议题，即人机关系的变革与重构、人机情感实践、生成式人...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "迈向自主知识体系的中国传播学：“十四五”华夏传播研究的进展与反思",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBfEC4KugmUiD2T0RTUoOo5vb8PO3BtVOH2efiH7f4_Gwq4wElPEfIo26AlMdpaNAdGrYgBsA5WLKuqILnHPv1xYn-2t-iLJiYrc3uSSYsZ8mM-BPnoqI0R0uRHfUudQslhOIo6ndOjBs4VGSh-fo82KIF-5wr74Vede9IdfOoWgw==&uniplatform=NZKPT&language=CHS",
+          "author": "王学敏;谢清果;",
+          "description": "“十四五”期间，构建中国哲学社会科学自主知识体系成为学界的重要理论命题。在新闻传播学领域，华夏传播研究以鲜明的问题意识与知识积累，积极回应这一时代要求。铺展于中华五千年历史文化的知识生产与传播方式的更迭，华夏传播研究以贯通中华文化价值观、回应当代传播实践为旨归，一面从中国传播现实问题出发，激活本土经验中的问题意识，推动传播学中国话语的生成；一面通过系统回溯历史资源，将华夏文脉中的观念智慧转化为解释...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        }
+      ],
+      "blocked": false,
+      "error": null,
+      "duration_sec": 0.25,
+      "warmup_success": true,
+      "warmup_duration_sec": 0.76,
+      "field_completeness": {
+        "title": 20,
+        "link": 20,
+        "author": 20,
+        "description": 20,
+        "pub_date": 20
+      }
+    },
+    {
+      "journal_code": "XWDX",
+      "journal_name": "新闻大学",
+      "max_papers": 20,
+      "papers_found": 20,
+      "papers": [
+        {
+          "title": "事件与新闻事件：关系、动力机制及影响研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjDKQxFWrQXrIMBfCJhdee0L0QJ87xc-2Ie7tv1hLXgd360G1cf8HBIVAQFCszNPnNWE03xcejdkQYPpfwaEaT_Iabm0w7VfbJKYIe_dphWrTlFvcIWAprNtqS0WOZ0cQOcMbWRr7LSd2wzdw0cMFQ4zczjmgRQNofwMAbdL924aCQ==&uniplatform=NZKPT&language=CHS",
+          "author": "涂凌波;杨靖毅;",
+          "description": "新闻事件实际上是新闻生产传播的结果而非事件本身，这个基本问题在新闻学理论研究中尚未得到足够重视。本研究结合事件现象学与事件社会学的理论资源，界定新闻事件的概念内涵，厘清事件与新闻事件的关系，并探讨新闻事件化的动力机制及其产生的影响。事件是新闻事件的本源，新闻事件是根据事件建构而来的制度性事实，两者是动态的互塑关系。新闻事件化的动力机制是以事件的媒介化作为原始动力，经媒体报道制定框架、大众群聚参与、...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "青年群体为何回避新闻？",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBHoQlwNWecxaNPgz73_O99hao6ekW2wmGRnr_oN22WP7hXZRLi5fwaSOwoX894tphHuSaFC0GXla5JRINkZm6zBVvHy2HpBwMYI0EijFbk0c56p9rU0F3nk0eHuDoeVjHSqkCK5knqjMi0ZRqhZcXjabsSmXyoepKgRb-3il-aOw==&uniplatform=NZKPT&language=CHS",
+          "author": "王亮;",
+          "description": "新闻回避在全球范围内正成为愈演愈烈的现象。其中，青年群体的新闻回避程度高于其他群体。论文从媒介环境、认知和情感出发，构建多因素分析框架，用组态分析方法展开研究。研究发现：高选择媒介环境是新闻回避的背景，新闻回避受认知和情感因素的双重驱动；偏好新闻、娱乐和没有明确偏好的青年群体回避新闻的原因不同；新闻倦怠是新闻回避的必要条件；存在四种引发新闻回避的条件组态和一种引发新闻接触的条件组态。这些发现对建立...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "回溯性生态修复：新闻播客“声音特稿”的尚古性媒介时间与行动方案",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjDAaCLitoiJa8GJ4Ce-h8Nj4eaVz2XEmhfWsoWvNCAzvSwZzmIHAjlEJiS94X_TxXcsmSZaTAPrc_hM09KQCTt9GgIA_d3rGCRDGUzgFXmGrf-6nzr4NyreYd54KvbrJTd8lrA9Vd4tEu6scBmoeATPFt1p5ZOhcYQ97Ju0SUhnvQ==&uniplatform=NZKPT&language=CHS",
+          "author": "王鸿坤;",
+          "description": "本文将新闻播客定义为一种回溯性媒介，并引入媒介尚古主义概念，描摹其在数字媒介生态中通过回溯听觉文化构型所生成的生产与消费实践，分析其对新闻业和数字媒介生态的影响，从而深入理解其独特价值和建设性意涵。借助对“声音特稿”这一具体播客体裁的个案研究和分析性精听，本文提出新闻播客塑造了一种非即时、情境协调、以自我把控为核心要素的低刺激媒介时间。这一媒介时间复归了低技术介入性的、人类主体性导向的文化实践结构...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "以声立行：行动主义视角下机构媒体的播客创新实践研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjB3nO0zYINjhSNjV6QjzU4aV_kUrMGRsCb9DE_--KwBdD2XFIhIvtxIRz3TpUTzWd92ZSTz0qHyILyIRtF8wbINxQR0UuuFS9msHBrpA5fS55bW7tawd7Blc_HVkB_Mh2PJ4M2gny_dudvVaatwV9ZVQBq_uyGeshrgy0HLO5JdvA==&uniplatform=NZKPT&language=CHS",
+          "author": "黄雅兰;方祎;",
+          "description": "在近年来的听觉复兴浪潮中，不少以往聚焦文字报道的媒体通过创设播客开展新闻创新。在行动主义视角下，本文通过播客民族志和深度访谈，总结出媒体创设播客的两条路径：一是媒体机构在整体数字转型过程中自上而下的创新安排，二是记者“用爱发电”、自下而上的创新探索。编辑部的创新文化、播客平台相对宽松的环境以及声音形态对透明规范的凸显和对深度内容的容纳，使先锋记者得以延续并拓展专业新闻生产实践，重构优质新闻的生产规...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "人机关系线索下的智能传播研究及其理论体系构想",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBffZPXg6U_MdJJJ5P5pzznAS5jgI2cNd2rUhtL_NPVqm8GnCACQVzjZxMDrRZeQvftNHhMMPrvQreMtWbr9ZYds5E7lpTJUh4yFQFabJRR9i7XQYI6AnIF8_ZJ-cPdk-Whu8EADdVKzWr3yIk1laIsr-alsqoyiYG0oWvUrr69Uw==&uniplatform=NZKPT&language=CHS",
+          "author": "彭兰;",
+          "description": "从人机交互技术诞生，到人机对话应用兴起，再到人机传播概念正式提出，人机关系的变革推动了人机传播在实践与理论上的发展，这也是智能传播发展的一条关键路径。在对人机关系认识不断深入的过程中，学者提出了不同的研究范式。但是，人机传播并不能覆盖所有与智能传播相关的领域。智能传播的完整版图与理论体系建构至少需要包括六个方面的核心线索：“人—机”关系、“人—机—内容”关系、“人—机—人”关系、“人—机—自我”关...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "锚点与断点：平台如何塑造算法的“可信”——基于15个算法推荐类媒体App规则体系的考察",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjByiesHHuY4aeu5KWa6_ZWAtBXlCPpeNI2SX2FfTIJhCSkXiMCfJ9fSmOfcDV5vlHhKzZCgnnmUZgYjN6FZC0kzYmZRIVG5rAeKhGr2d_lzlsMEpfcksxirC7E5xlqfmcZVwEXwQ2cxTvFi0-3hQIKajVPLlmMsNiH20bFlCIDhRQ==&uniplatform=NZKPT&language=CHS",
+          "author": "洪杰文;常静宜;",
+          "description": "信任与可信已经成为算法社会无法绕开的核心问题，但在用户侧信任与技术侧可信的双向讨论中存在平台视角的缺失。本研究分析15个算法推荐类媒体App的规则体系，探究平台如何塑造算法的“可信”。研究发现：平台基于法规要求在规则文本中设定“隐匿可见”的可信线索，通过交互设计显化这些线索以强调算法的可见与可控。但面对看似可信的算法，用户的信任依旧盲目且脆弱，甚至难以称得上真正的信任。而平台则进一步借助在线社区，...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "青年数字断连的实践悖论：能力分化及其心理影响",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjAG9IEi77C4XkNF2kcm9wUvDov0hqvutA7xdTP0W2YILZvF8AoxwZOU2eAmxctFVFmS-AxuBhhWRlpbOkfX9k61B_u6NjY-hYGfMMm2QFape43pwNoQ_7V833EsLGY-gdxW98K_ruUc5Bzxx62Yp24nG4cAZq8aJ2DAyML1KsXgbQ==&uniplatform=NZKPT&language=CHS",
+          "author": "杨江华;张梦竹;贾芸汀;",
+          "description": "面对数字设备过度使用的负面影响，数字断连正成为青年大学生平衡数字生活的新尝试。本文对青年大学生的数字断连行为及其心理影响进行了深入探讨。研究发现，青年大学生的数字断连呈现“解困反被困”的实践悖论特征：一方面，尽管部分学生试图通过断连缓解数字压力，却因断连频率过高、断连策略过多而诱发负面心理反应；另一方面，数字能力较强者虽能减轻高频断连的负面心理影响，但在策略调整中更可能经历心理健康水平的下降。质性...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "掩不住的“一团矛盾”：20世纪早期“边际新闻人”研究——以赵敏恒为中心的考察",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjB06wALDEzk6qqq3b-0XnkuGJJ0tWzohJ0KdlwjcyRegESE9q8Soar4rY5fowVGQOhdkIVI4iEeSj2Mn_loHdTeRAajjJHLni08CTy9D2m3Ja0mdNlTxQELOnjS7eRRnxwoQ58xu40Z4YfYmqfq9k-36YQK_NFpAM7vQZW2nm558A==&uniplatform=NZKPT&language=CHS",
+          "author": "于晴;",
+          "description": "本文将20世纪早期留美并接受专业新闻教育的中国知识分子概括为“边际新闻人”。通过研究该群体中颇为典型的赵敏恒的经历，发现其具有“一团矛盾”的特征：他们身处新旧、东西之间的边际情境，面临着专业主义和儒家传统、世界主义和民族主义的多重张力，也由此产生了可称为“新闻士人”的职业意识与国际主义的文化认同。他们有志于除旧布新、改革社会，成为沟通东西文化的中间人，并为中国现代国际新闻业做出了开创性贡献",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "《新闻大学》投稿须知（2022版）",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjA44czLEy_F1BspmDT0_BhwCNO5frnoFKbQaxVQmny_rrCQ9V48Skaea6b4_axiVcommBI3wapjksxQ4uxpx9Sj8ZuaP1epiqBBoijAI7uL-zTCv4uc8WxjZeCzl9Q5zlunkZLxKl5Us09e0WxRXuRQVt4_oQUYOWyVuYrpffaA9A==&uniplatform=NZKPT&language=CHS",
+          "author": "",
+          "description": "&lt;正&gt;一、基本要求来稿以8,000—13,000字左右为宜（加注释和参考文献一般不超过15,000字）。所有稿件请上传至本刊在线投稿系统，网址http://devjava.odb.sh.cn/fudan News/client/contribute.html。其中，来稿作者姓名、作者简介（含论文依托的基金项目等信息）、联系手机、邮件地址等信息请在网站系统中依次录入，上述信息请勿出现在上...",
+          "pub_date": "Sat, 14 Feb 2026 16:00:00 GMT"
+        },
+        {
+          "title": "从“内容产品”到“叙事文体”：精品化微短剧的叙事范式转型研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjB3rwwPjaNI_5_kns3uGJ2-iYm0rTACmVgZexOiTQwON5py0jysAbTTt-nfH6SWyWTHMyhxcHLXL3GGYKgMKpehBr8BgbrqerNBKsBGlmxzZhxMEPGvOa9kBTUe-xMgEHoFOaWWTMhO3ugmxcKrfn1hbdL27ruK6fJL5eeRRdqJqw==&uniplatform=NZKPT&language=CHS",
+          "author": "林升栋;殷秀云;",
+          "description": "网络视听产业正在从规模扩张向品质升维转型，作为网络视听产业的重要组成部分，微短剧的精品化是其当下及未来发展的必然趋势。当前，微短剧精品化常以长剧为参照标准。本文基于比较视野，通过对长剧、短剧与微剧的叙事分析，揭示了三者之间“系统叙事”“高概念闭环叙事”与“程式化爽感叙事”的根本分野。这种分野的根源在于“审美—文化”与“技术—流量”体制形态的不同。本研究指出，微短剧的进阶不需向长剧美学靠拢，而是应该...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "爱的幻想主题：微短剧“出海”区域国别传播的跨文化阐释",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBtnpjhA3mhHq0fd2z1JfT0XKaz_aln83ETDp5R_bSbcI7JrqRdjWSKpeW_TvRCf8T-acX9btIghWoxC2O-8LeIVoyQ9eqMIZXyrUWlf5bVkfkKVm7W-5PictzH8Ryf3p7YRy4HWtz4uWMFEfEvQBaShtbiNUZoK9EIUlteHzTSgA==&uniplatform=NZKPT&language=CHS",
+          "author": "肖珺;常乐;关晴;",
+          "description": "中国微短剧已传播至北美、欧洲、日韩、中东、东南亚等地域的200多个国家或地区。作为中国微短剧“出海”的核心叙事母题，“爱”在不同区域国别有何跨文化传播差异仍缺乏系统性研究。本文引入区域国别研究视角，采用幻想主题分析（FTA）与地理信息系统（GIS）的嵌入式混合设计，分析2022—2025年在全球有高热度的44部中国微短剧的“爱之幻想主题”。全球范围内流行的“爱”之幻想包括“寻求尊严的爱”“以家为名...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "掌心上的速效正义：微短剧观看对受众社会公平感的影响研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBcHxhTRGKmCkDfUcwljoDif8rIL6ZIV-z5xt7cDn2mrWDew2yzKnFVUEmyTQ2rbdJ007CJJ1TWSqmxW-3agvK5xsJFxWhN97Ep-40cebxUSvWALf7-ld09jv90bQ8uPKfScnPYsgsTbLjliZ3rr3gojRRqBL9kBQqiZncUq4QrEw==&uniplatform=NZKPT&language=CHS",
+          "author": "李华君;王凯悦;",
+          "description": "娱乐媒体在塑造公众的公平正义观念方面发挥着重要作用。作为新兴娱乐形式，微短剧的价值引导能力一直备受关注。本研究基于情感倾向理论和涵化理论，整合PLS-SEM与随机森林算法，探究微短剧观看频率对受众社会公平感的影响及其内在机制。研究发现：微短剧观看频率显著正向影响受众的社会公平感；感知真实性与公正世界信念在其中发挥链式中介作用；感知真实性的不同维度在此影响过程中呈现差异化效应，以叙事一致性和感知质量...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "日常生活中的政治嵌入：政务微短剧如何提升国家濡化能力？",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjD0BPPr4NVTWziSl_P8ynNCGy_eXC-R830hOSN7OPxYgn4d2sGdX7qTIIGsM7-8hGSUdYuPQUA89FJ7eFGTyUMBsV5XfBVyLHuZtHqjMY9AInhpDXdkJe_zjo-eLKZqmkGonPwqTuU294j7rWFlwJzsaVZ5UTSHKl4E0fwpD1ooNw==&uniplatform=NZKPT&language=CHS",
+          "author": "曾润喜;张文妍;",
+          "description": "作为与国家濡化能力密切相关的关键变量，媒介在沟通日常生活与政治实践方面的作用尚未得到充分探讨。本研究对全国范围内政务微短剧作品进行分析后发现，在深度媒介化时代，政务微短剧已成为提升国家濡化能力的重要工具。具体而言，政务微短剧通过符号构建、符号转译、碎片内化、情感具身等四种濡化策略，在娱乐化叙事中实现政治信息的偶然触达，促进公众政治“惯习”的形成与认知再强化，推动国家与社会关系的柔性调适。研究表明，...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "传播的隐喻：对50个传播学核心概念的前理论考察",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjAIuPaTQklMRL4_wZHT_n4uKlL8aWXMh1EifauKQvDbtL8VlCWwv5u4YxnJpiL389H2j42N30_Xk3WBZrDEnFwplz-X_rEEsQpmUV7J8B1FGVjpqwer02epPnPegxfnIyG3ld7w6QkN1DWseOo9_mMGQyvO4_ddwG5TyRbtqLXq8Q==&uniplatform=NZKPT&language=CHS",
+          "author": "吴小坤;",
+          "description": "传播学的理论建构呈现出一个耐人寻味的现象：相当数量的核心概念以隐喻形态被广泛使用，却在向形式理论转化的过程中遭遇持续阻滞。本文通过对50个隐喻概念的前理论考察，揭示其背后的“适应性陷阱”：隐喻的模糊性赋予概念跨情境适用性，但这种灵活性反而阻碍操作性转化，形成自我强化的路径依赖。研究将这些概念归纳为力、流动、空间、表演、结构、符号六种类型，发现各类型面临不同困境：空间类隐喻倾向于将动态过程实体化，在...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "找回“地方”：中国传播研究的一种可能路径——基于“民族志传播研究”的讨论",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjAIuPaTQklMRL4_wZHT_n4uKlL8aWXMh1EifauKQvDbtL8VlCWwv5u4cBrv90CF7sFAjcx44rjJlreFjVsxKrrNU2xqP3nbBHmfl7qyeT9MMVOl4mj5G_OqJQ1w8ql0Fg8ljq9fi2-TNTAeldb3WYYR5pr6CtKeE5d1d-eGnqVogw==&uniplatform=NZKPT&language=CHS",
+          "author": "郭建斌;",
+          "description": "本文以“民族志传播研究”为例，围绕何谓“地方”、为何要找回“地方”、如何找回“地方”三个问题展开讨论，目的在于表明“地方”在知识生产中的重要意义。本文对于“地方”的强调，绝非要夸大某种所谓“本土”价值，而是希望中国传播研究能以一种更加开放的心态，重新找回失落的“地方”，真正做到“再度出发”",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "信息推送与青年的爱国情感认同研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjDNsoiLdAH6vtKPIiv7ARYIwmU4NoE23HvGLxG30x1z34mByK8nNCtW0oMolC7zOYUAAYh0aNc7Xt_6SCWuKZg5-QxIEXvlkT8fxWElDiL7F8ntST6yGD_TcC80_C9JrBca_q_MIU8BiIQ3IpZ49JLD0QKDxsqKSNkZ8e-rVt1MEg==&uniplatform=NZKPT&language=CHS",
+          "author": "陈李伟;郑雯;黄荣贵;桂勇;",
+          "description": "网络信息推送日益介入观念的形成过程，但其具体影响及其机制尚待厘清。本文基于在线田野实验方法，综合运用倾向值匹配、T检验方法和加权线性回归模型，探讨网络信息推送对青年大学生爱国观念的影响。研究发现，信息推送显著提升了青年大学生的爱国情感认同，但在爱国行动态度层面有分化，整体上提升不显著。这种非对称效应可归因于信念层面与行动态度之间底层逻辑的差异，即信念层面遵循价值逻辑，易受信息推送的涵化；行动态度层...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "“认知正义”视野下的全球南方传播共同体——基于代表性媒体人的访谈研究（2022—2024）",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjDszapauY4FaVYdw_APgLn2qkC1ksJ8US_2bUJlwOVz_cmXzWzrzA1iRufA8mHbEFG3vQmeVXIsd6S5g6kBIVaZOoPCtOk3bHrHIO1YJXV9kGxMmFowpkBYg3uZNGEEp1OS0CbJ7h_5pHw5-lyat5cPvlm_qDJAIieLq3y3ZlVfRQ==&uniplatform=NZKPT&language=CHS",
+          "author": "朱泓宇;俞雅芸;史安斌;",
+          "description": "全球南方媒体合作网络正逐步构建。若要摆脱短期性的策略考量，须在认知层面形成共识，推动从合作网络向“传播共同体”转变。围绕知识生态学意义上认知正义与传播共同体的辩证关系、回溯从第三世界到全球南方的历史脉络，可以进一步理解南方国家在全球传播秩序中寻求集体认同与合作基础的价值与意义，分析基于全球南方媒体合作的传播共同体何以可为。通过对55名具有代表性的媒体从业者进行的为期三年的系统性访谈，本文将“认知正...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "《新闻大学》投稿须知（2022版）",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjA6BYb096DBwnnjVSBaCjJ0m9Y8jhm1IFZhncsqL58IAXkQWCBT1zjyl0keZMg5J4Qr4ttNR6qevXKpOQFnOX77yAex-5oUCestGBw7sgmz0v7kilzN4qvPUeP4EUBTcI532_S6ehbS0TKMlKBaoRPoU4ufX3WFx1C1wRi32lrFPQ==&uniplatform=NZKPT&language=CHS",
+          "author": "",
+          "description": "&lt;正&gt;一、基本要求来稿以8,000—13,000字左右为宜（加注释和参考文献一般不超过15,000字）。所有稿件请上传至本刊在线投稿系统，网址http://devjava.odb.sh.cn/fudanNews/client/contribute.html。其中，来稿作者姓名、作者简介（含论文依托的基金项目等信息）、联系手机、邮件地址等信息请在网站系统中依次录入，上述信息请勿出现在上传...",
+          "pub_date": "Wed, 14 Jan 2026 16:00:00 GMT"
+        },
+        {
+          "title": "如何叫好又叫座：电影营销宣传对市场绩效的影响",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjBvR1h7da-8dPf6cMRWMIJeYiYpJlRSHBRqKIG0XXE593_BA3O-rF5cXYxX9Ava9C-_8KiXzUPbk-aKK1ZG79b8cRBztmpwt84xKCWi2S7WWMfsKUtADgU7oT9OWj__kLWRRGIUEWPLZsVveNdroxAF66XtHR7tc1lmZoH36wv1WQ==&uniplatform=NZKPT&language=CHS",
+          "author": "朱虹;袁佳;",
+          "description": "随着我国影视产业的蓬勃发展，营销宣传已成为电影产业链中不可或缺的环节。本文基于2010—2023年上映的629部影片进行实证研究，发现营销活动虽有助于吸引观众并提升票房收益，但会显著降低观众满意度，同时观影期望在营销与市场绩效之间起到部分中介作用。相关的拓展性分析发现，相比进口电影，国产电影营销对票房和观影规模的影响并无显著差异，但对观众满意度的抑制效应要更为显著。因此，本文认为，如何平衡营销的商...",
+          "pub_date": "Sun, 14 Dec 2025 16:00:00 GMT"
+        },
+        {
+          "title": "“多多益善”还是“过犹不及”：网红粉丝量感知与消费者融入的“倒U型”关系研究",
+          "link": "https://kns.cnki.net/kcms2/article/abstract?v=tjV0JOkNcjC8HIkIle8y9SFfaAB4JObwoQ5XdWPeib_AmFbywXlMinj4C5-9Aqr8j_siJX_9NR9nz-uSmNjS_-T3oFPA85qqghmRMWYVta8zHbvZDvaYCGHMvzHLTp6sdwJDGAf3PYWdZq0apa2Jan0eNuGJNn1YDXKmyBmi4woatS1KM97L5A==&uniplatform=NZKPT&language=CHS",
+          "author": "顾晨昱;",
+          "description": "网红广告已成为数字营销传播的重要组成部分，但学界对于网红粉丝量与广告效果之间的关系仍存在争议。本研究提出网红粉丝量与消费者融入之间的“倒U型”关系，为这一争议提供了解释；同时，本研究以消费者融入作为双向传播时代广告效果研究新视角，推进广告效果研究由“一传十”到“十传百”聚焦点转变。通过对Z世代样本（N=320）进行分组实验，研究发现：（1）网红粉丝量感知与消费者融入呈先正向后负向的“倒U型”关系；...",
+          "pub_date": "Sun, 14 Dec 2025 16:00:00 GMT"
+        }
+      ],
+      "blocked": false,
+      "error": null,
+      "duration_sec": 0.15,
+      "warmup_success": true,
+      "warmup_duration_sec": 0.72,
+      "field_completeness": {
+        "title": 20,
+        "link": 20,
+        "author": 18,
+        "description": 20,
+        "pub_date": 20
+      }
+    }
+  ],
+  "blocked": false
+}

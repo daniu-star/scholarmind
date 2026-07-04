@@ -1,0 +1,13 @@
+{
+  "fetch_success": false,
+  "fetch_error": "未抓取到任何代理",
+  "total_fetched": 0,
+  "tested": 0,
+  "reachable": 0,
+  "cnki_blocked": 0,
+  "cnki_error": 0,
+  "residential": 0,
+  "datacenter": 0,
+  "unknown_type": 0,
+  "proxies_detail": []
+}

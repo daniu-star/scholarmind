@@ -1,5 +1,6 @@
 fastapi>=0.104.0
 uvicorn>=0.24.0
+python-magic>=0.4.27
 python-multipart>=0.0.6
 matplotlib>=3.8.0
 seaborn>=0.13.0
@@ -33,5 +34,15 @@ alembic>=1.13.0
 structlog>=24.1.0
 # ── 新增：测试依赖 ─────────────────────────────
 httpx>=0.27.0
+curl_cffi>=0.7.0
 pytest>=8.0.0
 pytest-asyncio>=0.23.0
+pyjwt==2.12.1
+pwdlib[argon2]==0.2.1
+python-multipart==0.0.20
+wechatpayv3[async]
+python-alipay-sdk==3.4.0
+cryptography>=42.0.0
+tiktoken
+# ── 新增：LLM 客户端鲁棒性 ─────────────────────
+tenacity>=8.2.0

@@ -54,6 +54,7 @@ class Discipline(str, Enum):
     ENGINEERING = "engineering"
     SCIENCE = "science"
     HUMANITIES = "humanities"
+    INTERDISCIPLINARY = "interdisciplinary"
 
 
 class ResearchType(str, Enum):

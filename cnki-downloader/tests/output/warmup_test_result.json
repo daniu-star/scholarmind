@@ -1,0 +1,41 @@
+{
+  "phase": "warmup",
+  "steps": [
+    {
+      "name": "home",
+      "url": "https://www.cnki.net/",
+      "success": true,
+      "status_code": 200,
+      "elapsed_sec": 0.21,
+      "content_length": 105696,
+      "server": "nginx",
+      "content_type": "text/html",
+      "final_url": "https://www.cnki.net/",
+      "is_cnki_blocked": false
+    },
+    {
+      "name": "search",
+      "url": "https://kns.cnki.net/kns8s/",
+      "success": true,
+      "status_code": 200,
+      "elapsed_sec": 0.17,
+      "content_length": 16775,
+      "server": "",
+      "content_type": "text/html;charset=UTF-8",
+      "final_url": "https://kns.cnki.net/kns8s/",
+      "is_cnki_blocked": false,
+      "has_login_marker": false
+    },
+    {
+      "name": "warmup_session",
+      "success": true,
+      "elapsed_sec": 0.62,
+      "return_value": true
+    }
+  ],
+  "blocked": false,
+  "block_info": null,
+  "warmup_success": true,
+  "total_duration_sec": 1.0,
+  "error_log_count": 0
+}

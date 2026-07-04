@@ -22,7 +22,7 @@ async def test_build_system_prompt_researcher():
     """测试研究员系统提示构建"""
     from ...services.agent_service import AgentService
     service = AgentService(api_key="test-key")
-    prompt = service._build_system_prompt("researcher", None)
+    prompt = await service._build_system_prompt("researcher", None)
     assert "研究员" in prompt
     assert "学术选题" in prompt
 
@@ -32,7 +32,7 @@ async def test_build_system_prompt_with_context():
     """测试带上下文的系统提示构建"""
     from ...services.agent_service import AgentService
     service = AgentService(api_key="test-key")
-    prompt = service._build_system_prompt(
+    prompt = await service._build_system_prompt(
         "researcher",
         {"discipline": "人文社科", "research_type": "质化研究"},
     )

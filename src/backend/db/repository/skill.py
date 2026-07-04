@@ -4,7 +4,7 @@ ScholarMind 技能仓储
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Sequence
 
 from sqlalchemy import select
@@ -60,7 +60,7 @@ class SkillRepository(BaseRepository[Skill]):
         if skill is None:
             return None
         skill.enabled = enabled
-        skill.updated_at = datetime.utcnow()
+        skill.updated_at = datetime.now(timezone.utc)
         return await self.update(skill)
 
     async def seed_preset_skills(self, presets: list[dict]) -> int:
@@ -83,8 +83,8 @@ class SkillRepository(BaseRepository[Skill]):
                     triggers=preset.get("triggers", []),
                     rules=preset.get("rules", ""),
                     is_preset=preset.get("is_preset", True),
-                    created_at=datetime.utcnow(),
-                    updated_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
                 )
                 self.db.add(skill)
                 inserted += 1

@@ -1,15 +1,19 @@
 """SQLite database service for academic resource storage."""
 
+import asyncio
 import sqlite3
 import uuid
 import json
-import logging
+import structlog
 from datetime import datetime, timedelta
 from typing import Optional
 
 from ..config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
+
+# ── Whitelist for update_crawl_log column names ──
+_CRAWL_LOG_COLUMNS = frozenset({"status", "items_found", "items_saved", "error_msg", "finished_at"})
 
 
 class DatabaseService:
@@ -177,6 +181,34 @@ class DatabaseService:
         rows = conn.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
+    def search_resources_by_titles(
+        self, titles: list[str], limit: int = 50
+    ) -> list[dict]:
+        """批量按多个标题搜索资源（避免 N+1 查询）。
+
+        单次查询匹配任一标题的所有资源，按引用数降序排列。
+        用于 RAG 服务批量补全向量搜索结果的元数据。
+        """
+        if not titles:
+            return []
+        # 🔴 修复: 限制 OR 子句数量，防止大查询
+        titles = titles[:50]
+        conn = self._get_conn()
+        where_clauses = []
+        params: list = []
+        for title in titles:
+            where_clauses.append("title LIKE ?")
+            params.append(f"%{title}%")
+        sql = f"""
+            SELECT * FROM academic_resources
+            WHERE {' OR '.join(where_clauses)}
+            ORDER BY citations DESC, crawled_at DESC
+            LIMIT ?
+        """
+        params.append(limit)
+        rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
     def get_recent_resources(
         self, source_db: Optional[str] = None, limit: int = 50
     ) -> list[dict]:
@@ -239,7 +271,13 @@ class DatabaseService:
         conn.commit()
 
     def update_crawl_log(self, log_id: str, **kwargs):
-        """Update a crawl log entry."""
+        """Update a crawl log entry.
+
+        🔴 修复: 列名白名单校验，防止 SQL 注入（f-string 拼接列名）。
+        """
+        for k in kwargs:
+            if k not in _CRAWL_LOG_COLUMNS:
+                raise ValueError(f"Invalid crawl_log column: {k}")
         conn = self._get_conn()
         sets = ", ".join(f"{k} = ?" for k in kwargs)
         values = list(kwargs.values()) + [log_id]
@@ -326,6 +364,50 @@ class DatabaseService:
         deleted = cursor.rowcount
         logger.info(f"Cleaned up {deleted} resources older than {days} days")
         return deleted
+
+    # ── Async wrappers (避免阻塞事件循环) ────────────────
+
+    async def search_resources_async(self, query: str, source_db=None, limit=20) -> list[dict]:
+        return await asyncio.to_thread(self.search_resources, query, source_db, limit)
+
+    async def search_resources_by_titles_async(self, titles: list[str], limit=50) -> list[dict]:
+        return await asyncio.to_thread(self.search_resources_by_titles, titles, limit)
+
+    async def get_recent_resources_async(self, source_db=None, limit=50) -> list[dict]:
+        return await asyncio.to_thread(self.get_recent_resources, source_db, limit)
+
+    async def get_resource_count_async(self, source_db=None) -> int:
+        return await asyncio.to_thread(self.get_resource_count, source_db)
+
+    async def get_all_resources_for_index_async(self) -> list[dict]:
+        return await asyncio.to_thread(self.get_all_resources_for_index)
+
+    async def get_latest_crawl_status_async(self) -> dict:
+        return await asyncio.to_thread(self.get_latest_crawl_status)
+
+    async def get_hot_keywords_async(self, limit=20) -> list[dict]:
+        return await asyncio.to_thread(self.get_hot_keywords, limit)
+
+    async def save_resource_async(self, resource: dict) -> bool:
+        return await asyncio.to_thread(self.save_resource, resource)
+
+    async def save_resources_batch_async(self, resources: list[dict]) -> int:
+        return await asyncio.to_thread(self.save_resources_batch, resources)
+
+    async def log_crawl_async(self, log: dict) -> None:
+        return await asyncio.to_thread(self.log_crawl, log)
+
+    async def update_crawl_log_async(self, log_id: str, **kwargs) -> None:
+        return await asyncio.to_thread(self.update_crawl_log, log_id, **kwargs)
+
+    async def upsert_keyword_async(self, keyword: str, source_db: str) -> None:
+        return await asyncio.to_thread(self.upsert_keyword, keyword, source_db)
+
+    async def upsert_keywords_batch_async(self, keywords: list[str], source_db: str) -> None:
+        return await asyncio.to_thread(self.upsert_keywords_batch, keywords, source_db)
+
+    async def close_async(self) -> None:
+        return await asyncio.to_thread(self.close)
 
 
 # Singleton instance

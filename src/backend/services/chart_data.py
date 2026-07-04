@@ -5,7 +5,7 @@ ScholarMind 学术图表数据解析与辅助函数
 import io
 import json
 import csv
-import logging
+import structlog
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -16,7 +16,7 @@ from typing import Any
 
 from .chart_style import get_origin_style, _apply_origin_style
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # ── 数据解析 ──────────────────────────────────────────────
 

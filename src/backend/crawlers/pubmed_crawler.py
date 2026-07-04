@@ -1,6 +1,6 @@
 """PubMed crawler adapter — uses E-utilities API."""
 
-import logging
+import structlog
 from datetime import datetime, timedelta
 from xml.etree import ElementTree
 
@@ -8,7 +8,7 @@ import aiohttp
 
 from .base import BaseCrawler
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class PubMedCrawler(BaseCrawler):

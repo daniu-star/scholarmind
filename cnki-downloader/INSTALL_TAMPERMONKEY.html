@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CNKI Auto-Download Setup</title>
+<style>
+body{font-family:"Microsoft YaHei",sans-serif;max-width:800px;margin:30px auto;padding:20px;background:#f5f5f5}
+h1{color:#1a73e8}.step{background:white;border:1px solid #ddd;padding:20px;margin:15px 0;border-radius:8px}
+.step h2{margin:0 0 10px 0;color:#333}.step p{margin:5px 0;color:#555}
+.step code{background:#f0f0f0;padding:2px 6px;border-radius:3px;font-size:13px}
+.step textarea{width:100%;height:200px;font-family:Consolas,monospace;font-size:12px;border:1px solid #ddd;border-radius:4px;padding:10px}
+.btn{display:inline-block;padding:12px 24px;background:#1a73e8;color:white;text-decoration:none;border-radius:6px;font-size:15px;margin:10px 0}
+.btn:hover{opacity:0.85}
+.note{background:#fff3cd;border:1px solid #ffc107;padding:12px;border-radius:6px;margin:10px 0}
+</style>
+</head>
+<body>
+<h1>CNKI Auto-Download Setup</h1>
+<p>This will enable FULLY AUTOMATIC PDF downloads from CNKI paper pages.</p>
+
+<div class="step">
+<h2>Step 1: Install Tampermonkey</h2>
+<p>Tampermonkey is a browser extension that runs custom scripts on websites.</p>
+<p>
+<a class="btn" href="https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo" target="_blank">Install for Chrome</a>
+<a class="btn" href="https://microsoftedge.microsoft.com/addons/detail/tampermonkey/iikmkjmpaadaobahmlepeloendndfphd" target="_blank">Install for Edge</a>
+</p>
+<p style="font-size:12px;color:#888">If the links don't work, search "Tampermonkey" in your browser's extension store.</p>
+</div>
+
+<div class="step">
+<h2>Step 2: Add the CNKI Auto-Download Script</h2>
+<p>Click the Tampermonkey icon → "Create a new script..." → Replace all content with the code below → Save (Ctrl+S)</p>
+<textarea id="script" readonly></textarea>
+<p><button class="btn" onclick="copyScript()">Copy Script to Clipboard</button></p>
+</div>
+
+<div class="step">
+<h2>Step 3: Open the Download Page</h2>
+<p>Once Tampermonkey is set up, open the download page:</p>
+<p><a class="btn" href="all_papers_v2.html" target="_blank">Open V2 Download Page (400 Papers)</a></p>
+<p>Press <b>S</b> on the download page to start auto-opening papers.</p>
+<p>Each paper detail page will auto-download PDF thanks to Tampermonkey!</p>
+</div>
+
+<div class="note">
+<b>How it works:</b> Tampermonkey runs the script on every CNKI paper detail page.
+The script automatically finds the "PDF下载" button and clicks it, triggering the download.
+Your browser's CNKI cookies handle the authentication chain automatically.
+<br><br>
+<b>Troubleshooting:</b> If PDFs aren't downloading:
+<br>1. Make sure Tampermonkey is enabled (icon should be colored, not gray)
+<br>2. Check that your browser has CNKI login cookies (visit www.cnki.net to verify)
+<br>3. Open a paper page manually and check if the script runs (you'll see a blue bar at the top)
+</div>
+
+<script>
+// Load the userscript content
+fetch('tests/cnki-autodownload.user.js').then(r => r.text()).then(t => {
+    document.getElementById('script').value = t;
+});
+
+function copyScript() {
+    var ta = document.getElementById('script');
+    ta.select();
+    document.execCommand('copy');
+    alert('Script copied to clipboard! Paste it into Tampermonkey.');
+}
+</script>
+</body>
+</html>

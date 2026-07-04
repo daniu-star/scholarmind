@@ -1,6 +1,6 @@
 """Wanfang (万方) crawler adapter — HTTP + HTML parsing."""
 
-import logging
+import structlog
 import re
 
 import aiohttp
@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from .base import BaseCrawler
 from ..config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class WanfangCrawler(BaseCrawler):

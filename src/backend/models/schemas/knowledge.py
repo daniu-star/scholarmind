@@ -16,6 +16,14 @@ class CNKISearchRequest(BaseModel):
     count: int = Field(default=20, ge=1, le=50, description="返回结果数量")
 
 
+class AcademicSearchRequest(BaseModel):
+    """多源学术搜索请求"""
+    query: str = Field(..., min_length=1, max_length=200, description="检索词")
+    count: int = Field(default=20, ge=1, le=50, description="结果数量")
+    source_filter: Optional[str] = Field(default=None, description="数据源过滤，逗号分隔")
+    year_filter: str = Field(default="", description="年份过滤")
+
+
 class CNKIConfigRequest(BaseModel):
     """CNKI 配置请求"""
     proxy_url: Optional[str] = Field(default=None, description="代理 URL")

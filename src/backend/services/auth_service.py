@@ -1,0 +1,227 @@
+from datetime import datetime, timezone, timedelta
+import secrets
+from typing import Optional
+import jwt
+from pwdlib import PasswordHash
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from ..models.orm import User, UserQuota, VerificationCode
+from ..config import settings
+
+pwd_hash = PasswordHash.recommended()
+
+
+def normalize_phone(phone: str) -> str:
+    """将中国大陆手机号统一保存为 E.164，接受空格、短横线和 +86 前缀。"""
+    compact = "".join(ch for ch in phone.strip() if ch.isdigit() or ch == "+")
+    compact = compact.replace("-", "")
+    digits = "".join(ch for ch in compact if ch.isdigit())
+    if digits.startswith("0086"):
+        digits = digits[4:]
+    elif digits.startswith("86") and len(digits) == 13:
+        digits = digits[2:]
+    if len(digits) != 11 or not digits.startswith("1") or digits[1] not in "3456789":
+        raise ValueError("请输入有效的中国大陆手机号")
+    return f"+86{digits}"
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return pwd_hash.verify(plain, hashed)
+
+def get_password_hash(password: str) -> str:
+    return pwd_hash.hash(password)
+
+def create_access_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire, "type": "access"})
+    return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+def create_refresh_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "type": "refresh"})
+    return jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+def decode_token(
+    token: str, expected_type: Optional[str] = None
+) -> Optional[dict]:
+    """解码并校验 JWT。
+
+    Args:
+        token: JWT 字符串
+        expected_type: 期望的 token 类型 ("access" 或 "refresh")。
+            - None（默认）：不校验 type，保持向后兼容（仅检查签名与过期）
+            - "access"：仅接受 type=access 的 token，refresh/其他类型返回 None
+            - "refresh"：仅接受 type=refresh 的 token
+            P0 Task 3.7：阻断 refresh token 访问业务 API（access 端点），
+            以及 access token 调用 refresh 端点的混用攻击。
+    """
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+    if expected_type is not None and payload.get("type") != expected_type:
+        # 类型不匹配（如 refresh token 访问业务 API）→ 视为无效
+        return None
+    return payload
+
+async def authenticate_user(db: AsyncSession, phone: str, password: str) -> Optional[User]:
+    try:
+        normalized = normalize_phone(phone)
+    except ValueError:
+        return None
+    result = await db.execute(select(User).where(User.phone == normalized))
+    user = result.scalar_one_or_none()
+    if not user or not verify_password(password, user.password_hash):
+        return None
+    return user
+
+async def register_user(
+    db: AsyncSession, phone: str, password: str, nickname: str = ""
+) -> User:
+    normalized = normalize_phone(phone)
+    user = User(
+        username=normalized,
+        phone=normalized,
+        password_hash=get_password_hash(password),
+        nickname=nickname,
+    )
+    db.add(user)
+    await db.flush()
+    # 初始化配额
+    quota = UserQuota(
+        user_id=user.id,
+        tokens_used=0,
+        tokens_limit=settings.FREE_TIER_TOKEN_LIMIT,
+        plan="free",
+        free_chats_used=0,
+        free_chat_limit=settings.FREE_CHAT_LIMIT,
+        model_tier="flash",
+    )
+    db.add(quota)
+    await db.flush()
+    return user
+
+async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
+    result = await db.execute(select(User).where(User.id == user_id))
+    return result.scalar_one_or_none()
+
+
+# ── 邮箱验证码 ──────────────────────────────────────────
+
+
+def generate_verification_code() -> str:
+    return str(secrets.randbelow(900000) + 100000)
+
+
+async def create_and_send_code(
+    db: AsyncSession, target: str, purpose: str = "login"
+) -> dict:
+    """创建验证码并发送邮件。含限频检查。"""
+    from ..services.email_service import send_verification_email, EmailSendError
+
+    # 限频检查（用 first() 避免多行报错）
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        seconds=settings.VERIFICATION_CODE_RATE_LIMIT_SECONDS
+    )
+    recent = await db.execute(
+        select(VerificationCode)
+        .where(VerificationCode.target == target, VerificationCode.created_at >= cutoff)
+        .limit(1)
+    )
+    if recent.scalars().first():
+        raise ValueError("验证码发送过于频繁，请稍后再试")
+
+    code = generate_verification_code()
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES
+    )
+
+    vc = VerificationCode(
+        target=target,
+        code=code,
+        purpose=purpose,
+        expires_at=expires_at,
+    )
+    db.add(vc)
+    await db.flush()
+
+    # 发送邮件
+    await send_verification_email(target, code)
+
+    return {
+        "target": target,
+        "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
+    }
+
+
+async def verify_code_and_login(
+    db: AsyncSession, target: str, code: str
+) -> Optional[User]:
+    """校验验证码，返回或创建用户。
+
+    target 可以是手机号或邮箱。若用户不存在则自动注册（验证码登录模式）。
+    """
+    now = datetime.now(timezone.utc)
+    # 🔴 修复: 检查最近 5 分钟内该 target 的失败尝试次数，防止暴力破解
+    failed_window = now - timedelta(minutes=5)
+    failed_count = await db.scalar(
+        select(func.count(VerificationCode.id)).where(
+            VerificationCode.target == target,
+            VerificationCode.used == True,
+            VerificationCode.created_at >= failed_window,
+        )
+    )
+    if failed_count and failed_count >= 10:
+        return None  # 10 次验证尝试后拒绝，防止暴力破解
+
+    result = await db.execute(
+        select(VerificationCode)
+        .where(
+            VerificationCode.target == target,
+            VerificationCode.code == code,
+            VerificationCode.used == False,
+            VerificationCode.expires_at > now,
+        )
+        .order_by(VerificationCode.created_at.desc())
+    )
+    vc = result.scalars().first()
+    if not vc:
+        return None
+
+    # 标记已使用
+    vc.used = True
+    await db.flush()
+
+    # 查找或创建用户：按 phone 或 email 匹配
+    user_result = await db.execute(
+        select(User).where(
+            (User.phone == target) | (User.email == target)
+        )
+    )
+    user = user_result.scalar_one_or_none()
+
+    if user is None:
+        # 自动注册新用户
+        user = User(
+            username=target,
+            phone=target if "@" not in target else None,
+            email=target if "@" in target else None,
+            password_hash=get_password_hash(secrets.token_hex(16)),
+        )
+        db.add(user)
+        await db.flush()
+        # 初始化配额
+        quota = UserQuota(
+            user_id=user.id,
+            tokens_used=0,
+            tokens_limit=settings.FREE_TIER_TOKEN_LIMIT,
+            plan="free",
+            free_chats_used=0,
+            free_chat_limit=settings.FREE_CHAT_LIMIT,
+            model_tier="flash",
+        )
+        db.add(quota)
+        await db.flush()
+
+    return user

@@ -1,111 +1,49 @@
 from __future__ import annotations
 
-from openai import AsyncOpenAI
+import asyncio
 from typing import Optional, Any, TYPE_CHECKING
 import json
-import logging
+import structlog
 import re
 import uuid
+import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..services.skills_service import SkillsService
 from ..services import chart_service
 from ..config import settings
 from ..utils.circuit_breaker import deepseek_circuit_breaker
-from ..core.exceptions import AgentChatFailedError
+from ..utils.file_parser import extract_pdf, extract_docx
+from ..utils.cache import cache_result
+from ..utils.llm_client import llm_client
+from ..core.exceptions import AgentChatFailedError, LLMTruncatedError
 from .interfaces import IAgentService
+
+# ── 从 agent 子包导入拆分后的模块（agent_service.py 拆分 → 5 模块） ──
+from .agent.cot_processor import is_cot_enabled, get_cot_instruction, parse_cot_response, CoTStreamState, match_partial_tag_suffix
+from .agent.prompt_builder import (
+    AGENT_LLM_CONFIG, _get_agent_llm_config, _AGENT_STAGE_NAMES, _canned_greeting,
+    AGENT_PROMPTS, CONTEXT_TEMPLATES, VALID_AGENTS,
+    AGENT_ACADEMIC_ENHANCEMENT,
+)
+from .agent.skill_router import SkillRouter
+from .agent.session_manager import SessionManager
 
 if TYPE_CHECKING:
     from ..db.repository.conversation import ConversationRepository
     from ..db.repository.chart import ChartRepository
     from ..services.cnki_service import CNKIService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
-# Agent system prompts
-AGENT_PROMPTS = {
-    "researcher": """你是ScholarMind的「研究员」Agent，一位学术选题与问题建构专家。
-你的职责是通过循循善诱的对话，帮助用户：
-1. 明确研究方向和选题
-2. 建构问题边界
-3. 发现研究空白
-4. 初步确定研究框架
+# ── Prompt/config 从 agent 子包导入（prompt_builder.py 统一管理） ──
+# AGENT_PROMPTS, CONTEXT_TEMPLATES, VALID_AGENTS 等均已从 prompt_builder 导入（第 21-24 行）。
+# 本文件不再重复定义，避免双源维护不一致。
+# 文件模式下的路径常量使用 settings 中的配置。
+_CONVERSATIONS_DIR = Path(settings.CONVERSATIONS_DIR)
+_UPLOADS_DIR = Path(settings.UPLOAD_DIR)
 
-对话规则：
-- 每次回复提供2-4个选项按钮供用户选择，格式为【选项A】选项文字
-- 用学术但易懂的语言
-- 适时建议使用CNKI检索相关文献
-- 当用户提到数据时，建议生成学术图表
-- 回复末尾用单独一行列出所有选项，格式：[选项A|选项B|选项C]""",
-
-    "reviewer": """你是ScholarMind的「审查员」Agent，一位研究思路审查与优化专家。
-你的职责是：
-1. 审查用户的研究思路文档
-2. 评估研究问题的明确性、理论框架适配度、方法论可行性、创新性
-3. 给出具体的改进建议
-
-对话规则：
-- 审查时从4个维度评估：研究问题明确性、理论框架适配度、方法论可行性、创新性
-- 每个维度给出1-10评分和改进建议
-- 支持用户上传附件进行审查
-- 回复末尾用单独一行列出后续操作选项，格式：[选项A|选项B|选项C]""",
-
-    "architect": """你是ScholarMind的「架构师」Agent，一位论文架构审查与优化专家。
-你的职责是：
-1. 审查论文架构的完整性与逻辑性
-2. 评估逻辑连贯性、章节完整性、论证链路
-3. 优化论文结构
-
-对话规则：
-- 用树状结构展示论文架构
-- 对每个章节给出颜色标记：✅完整 / ⚠️待完善 / ❌缺失
-- 计算架构完整度评分（0-100）
-- 回复末尾用单独一行列出后续操作选项，格式：[选项A|选项B|选项C]""",
-
-    "synthesizer": """你是ScholarMind的「综述员」Agent，一位文献综述撰写专家。
-你的职责是：
-1. 辅助文献检索与筛选
-2. 帮助撰写系统文献综述
-3. 组织文献之间的逻辑关系
-
-对话规则：
-- 建议使用CNKI检索文献
-- 按主题/方法/时间线组织文献
-- 生成文献综述大纲
-- 回复末尾用单独一行列出后续操作选项，格式：[选项A|选项B|选项C]""",
-
-    "polisher": """你是ScholarMind的「润色员」Agent，一位学术语言润色与AIGC降重专家。
-你的职责是：
-1. 学术语言润色
-2. 降低AIGC检测率
-3. 确保学术写作规范
-
-对话规则：
-- 保持原文核心意思不变
-- 使用学术化表达
-- 调整句式结构降低AI检测率
-- 具体策略：变换句式结构、使用同义替换、增加过渡词、调整段落逻辑
-- 回复末尾用单独一行列出后续操作选项，格式：[选项A|选项B|选项C]"""
-}
-
-# Context templates that get appended to system prompts based on user profile
-CONTEXT_TEMPLATES = {
-    "discipline": "\n当前用户学科领域：{value}",
-    "research_type": "\n研究类型：{value}",
-    "readiness": "\n用户研究准备度：{value}",
-}
-
-# Valid agent IDs
-VALID_AGENTS = set(AGENT_PROMPTS.keys())
-
-# Conversation persistence directory
-CONVERSATIONS_DIR = Path("data/conversations")
-
-# Upload directory base
-UPLOADS_DIR = Path("data/uploads")
-
-# Supported file extensions for text extraction
 TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".py", ".r", ".bib"}
 BINARY_EXTENSIONS = {".pdf", ".docx"}
 
@@ -121,24 +59,29 @@ class AgentService(IAgentService):
         cnki_service: CNKIService | None = None,
         chart_repo: ChartRepository | None = None,
     ):
-        self.client = AsyncOpenAI(api_key=api_key, base_url=base_url) if api_key else None
+        # P0 修复: 不再自建 AsyncOpenAI 客户端，统一使用 llm_client 单例
+        # （走 tenacity 重试 + 超时 + deepseek_circuit_breaker 熔断器保护）
+        # api_key/base_url 参数保留以维持向后兼容，由 llm_client 从 settings 读取
         self.model = model
         self.conversation_repo = conversation_repo
         self.skills_service = skills_service or SkillsService()
         self.cnki_service = cnki_service
         self.chart_repo = chart_repo
 
-        # 文件模式回退：当无 repository 时使用内存字典 + 文件存储
-        self.conversations: dict[str, list[dict]] = {}
-        self._use_db = conversation_repo is not None
+        # ── 拆分后模块实例化 ──
+        self._sessions = SessionManager(conversation_repo)
+        self._skills = SkillRouter(skills_service=self.skills_service, cnki_service=cnki_service, chart_repo=chart_repo)
 
-        # RAG service for knowledge base injection
+        self.conversations = self._sessions.conversations
+        self._use_db = self._sessions._use_db
+
+        # 延迟初始化 RAG（避免阻塞 AgentService 构造）
         self.rag_service = None
-        try:
-            from .rag_service import get_rag_service
-            self.rag_service = get_rag_service()
-        except Exception as e:
-            logger.warning(f"RAG service not available: {e}")
+        self._rag_warmed_up = False
+
+        # 性能缓存
+        self._prompt_cache: dict[str, tuple[str, str]] = {}
+        self._skills_cache: dict[str, tuple[str, list[dict]]] = {}
 
         # 只在文件模式下加载持久化的对话
         if not self._use_db:
@@ -148,8 +91,8 @@ class AgentService(IAgentService):
 
     def _load_all_conversations(self) -> None:
         """Load all persisted conversations from data/conversations/"""
-        CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
-        for fp in CONVERSATIONS_DIR.glob("*.json"):
+        _CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
+        for fp in _CONVERSATIONS_DIR.glob("*.json"):
             try:
                 data = json.loads(fp.read_text(encoding="utf-8"))
                 session_id = fp.stem
@@ -159,8 +102,8 @@ class AgentService(IAgentService):
 
     def _save_conversation(self, session_id: str) -> None:
         """Persist a single conversation to data/conversations/{session_id}.json"""
-        CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
-        filepath = CONVERSATIONS_DIR / f"{session_id}.json"
+        _CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
+        filepath = _CONVERSATIONS_DIR / f"{session_id}.json"
         try:
             payload = {
                 "session_id": session_id,
@@ -171,6 +114,69 @@ class AgentService(IAgentService):
         except Exception as e:
             logger.error(f"Failed to save conversation {session_id}: {e}")
 
+    # ── Context preparation (shared by chat & stream_chat) ──
+
+    async def _prepare_context(
+        self,
+        user_id: int,
+        session_id: str,
+        message: str,
+        agent_id: Optional[str] = None,
+        uploads: Optional[list] = None,
+        context: Optional[dict] = None,
+    ) -> tuple[list, str, list]:
+        """Task 7: 抽取 chat() / stream_chat() 公共上下文准备逻辑。
+
+        封装以下职责（消除两处重复代码块）：
+        - 加载对话历史（DB 模式走 conversation_repo.get_by_session(session_id, user_id)
+          实现用户隔离；文件模式走内存字典）
+        - 构建 system prompt（含技能注入、RAG 上下文；由 _build_system_prompt 完成）
+        - 加载上传文件上下文（_load_upload_context，session_id 维度；uploads 参数预留）
+        - 组装 LLM 调用所需的 messages 列表（system + history + user_content）
+
+        Args:
+            user_id: 用户 ID（DB 隔离用）
+            session_id: 会话 ID
+            message: 用户消息原文
+            agent_id: Agent 标识（用于 system prompt 构建）
+            uploads: 预留参数（当前未使用，上传上下文由 session_id 自动加载）
+            context: 模板变量字典（若 None 则初始化为空 dict）
+
+        Returns:
+            (messages, system_prompt, history) — history 引用保留以便调用方
+            后续 append 用户/助手消息（chat 直写、stream_chat 走 _post_process_async）。
+        """
+        # Get or create conversation history (with user_id isolation)
+        if self._use_db:
+            db_history = await self.conversation_repo.get_by_session(session_id, user_id)
+            history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in db_history
+            ]
+        else:
+            if session_id not in self.conversations:
+                self.conversations[session_id] = []
+            history = self.conversations[session_id]
+
+        # Build system prompt (with skills injection)
+        if context is None:
+            context = {}
+        context["last_message"] = message
+        system_prompt = self._build_system_prompt(agent_id, context)
+
+        # Load file upload context (P0: path_safety applied)
+        upload_context = self._load_upload_context(session_id)
+        user_content = message
+        if upload_context:
+            user_content = f"{message}\n\n---\n📎 用户上传的文件内容摘要：\n{upload_context}"
+
+        # Build messages list for API call
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(history)
+        messages.append({"role": "user", "content": user_content})
+
+        return messages, system_prompt, history
+
     # ── Main chat method ──────────────────────────────────
 
     async def chat(
@@ -179,8 +185,13 @@ class AgentService(IAgentService):
         agent_id: str,
         session_id: str,
         context: Optional[dict] = None,
+        user_id: int = 0,
+        model: Optional[str] = None,
     ) -> dict:
         """Send message to agent and get response
+
+        P0: user_id 透传至 Repository 实现用户数据隔离；
+            model 由 Router 层 model_policy 解析后传入，覆盖默认模型。
 
         Returns:
             dict with keys: reply, options, skills_used, chart_info, cnki_results, skill_hint
@@ -198,48 +209,43 @@ class AgentService(IAgentService):
         if not settings.DEEPSEEK_API_KEY:
             raise AgentChatFailedError("DeepSeek API key not configured")
 
-        # Get or create conversation history
-        if self._use_db:
-            db_history = await self.conversation_repo.get_by_session(session_id)
-            history = [
-                {"role": msg.role, "content": msg.content}
-                for msg in db_history
-            ]
-        else:
-            if session_id not in self.conversations:
-                self.conversations[session_id] = []
-            history = self.conversations[session_id]
+        llm_model = model or self.model
 
-        # Build system prompt (with skills injection)
-        if context is None:
-            context = {}
-        context["last_message"] = message
-        system_prompt = self._build_system_prompt(agent_id, context)
+        # Task 7: 抽取公共上下文准备逻辑（历史加载、Prompt 构建、上传上下文加载、messages 组装）
+        messages, system_prompt, history = await self._prepare_context(
+            user_id=user_id, session_id=session_id, message=message,
+            agent_id=agent_id, context=context,
+        )
 
-        # Load file upload context and append to user message
-        upload_context = self._load_upload_context(session_id)
-        user_content = message
-        if upload_context:
-            user_content = f"{message}\n\n---\n📎 用户上传的文件内容摘要：\n{upload_context}"
-
-        # Build messages list for API call
-        messages = [{"role": "system", "content": system_prompt}]
-        messages.extend(history)
-        messages.append({"role": "user", "content": user_content})
-
-        # Call DeepSeek API (async client) with circuit breaker
+        # P1: 使用统一 LLM 客户端（tenacity 重试 + 超时 + 熔断器保护）
+        # 使用 per-agent 配置的 temperature/max_tokens
+        _llm = llm_client
+        agent_cfg = _get_agent_llm_config(agent_id)
+        llm_start = time.monotonic()
         try:
-            async with deepseek_circuit_breaker:
-                response = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.7,
-                    max_tokens=2048,
-                    stream=False,
-                )
-            reply = response.choices[0].message.content
+            response = await _llm.chat_messages(
+                messages=messages,
+                temperature=agent_cfg["temperature"],
+                max_tokens=agent_cfg["max_tokens"],
+                model=llm_model,
+            )
+            reply = response.content
+            latency_ms = int((time.monotonic() - llm_start) * 1000)
+            # P1: 记录 LLM 调用成功日志
+            await self._log_agent_execution(
+                user_id=user_id, agent_id=agent_id, session_id=session_id,
+                model=llm_model, status="success", latency_ms=latency_ms,
+                prompt_tokens=getattr(response.raw, "usage", None) and getattr(response.raw.usage, "prompt_tokens", None) if response.raw else None,
+                completion_tokens=getattr(response.raw, "usage", None) and getattr(response.raw.usage, "completion_tokens", None) if response.raw else None,
+            )
         except Exception as e:
+            latency_ms = int((time.monotonic() - llm_start) * 1000)
             logger.error(f"DeepSeek API call failed: {e}")
+            await self._log_agent_execution(
+                user_id=user_id, agent_id=agent_id, session_id=session_id,
+                model=llm_model, status="failed", latency_ms=latency_ms,
+                error_code="LLM_API_FAILED", error_message=str(e),
+            )
             raise AgentChatFailedError(f"AI服务调用失败: {str(e)}")
 
         # Update conversation history
@@ -247,15 +253,13 @@ class AgentService(IAgentService):
         history.append({"role": "assistant", "content": reply})
 
         if self._use_db:
-            # 使用 repository 持久化
-            await self.conversation_repo.add_message(session_id, agent_id, "user", message)
-            await self.conversation_repo.add_message(session_id, agent_id, "assistant", reply)
+            await self.conversation_repo.add_message(session_id, agent_id, "user", message, user_id)
+            await self.conversation_repo.add_message(session_id, agent_id, "assistant", reply, user_id)
         else:
-            # Keep conversation history within reasonable limits (last 20 turns)
-            max_history_messages = 40  # 20 turns * 2 messages
+            # Task 24.5: 从 config 读取 MAX_HISTORY_MESSAGES
+            max_history_messages = settings.MAX_HISTORY_MESSAGES
             if len(history) > max_history_messages:
                 self.conversations[session_id] = history[-max_history_messages:]
-            # Persist conversation to disk
             self._save_conversation(session_id)
 
         # Parse options from reply
@@ -294,8 +298,13 @@ class AgentService(IAgentService):
         agent_id: str,
         session_id: str,
         context: Optional[dict] = None,
+        user_id: int = 0,
+        model: Optional[str] = None,
     ):
         """流式对话：逐token生成回复，通过 async generator 返回
+
+        P0: user_id 透传至 Repository 实现用户数据隔离；
+            model 由 Router 层 model_policy 解析后传入，覆盖默认模型。
 
         Yields:
             dict with keys: type, content, index, skills_used, options, chart_info, cnki_results
@@ -314,136 +323,199 @@ class AgentService(IAgentService):
             }
             return
 
-        # Get or create conversation history (stream)
-        if self._use_db:
-            db_history = await self.conversation_repo.get_by_session(session_id)
-            history = [
-                {"role": msg.role, "content": msg.content}
-                for msg in db_history
-            ]
-        else:
-            if session_id not in self.conversations:
-                self.conversations[session_id] = []
-            history = self.conversations[session_id]
+        llm_model = model or self.model
 
-        # Build system prompt
-        if context is None:
-            context = {}
-        context["last_message"] = message
-        system_prompt = self._build_system_prompt(agent_id, context)
+        # Task 7: 抽取公共上下文准备逻辑（历史加载、Prompt 构建、上传上下文加载、messages 组装）
+        messages, system_prompt, history = await self._prepare_context(
+            user_id=user_id, session_id=session_id, message=message,
+            agent_id=agent_id, context=context,
+        )
 
-        # Load file upload context
-        upload_context = self._load_upload_context(session_id)
-        user_content = message
-        if upload_context:
-            user_content = f"{message}\n\n---\n📎 用户上传的文件内容摘要：\n{upload_context}"
-
-        # Build messages
-        messages = [{"role": "system", "content": system_prompt}]
-        messages.extend(history)
-        messages.append({"role": "user", "content": user_content})
-
-        # Stream from DeepSeek API with circuit breaker
+        # P1: 使用统一 LLM 客户端流式调用（熔断器保护，无重试因流已在进行中）
+        # P0 修复: llm_client 顶层已导入为 llm_client；此处保留局部别名以最小化改动
+        _llm = llm_client
         full_reply = ""
+        llm_start = time.monotonic()
         try:
-            async with deepseek_circuit_breaker:
-                stream = await self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.7,
-                    max_tokens=2048,
-                    stream=True,
-                )
-
-                async for chunk in stream:
-                    delta = chunk.choices[0].delta
-                    if delta.content:
-                        full_reply += delta.content
-                        yield {"type": "token", "content": delta.content}
-
+            # 使用 per-agent 配置的 temperature/max_tokens
+            agent_cfg = _get_agent_llm_config(agent_id)
+            async for token in _llm.chat_messages(
+                messages=messages,
+                temperature=agent_cfg["temperature"],
+                max_tokens=agent_cfg["max_tokens"],
+                model=llm_model,
+                stream=True,
+            ):
+                # P0 修复: 防御性类型检查，避免 yield dict 时 TypeError
+                if isinstance(token, str):
+                    full_reply += token
+                    yield {"type": "token", "content": token}
+        except LLMTruncatedError:
+            # P0 修复: 流式因 max_tokens 截断时优雅结束（不抛 TypeError，已收到的部分回复有效）
+            logger.info(f"stream_truncated session={session_id} agent={agent_id} reply_len={len(full_reply)}")
         except Exception as e:
+            latency_ms = int((time.monotonic() - llm_start) * 1000)
             logger.error(f"DeepSeek stream API failed: {e}")
+            await self._log_agent_execution(
+                user_id=user_id, agent_id=agent_id, session_id=session_id,
+                model=llm_model, status="failed", latency_ms=latency_ms,
+                error_code="LLM_STREAM_FAILED", error_message=str(e),
+            )
             yield {"type": "error", "message": f"AI服务调用失败: {str(e)}"}
             return
 
-        # Update conversation history
-        history.append({"role": "user", "content": message})
-        history.append({"role": "assistant", "content": full_reply})
+        # P1: 记录流式 LLM 调用成功日志
+        latency_ms = int((time.monotonic() - llm_start) * 1000)
+        await self._log_agent_execution(
+            user_id=user_id, agent_id=agent_id, session_id=session_id,
+            model=llm_model, status="success", latency_ms=latency_ms,
+        )
 
-        if self._use_db:
-            await self.conversation_repo.add_message(session_id, agent_id, "user", message)
-            await self.conversation_repo.add_message(session_id, agent_id, "assistant", full_reply)
-        else:
-            max_history_messages = 40
-            if len(history) > max_history_messages:
-                self.conversations[session_id] = history[-max_history_messages:]
-            self._save_conversation(session_id)
-
-        # Parse options, detect skills
-        options = self._parse_options(full_reply)
-        skills_used = self._detect_skills(full_reply, message)
-        skill_hint = self._detect_skill_hint(full_reply, message, skills_used)
-
-        # Execute chart/cnki skills asynchronously
-        chart_info = None
-        cnki_results = None
-
-        if "chart_generation" in skills_used:
-            chart_info = await self._execute_chart_skill(message, full_reply, session_id)
-
-        if "cnki_search" in skills_used:
-            cnki_results = await self._execute_cnki_skill(message, session_id)
-
+        # ═══ 立即发送 done 事件，让前端停止"思考中"动画 ═══
+        # 所有后处理（DB 写入、技能检测、图表/CNKI 执行）移到后台异步执行，
+        # 不再阻塞 done 事件的发送。感知延迟从 3-7 秒降至 0。
         yield {
             "type": "done",
-            "skills_used": skills_used,
-            "options": options,
-            "chart_info": chart_info,
-            "cnki_results": cnki_results,
-            "skill_hint": skill_hint,
+            "skills_used": [],       # 后台异步填充
+            "options": [],           # 后台异步填充
+            "chart_info": None,
+            "cnki_results": None,
+            "skill_hint": None,
         }
+
+        # ── 后台后处理（fire-and-forget，不阻塞用户看到响应）──
+        asyncio.create_task(self._post_process_async(
+            message=message, full_reply=full_reply, agent_id=agent_id,
+            session_id=session_id, user_id=user_id, history=history,
+        ))
+
+    # ── Post-processing (fire-and-forget, does not block user response) ──
+
+    async def _post_process_async(
+        self, *, message: str, full_reply: str, agent_id: str,
+        session_id: str, user_id: int, history: list[dict],
+    ) -> None:
+        """后台异步后处理：保存历史、检测技能、执行图表/CNKI 技能。
+
+        与 stream_chat 的 token 流并行拆分：token 流结束后立即发送 done 事件，
+        DB 写入与技能执行在后台异步完成，不阻塞用户交互。
+        """
+        try:
+            # 1. 保存对话历史到 DB（容错：失败不影响其他后处理）
+            history.append({"role": "user", "content": message})
+            history.append({"role": "assistant", "content": full_reply})
+            if self._use_db:
+                try:
+                    await self.conversation_repo.add_message(session_id, agent_id, "user", message, user_id)
+                    await self.conversation_repo.add_message(session_id, agent_id, "assistant", full_reply, user_id)
+                except Exception as e:
+                    logger.warning(f"Failed to save conversation to DB: {e}")
+            else:
+                # Task 24.5: 从 config 读取 MAX_HISTORY_MESSAGES
+                max_history_messages = settings.MAX_HISTORY_MESSAGES
+                if len(history) > max_history_messages:
+                    self.conversations[session_id] = history[-max_history_messages:]
+                self._save_conversation(session_id)
+
+            # 2. 解析选项和检测技能（纯 CPU，不阻塞）
+            options = self._parse_options(full_reply)
+            skills_used = self._detect_skills(full_reply, message)
+            skill_hint = self._detect_skill_hint(full_reply, message, skills_used)
+
+            # 3. 执行图表/CNKI 技能（可能较慢，但不影响用户交互）
+            chart_info = None
+            cnki_results = None
+            if "chart_generation" in skills_used:
+                chart_info = await self._execute_chart_skill(message, full_reply, session_id)
+            if "cnki_search" in skills_used:
+                cnki_results = await self._execute_cnki_skill(message, session_id)
+
+            logger.info(
+                f"post_process_complete session={session_id} agent={agent_id} "
+                f"reply_len={len(full_reply)} skills={skills_used} "
+                f"has_chart={chart_info is not None} has_cnki={cnki_results is not None}"
+            )
+        except Exception as e:
+            # P1 Task 8.3：补全 user_id/session_id 上下文 + exc_info 输出堆栈
+            logger.error(
+                f"post_process_failed user_id={user_id} session_id={session_id} exc={e}",
+                exc_info=True,
+            )
 
     # ── System prompt building with skills injection ──────
 
     def _build_system_prompt(
         self, agent_id: str, context: Optional[dict] = None
     ) -> str:
-        """Build system prompt for the agent, including enabled skills rules and RAG context"""
-        prompt = AGENT_PROMPTS[agent_id]
+        """Build system prompt for the agent using Jinja2 template engine.
 
+        性能优化：
+        - base prompt 按 agent_id 缓存（仅首次或模板文件变化时重新加载）
+        - RAG 上下文检索延迟到首次需要时，且使用轻量查询
+        """
+        from .agent.prompt_builder import get_prompt_builder
+
+        builder = get_prompt_builder(auto_reload=settings.DEBUG)
+
+        # ── 构建模板变量 ──
+        context_info = ""
         if context:
+            parts = []
             for key, template in CONTEXT_TEMPLATES.items():
                 value = context.get(key)
                 if value:
-                    prompt += template.format(value=value)
+                    parts.append(template.format(value=value))
+            context_info = "\n".join(parts)
 
-        # Inject enabled skills associated with this agent
-        skills_rules = self._load_skills_for_agent(agent_id)
-        if skills_rules:
-            prompt += "\n\n── 已启用的技能规则 ──\n"
-            for skill in skills_rules:
-                prompt += f"\n【技能：{skill['display_name']}】\n"
+        # 技能规则（带缓存，减少 DB 查询）
+        # Task 27: 调用合并后的 _load_skills_for_agent（缓存由 @cache_result 装饰器实现）
+        skills_rules_text = ""
+        skills_list = self._load_skills_for_agent(agent_id)
+        if skills_list:
+            skills_parts = []
+            for skill in skills_list:
+                skill_text = f"【技能：{skill['display_name']}】"
                 if skill.get("rules"):
-                    prompt += skill["rules"] + "\n"
+                    skill_text += f"\n{skill['rules']}"
+                skills_parts.append(skill_text)
+            skills_rules_text = "\n".join(skills_parts)
 
-        # Inject RAG knowledge base context
-        if self.rag_service and context and context.get("last_message"):
+        # RAG 上下文延迟初始化（fire-and-forget，不阻塞首 token）
+        rag_text = ""
+        if context and context.get("last_message"):
             try:
-                rag_context = self.rag_service.build_context(
-                    query=context["last_message"],
-                    agent_id=agent_id,
-                    top_k=settings.RAG_TOP_K,
-                )
-                if rag_context:
-                    prompt += "\n\n── 相关学术资源（来自知识库） ──\n"
-                    prompt += rag_context
+                if not self._rag_warmed_up:
+                    from .rag_service import get_rag_service
+                    self.rag_service = get_rag_service()
+                    self._rag_warmed_up = True
+                if self.rag_service:
+                    rag_text = self.rag_service.build_context(
+                        query=context["last_message"],
+                        agent_id=agent_id,
+                        top_k=min(3, settings.RAG_TOP_K),
+                    )
             except Exception as e:
                 logger.warning(f"RAG context injection failed: {e}")
 
-        return prompt
+        # ── 模板渲染 ──
+        return builder.build_with_academic_features(
+            agent_id=agent_id,
+            context_info=context_info,
+            guidance_info="",
+            user_core_context="",
+            style_features="",
+            skills_rules=skills_rules_text,
+            rag_context=rag_text,
+            cot_instruction="",
+        )
 
+    @cache_result(ttl=300)
     def _load_skills_for_agent(self, agent_id: str) -> list[dict]:
-        """Load enabled skills associated with the given agent_id"""
+        """Load enabled skills associated with the given agent_id
+
+        Task 27: 合并原 `_load_skills_for_agent_cached` 与 `_load_skills_for_agent`，
+        缓存由 `@cache_result` 装饰器统一实现（共享 default_cache LRU+TTL）。
+        """
         all_skills = self.skills_service.list_all()
         matched = []
         for skill in all_skills:
@@ -457,8 +529,17 @@ class AgentService(IAgentService):
     # ── File upload context ───────────────────────────────
 
     def _load_upload_context(self, session_id: str) -> str:
-        """Read uploaded files for the session and return a summary string"""
-        upload_dir = UPLOADS_DIR / session_id
+        """Read uploaded files for the session and return a summary string
+
+        P0: 使用 safe_session_path 防御路径穿越攻击。
+        """
+        from ..core.path_safety import validate_session_id, safe_session_path
+        try:
+            safe_sid = validate_session_id(session_id)
+            upload_dir = safe_session_path(Path(settings.UPLOAD_DIR), safe_sid)
+        except Exception:
+            logger.warning(f"Invalid session_id for upload context: {session_id[:32]!r}")
+            return ""
         if not upload_dir.exists():
             return ""
 
@@ -490,44 +571,14 @@ class AgentService(IAgentService):
             return fp.read_text(encoding="utf-8", errors="replace")
 
         if ext == ".pdf":
-            return self._extract_pdf(fp)
+            # Task 27: 改用 utils/file_parser.py 公共实现
+            return extract_pdf(fp)
 
         if ext == ".docx":
-            return self._extract_docx(fp)
+            # Task 27: 改用 utils/file_parser.py 公共实现
+            return extract_docx(fp)
 
         return ""
-
-    def _extract_pdf(self, fp: Path) -> str:
-        """Extract text from PDF using pypdf"""
-        try:
-            from pypdf import PdfReader
-            reader = PdfReader(str(fp))
-            pages = []
-            for page in reader.pages:
-                text = page.extract_text()
-                if text:
-                    pages.append(text)
-            return "\n".join(pages)
-        except ImportError:
-            logger.warning("pypdf not installed, cannot extract PDF content")
-            return ""
-        except Exception as e:
-            logger.warning(f"Failed to extract PDF {fp.name}: {e}")
-            return ""
-
-    def _extract_docx(self, fp: Path) -> str:
-        """Extract text from DOCX using python-docx"""
-        try:
-            from docx import Document
-            doc = Document(str(fp))
-            paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-            return "\n".join(paragraphs)
-        except ImportError:
-            logger.warning("python-docx not installed, cannot extract DOCX content")
-            return ""
-        except Exception as e:
-            logger.warning(f"Failed to extract DOCX {fp.name}: {e}")
-            return ""
 
     # ── Chart generation skill ────────────────────────────
 
@@ -555,14 +606,14 @@ AI回复：{reply}
 {{"chart_type": "图表类型key", "title": "图表标题", "x_label": "X轴标签", "y_label": "Y轴标签", "data_description": "数据格式说明"}}
 """
 
-            analysis_response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": analysis_prompt}],
+            analysis_response = await llm_client.chat(
+                system="",
+                user=analysis_prompt,
                 temperature=0.3,
                 max_tokens=512,
-                stream=False,
+                model=self.model,
             )
-            analysis_text = analysis_response.choices[0].message.content.strip()
+            analysis_text = analysis_response.content.strip()
 
             # Parse the JSON from the analysis
             # Try to extract JSON from the response (may be wrapped in markdown code block)
@@ -601,7 +652,7 @@ AI回复：{reply}
 
             # Save chart to file
             chart_id = str(uuid.uuid4())
-            charts_dir = Path("data/charts")
+            charts_dir = Path(settings.CHARTS_DIR)
             charts_dir.mkdir(parents=True, exist_ok=True)
             chart_filename = f"{chart_id}.png"
             chart_filepath = charts_dir / chart_filename
@@ -704,14 +755,14 @@ AI回复：{reply}
 year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
 仅返回JSON，不要其他内容。"""
 
-            keyword_response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[{"role": "user", "content": keyword_prompt}],
+            keyword_response = await llm_client.chat(
+                system="",
+                user=keyword_prompt,
                 temperature=0.2,
                 max_tokens=256,
-                stream=False,
+                model=self.model,
             )
-            keyword_text = keyword_response.choices[0].message.content.strip()
+            keyword_text = keyword_response.content.strip()
 
             # Parse JSON
             json_match = re.search(r'\{[\s\S]*\}', keyword_text)
@@ -852,39 +903,56 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
 
         return skills
 
-    # ── Conversation management (unchanged) ───────────────
+    # ── Conversation management (delegating to SessionManager) ──
 
-    async def clear_conversation(self, session_id: str) -> bool:
-        """Clear conversation history for a session
+    async def clear_conversation(self, session_id: str, user_id: int = 0) -> bool:
+        return await self._sessions.clear_conversation(session_id, user_id)
 
-        Returns True if session existed and was cleared, False otherwise
+    async def get_conversation_history(self, session_id: str, user_id: int = 0) -> list[dict]:
+        return await self._sessions.get_conversation_history(session_id, user_id)
+
+    async def list_sessions_with_meta(self, user_id: int = 0, agent_id: str | None = None, limit: int = 50) -> list[dict]:
+        return await self._sessions.list_sessions_with_meta(user_id, agent_id, limit)
+
+    async def rename_session(self, session_id: str, title: str, user_id: int = 0) -> bool:
+        return await self._sessions.rename_session(session_id, title, user_id)
+
+    async def delete_session(self, session_id: str, user_id: int = 0) -> int:
+        return await self._sessions.delete_session(session_id, user_id)
+
+    async def _log_agent_execution(
+        self, *, user_id: int, agent_id: str, session_id: str,
+        model: str, status: str, latency_ms: int = 0,
+        prompt_tokens: int | None = None, completion_tokens: int | None = None,
+        error_code: str | None = None, error_message: str | None = None,
+    ) -> None:
+        """P1: 写入 AgentExecutionLog 用于成本分析、延迟监控与故障排查。
+
+        Task 26: 通过 ConversationRepository.log_agent_execution 封装，
+        不再直接访问 self.conversation_repo.db.add(...)。
         """
-        if self._use_db:
-            deleted = await self.conversation_repo.clear_session(session_id)
-            return deleted > 0
-        else:
-            if session_id in self.conversations:
-                del self.conversations[session_id]
-                # Also remove persisted file
-                filepath = CONVERSATIONS_DIR / f"{session_id}.json"
-                if filepath.exists():
-                    try:
-                        filepath.unlink()
-                    except Exception as e:
-                        logger.warning(f"Failed to delete conversation file {session_id}: {e}")
-                return True
-            return False
-
-    async def get_conversation_history(self, session_id: str) -> list[dict]:
-        """Get conversation history for a session"""
-        if self._use_db:
-            db_history = await self.conversation_repo.get_by_session(session_id)
-            return [
-                {"role": msg.role, "content": msg.content}
-                for msg in db_history
-            ]
-        else:
-            return self.conversations.get(session_id, [])
+        if not self._use_db or user_id <= 0:
+            return
+        if self.conversation_repo is None:
+            return
+        try:
+            # 失败语义：error_message 非空（或 status != success）
+            error = error_message if status != "success" else None
+            token_usage = {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+            }
+            await self.conversation_repo.log_agent_execution(
+                user_id=user_id,
+                session_id=session_id,
+                agent_id=agent_id,
+                model=model,
+                token_usage=token_usage,
+                duration_ms=latency_ms,
+                error=error,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to write agent execution log: {e}")
 
     def list_agents(self) -> list[dict]:
         """List all available agents with their descriptions"""

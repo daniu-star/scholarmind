@@ -1,0 +1,54 @@
+{
+  "phase": "pdf_download",
+  "paper": {
+    "title": "情绪偏移：生育报道的情绪不一致性启动路径探究附视频",
+    "filename": "GJXW202603005",
+    "dbcode": "CJFQ",
+    "pdf_order_url": "https://bar.cnki.net/bar/download/order?id=Pmp%2F5es3RB81cmauPwpbvjMKNSQwBIl4wRdJzL0QEWzXcAnP8r1CXQr3sOk9lHqSUcAl7LqOEkIGgPy6JpTp3Ht5SKXqV5vJNoTbv1Q7f2O96ALiqxAdguwT1Naz%2BHyVwddxEU3rL3oTHoiWc6PitFK57xT%2B8LhM%2BfEqYWvBGm0igmLMld3nSvbU4a5%2BOkNaUlSU0HSLnl9m7MwOtW%2FIk4OU8%2B%2FuREEME6u9MGhXjchlgv7q8C%2BP7FPVW3hwYPcqveGzrp%2B41EH7caBaJ8FVkg%3D%3D",
+    "caj_order_url": "https://bar.cnki.net/bar/download/order?id=Pmp%2F5es3RB81cmauPwpbvjMKNSQwBIl4wRdJzL0QEWzXcAnP8r1CXQr3sOk9lHqSUcAl7LqOEkIGgPy6JpTp3KCzq0HF%2FgmsAjVYBf896L4Yz7hIz%2Bm4gioz%2Fd0uFLWAlsQo%2BpRvK7ckfm79OSQVfSBnBa%2BGi6z13JPvtSv3a9ygQ3rcCWK8v00%2FaZoGrk3nZXSzGFiMZ2VxkM91%2FAHX6TkPUqxX8eF2BQVGMywdcigwfYdxjGOeoWVZl7YToWNbdygFAZVSLIHG9BPLv2JAig%3D%3D",
+    "auth_check_url": "https://x.cnki.net/web/page/auth-check?redirect",
+    "download_success": false,
+    "file_path": "",
+    "file_format": "",
+    "file_size": 0,
+    "file_checksum": "",
+    "body_text_length": 0,
+    "errors": [
+      "bar_download: HTML response, no PDF link found (content-type: text/html, size: 2457 bytes)",
+      "auth_check: HTML response, no download link found (size: 4263 bytes)",
+      "gateway: all URLs failed",
+      "legacy: all URLs failed"
+    ]
+  },
+  "download_success": false,
+  "strategies_tried": [],
+  "errors": [
+    "bar_download: HTML response, no PDF link found (content-type: text/html, size: 2457 bytes)",
+    "auth_check: HTML response, no download link found (size: 4263 bytes)",
+    "gateway: all URLs failed",
+    "legacy: all URLs failed"
+  ],
+  "duration_sec": 0.83,
+  "magic_check": "no_file",
+  "block_status": {
+    "blocked_proxies": [],
+    "blocked_count": 0,
+    "available_proxies": 0,
+    "current_proxy": null,
+    "current_proxy_blocked": false,
+    "cooldown_remaining": {}
+  },
+  "stats": {
+    "total_attempted": 2,
+    "detail_success": 1,
+    "detail_failed": 0,
+    "pdf_success": 0,
+    "pdf_failed": 1,
+    "body_text_success": 0,
+    "body_text_failed": 0,
+    "cnki_blocks_detected": 0,
+    "proxy_switches": 0,
+    "total_errors": 0,
+    "cnki_blocked_proxies": []
+  }
+}

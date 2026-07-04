@@ -4,7 +4,7 @@ ScholarMind 图表记录仓储
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Sequence
 
 from sqlalchemy import select
@@ -54,7 +54,7 @@ class ChartRepository(BaseRepository[ChartRecord]):
             title=title,
             filepath=filepath,
             session_id=session_id,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         return await self.create(record)
 
