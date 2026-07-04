@@ -19,6 +19,7 @@ function NotFoundPage() {
 
 // Code-split page loaders — each page dynamically imported
 const pageLoaders = {
+  'landing':        () => import('../pages/LandingPage.js').then(m => m.LandingPage),
   'homepage':       () => import('../pages/HomePage.js').then(m => m.HomePage),
   'engineering':    () => import('../pages/ResearchTypePage.js').then(m => m.ResearchTypePage),
   'science':        () => import('../pages/ResearchTypePage.js').then(m => m.ResearchTypePage),
@@ -40,7 +41,8 @@ const pageLoaders = {
 };
 
 const routes = {
-  'homepage':       { title: 'ScholarMind', props: {} },
+  'landing':        { title: 'ScholarMind', props: {} },
+  'homepage':       { title: 'ScholarMind · 工作台', props: {} },
   'engineering':    { title: '工科',     props: { discipline: 'engineering' } },
   'science':        { title: '理科',     props: { discipline: 'science' } },
   'humanities':     { title: '人文社科', props: { discipline: 'humanities' } },
@@ -62,7 +64,7 @@ const routes = {
 
 // Track navigation direction for transitions
 let navDirection = 0; // -1=backward, 0=same, 1=forward
-let prevPageId = 'homepage';
+let prevPageId = 'landing';
 
 export function navigateTo(pageId, extraState = {}) {
   Object.assign(state, extraState);

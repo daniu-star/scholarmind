@@ -39,7 +39,7 @@ function debouncedStore(fn, delay = 300) {
 }
 
 export const { state, watch } = createStore({
-  currentPage: window.location.hash.slice(1) || 'homepage',
+  currentPage: window.location.hash.slice(1) || 'landing',
   discipline: storage.get('sm_discipline', null),
   researchType: storage.get('sm_researchType', null),
   readiness: storage.get('sm_readiness', null),

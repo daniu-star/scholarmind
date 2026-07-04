@@ -1305,6 +1305,15 @@
 .theme-preview-swatch.warm {
   background: linear-gradient(135deg, #FFF8F0 50%, #65A30D 50%);
 }
+.theme-preview-swatch.zen {
+  background: linear-gradient(135deg, #F5F4ED 50%, #117C0D 50%);
+}
+.theme-preview-swatch.eye-care {
+  background: linear-gradient(135deg, #C7EDCC 50%, #2D6A4F 50%);
+}
+.theme-preview-swatch.volcano-academic {
+  background: linear-gradient(135deg, #0A0E1A 50%, #9B85C8 50%);
+}
 .theme-preview-label {
   font-size: var(--text-sm); font-weight: 600; color: var(--text-primary);
 }

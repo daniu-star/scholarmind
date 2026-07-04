@@ -47,8 +47,11 @@ export function SettingsPage() {
   const themeMeta = [
     { id: 'dark', label: '深色风', desc: '学术暖暗色', swatchClass: 'dark' },
     { id: 'light', label: '浅色风', desc: '学术暖浅色', swatchClass: 'light' },
+    { id: 'zen', label: '禅意风', desc: '温润纸米色', swatchClass: 'zen' },
     { id: 'pure', label: '洁白风', desc: '纯白极简', swatchClass: 'pure' },
     { id: 'warm', label: '温暖风', desc: '暖米橙红', swatchClass: 'warm' },
+    { id: 'eye-care', label: '护眼风', desc: '柔绿色调', swatchClass: 'eye-care' },
+    { id: 'volcano-academic', label: '火山风', desc: '冷紫蓝学术', swatchClass: 'volcano-academic' },
   ];
   themeMeta.forEach(t => {
     const card = createElement('div', {
@@ -157,7 +160,7 @@ export function SettingsPage() {
   rightCol.appendChild(apiSection);
 
   // About 区 — 丰富列表
-  const themeLabelMap = { dark: '学术暖暗色', light: '学术暖浅色', pure: '纯白极简', warm: '暖米橙红' };
+  const themeLabelMap = { dark: '学术暖暗色', light: '学术暖浅色', zen: '温润新禅意', pure: '纯白极简', warm: '暖米橙红', 'eye-care': '护眼绿', 'volcano-academic': '火山学术' };
   const themeValueEl = createElement('span', { className: 'about-list-value' }, themeLabelMap[state.settings.theme] || '学术暖暗色');
   const aboutSection = createElement('div', { className: 'settings-section' },
     createElement('label', { className: 'settings-label' }, '关于 ScholarMind'),

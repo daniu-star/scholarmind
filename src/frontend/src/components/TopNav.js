@@ -74,6 +74,17 @@ function renderBreadcrumbs() {
 export function TopNav() {
   const nav = createElement('nav', { className: 'top-nav' });
 
+  // 在 Landing Page 上隐藏工作区导航（Landing 有自己的全局导航）
+  const updateVisibility = () => {
+    if (state.currentPage === 'landing') {
+      nav.style.display = 'none';
+    } else {
+      nav.style.display = '';
+    }
+  };
+  updateVisibility();
+  watch('currentPage', updateVisibility);
+
   // BC-20: skip-to-content 无障碍链接
   const skipLink = createElement('a', {
     className: 'skip-link',
@@ -90,7 +101,7 @@ export function TopNav() {
     createElement('span', { className: 'nav-logo-icon' }, 'SM'),
     createElement('span', {}, 'ScholarMind'),
   );
-  logo.addEventListener('click', () => navigateTo('homepage'));
+  logo.addEventListener('click', () => navigateTo('landing'));
   nav.appendChild(logo);
 
   // Breadcrumb
@@ -162,8 +173,11 @@ export function TopNav() {
   const THEME_OPTIONS = [
     { id: 'dark', label: '学术暖暗色' },
     { id: 'light', label: '学术暖浅色' },
+    { id: 'zen', label: '温润新禅意' },
     { id: 'pure', label: '纯白极简' },
     { id: 'warm', label: '暖米橙红' },
+    { id: 'eye-care', label: '护眼绿' },
+    { id: 'volcano-academic', label: '火山学术' },
   ];
   const themeMenuWrap = createElement('div', { className: 'theme-dropdown' });
   const themeBtn = createElement('button', {
