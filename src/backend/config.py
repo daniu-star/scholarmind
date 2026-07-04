@@ -91,6 +91,7 @@ class Settings(BaseSettings):
         "http://localhost:5173", "http://127.0.0.1:5173",  # Vite 前端
         "http://localhost:8080", "http://127.0.0.1:8080",  # 备用
         "http://localhost:8000", "http://127.0.0.1:8000",  # 后端直连
+        "https://www.quannengyanjiu.cn", "https://quannengyanjiu.cn",  # 生产前端
     ]
     CORS_ALLOW_ALL_IN_DEV: bool = False  # P0 修复：默认关闭全放通，开发环境显式开启
 
