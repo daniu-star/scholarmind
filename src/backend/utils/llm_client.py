@@ -14,30 +14,30 @@
 """
 from __future__ import annotations
 
-import json
 import base64
+import json
 import logging  # for logging.WARNING constant used by tenacity.before_sleep_log
 from typing import AsyncIterator, Optional
 
 import httpx
 import structlog
 from openai import (
-    AsyncOpenAI,
     APIConnectionError,
     APITimeoutError,
+    AsyncOpenAI,
     RateLimitError,
 )
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
 from src.backend.config import settings
-from src.backend.utils.circuit_breaker import deepseek_circuit_breaker, CircuitBreakerOpenError
 from src.backend.core.exceptions import LLMTruncatedError
+from src.backend.utils.circuit_breaker import CircuitBreakerOpenError, deepseek_circuit_breaker
 
 logger = structlog.get_logger(__name__)
 
@@ -255,35 +255,42 @@ class LLMClient:
             kwargs["response_format"] = response_format
 
         if stream:
-            kwargs["stream"] = True
-            try:
-                stream_resp = await client.chat.completions.create(**kwargs)
-                async for chunk in stream_resp:
-                    if chunk.choices and chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
-                deepseek_circuit_breaker.record_success()
-            except _RETRYABLE_EXCEPTIONS:
-                deepseek_circuit_breaker.record_failure()
-                raise
-        else:
-            retry_decorator = self._build_retry_decorator()
+            return self._chat_messages_stream(client, **kwargs)
+        return await self._chat_messages_sync(client, **kwargs)
 
-            @retry_decorator
-            async def _call():
-                return await client.chat.completions.create(**kwargs)
+    async def _chat_messages_stream(self, client, **kwargs):
+        """流式对话（异步生成器）"""
+        kwargs["stream"] = True
+        try:
+            stream_resp = await client.chat.completions.create(**kwargs)
+            async for chunk in stream_resp:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+            deepseek_circuit_breaker.record_success()
+        except _RETRYABLE_EXCEPTIONS:
+            deepseek_circuit_breaker.record_failure()
+            raise
 
-            try:
-                completion = await _call()
-                deepseek_circuit_breaker.record_success()
-                content = completion.choices[0].message.content or ""
-                return LLMResponse(content=content, raw=completion)
-            except _RETRYABLE_EXCEPTIONS as e:
-                deepseek_circuit_breaker.record_failure()
-                logger.error(f"llm_chat_messages_failed error={e} error_type={type(e).__name__}")
-                raise
-            except Exception as e:
-                logger.error(f"llm_chat_messages_error error={e} error_type={type(e).__name__}")
-                raise
+    async def _chat_messages_sync(self, client, **kwargs):
+        """非流式对话"""
+        retry_decorator = self._build_retry_decorator()
+
+        @retry_decorator
+        async def _call():
+            return await client.chat.completions.create(**kwargs)
+
+        try:
+            completion = await _call()
+            deepseek_circuit_breaker.record_success()
+            content = completion.choices[0].message.content or ""
+            return LLMResponse(content=content, raw=completion)
+        except _RETRYABLE_EXCEPTIONS as e:
+            deepseek_circuit_breaker.record_failure()
+            logger.error(f"llm_chat_messages_failed error={e} error_type={type(e).__name__}")
+            raise
+        except Exception as e:
+            logger.error(f"llm_chat_messages_error error={e} error_type={type(e).__name__}")
+            raise
 
     async def chat_json(
         self,
