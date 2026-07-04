@@ -21,7 +21,7 @@ function switchLandingTheme(themeId) {
 }
 
 export function LandingPage() {
-  const page = createElement('div', { className: 'page landing-page' });
+  const page = createElement('div', { className: 'page active landing-page' });
 
   // ── Global Nav ──
   const nav = createElement('nav', { className: 'global-top-nav', id: 'globalTopNav' },
