@@ -1,7 +1,14 @@
 import { state } from '../app/store.js';
 
-// 开发环境使用相对路径走 Vite 代理，用户可通过 settings.apiBase 覆盖
-const getBaseUrl = () => state.settings.apiBase || '';
+// 优先级：用户设置 > 环境变量（生产构建时注入）> 相对路径（开发走 Vite 代理）
+const getBaseUrl = () => {
+  if (state.settings.apiBase) return state.settings.apiBase;
+  // @ts-ignore — Vite 在构建时替换 import.meta.env.VITE_API_BASE
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE) {
+    return import.meta.env.VITE_API_BASE;
+  }
+  return '';
+};
 
 class ApiError extends Error {
   constructor(status, message, data = null) {

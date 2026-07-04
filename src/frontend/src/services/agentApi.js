@@ -3,7 +3,9 @@ import { api, ApiError } from './api.js';
 // P0-2: SSE 流式对话 — 通过 fetch + ReadableStream 消费后端 /agent/stream 端点
 // 事件类型: token, thought, options, done, error
 async function streamChat(params, { onToken, onThought, onOptions, onDone, onError, signal }) {
-  const baseUrl = (await import('../app/store.js')).state.settings?.apiBase || '';
+  const baseUrl = (await import('../app/store.js')).state.settings?.apiBase
+    || (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE)
+    || '';
   const url = `${baseUrl}/api/v1/agent/stream`;
   const storedToken = localStorage.getItem('sm_token');
   let token = '';
