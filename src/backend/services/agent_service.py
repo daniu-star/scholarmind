@@ -8,12 +8,11 @@ import re
 import uuid
 import time
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime
 
 from ..services.skills_service import SkillsService
 from ..services import chart_service
 from ..config import settings
-from ..utils.circuit_breaker import deepseek_circuit_breaker
 from ..utils.file_parser import extract_pdf, extract_docx
 from ..utils.cache import cache_result
 from ..utils.llm_client import llm_client
@@ -21,11 +20,8 @@ from ..core.exceptions import AgentChatFailedError, LLMTruncatedError
 from .interfaces import IAgentService
 
 # ── 从 agent 子包导入拆分后的模块（agent_service.py 拆分 → 5 模块） ──
-from .agent.cot_processor import is_cot_enabled, get_cot_instruction, parse_cot_response, CoTStreamState, match_partial_tag_suffix
 from .agent.prompt_builder import (
-    AGENT_LLM_CONFIG, _get_agent_llm_config, _AGENT_STAGE_NAMES, _canned_greeting,
-    AGENT_PROMPTS, CONTEXT_TEMPLATES, VALID_AGENTS,
-    AGENT_ACADEMIC_ENHANCEMENT,
+    _get_agent_llm_config, CONTEXT_TEMPLATES, VALID_AGENTS,
 )
 from .agent.skill_router import SkillRouter
 from .agent.session_manager import SessionManager
@@ -418,9 +414,9 @@ class AgentService(IAgentService):
                 self._save_conversation(session_id)
 
             # 2. 解析选项和检测技能（纯 CPU，不阻塞）
-            options = self._parse_options(full_reply)
+            self._parse_options(full_reply)
             skills_used = self._detect_skills(full_reply, message)
-            skill_hint = self._detect_skill_hint(full_reply, message, skills_used)
+            self._detect_skill_hint(full_reply, message, skills_used)
 
             # 3. 执行图表/CNKI 技能（可能较慢，但不影响用户交互）
             chart_info = None

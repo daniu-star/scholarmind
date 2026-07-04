@@ -8,7 +8,7 @@ import time
 import functools
 import structlog
 from enum import Enum
-from typing import Callable, Optional
+from typing import Callable
 
 logger = structlog.get_logger(__name__)
 

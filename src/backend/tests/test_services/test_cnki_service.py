@@ -1,7 +1,6 @@
 """
 CNKI Service 测试
 """
-import pytest
 
 
 def test_cnki_result_to_dict():

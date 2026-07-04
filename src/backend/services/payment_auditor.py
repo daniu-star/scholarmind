@@ -8,9 +8,7 @@
 
 from __future__ import annotations
 
-import json
 import structlog
-from pathlib import Path
 from dataclasses import dataclass
 
 from ..utils.llm_client import llm_client
@@ -82,7 +80,9 @@ def _try_ocr(image_path: str) -> str:
             for x in range(0, w, step):
                 for y in range(0, h, step):
                     px = img.getpixel((x, y))
-                    r_vals.append(px[0]); g_vals.append(px[1]); b_vals.append(px[2])
+                    r_vals.append(px[0])
+                    g_vals.append(px[1])
+                    b_vals.append(px[2])
             r_range = max(r_vals) - min(r_vals)
             g_range = max(g_vals) - min(g_vals)
             b_range = max(b_vals) - min(b_vals)
@@ -174,7 +174,7 @@ OCR 识别文字：
                 issues.append("OCR 内容不包含支付相关信息")
             if verdict == "approved" and not amount_match:
                 verdict = "rejected"
-                issues.append(f"金额不匹配")
+                issues.append("金额不匹配")
 
             # OCR 为空但非图片异常的降级
             if not ocr_text.strip() or ocr_text.startswith("[图片基本信息]"):

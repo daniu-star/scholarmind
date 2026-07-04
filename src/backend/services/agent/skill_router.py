@@ -4,16 +4,13 @@ SkillRouter — 技能检测、工具执行与选项解析
 """
 from __future__ import annotations
 
-import json
 import structlog
-from typing import Any, Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from ...services import chart_service
-from ...core.exceptions import AgentChatFailedError
 
 if TYPE_CHECKING:
-    from ...services.cnki_service import CNKIService
-    from ...services.skills_service import SkillsService
+    pass
 
 logger = structlog.get_logger(__name__)
 

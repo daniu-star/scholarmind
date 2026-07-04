@@ -6,7 +6,6 @@ from datetime import datetime, timedelta
 import aiohttp
 
 from .base import BaseCrawler
-from ..config import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -22,7 +21,7 @@ class CrossRefCrawler(BaseCrawler):
     async def _fetch(self, params: dict) -> list[dict]:
         """Fetch results from CrossRef API."""
         headers = {
-            "User-Agent": f"ScholarMind/1.0 (mailto:support@scholarmind.ai)",
+            "User-Agent": "ScholarMind/1.0 (mailto:support@scholarmind.ai)",
         }
         async with aiohttp.ClientSession(headers=headers) as session:
             async with session.get(self.API_BASE, params=params) as resp:

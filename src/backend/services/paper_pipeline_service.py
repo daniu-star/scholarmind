@@ -19,7 +19,6 @@ import uuid
 import asyncio
 import structlog
 import threading
-import time
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Optional
@@ -526,7 +525,7 @@ class PaperPipelineService:
         while not cancel_event.is_set():
             await asyncio.sleep(interval)
             count += 1
-            elapsed = count * interval
+            count * interval
             try:
                 state = await self._repo.get(pipeline_id)
                 if state and state.get("status") == "running":

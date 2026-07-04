@@ -25,6 +25,7 @@ Version: 1.0.0
 """
 from __future__ import annotations
 
+import asyncio
 import structlog
 import os
 import sys

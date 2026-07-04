@@ -1,7 +1,6 @@
 """CNKI crawler adapter — reuses CNKIService search logic."""
 
 import structlog
-from typing import Optional
 
 from .base import BaseCrawler
 

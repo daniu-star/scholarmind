@@ -17,7 +17,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from .pipeline import build_pipeline, get_pipeline
+from .pipeline import build_pipeline as build_pipeline, get_pipeline
 from .state import PipelineState
 
 logger = structlog.get_logger(__name__)

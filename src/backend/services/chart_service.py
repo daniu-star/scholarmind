@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 from typing import Any
 
 # ── 向后兼容 re-exports ───────────────────────────────────
-from .chart_style import ACADEMIC_COLORS, get_origin_style, _apply_origin_style
-from .chart_data import parse_data_input, _safe_array, _make_figure, _finalize
+from .chart_style import _apply_origin_style
+from .chart_data import parse_data_input
 from .chart_functions import (
     ribbon_chart, violin_chart, alluvial_chart, bubble_kde_chart,
     gradient_area_chart, surface3d_chart, parallel_chart, contour_chart,

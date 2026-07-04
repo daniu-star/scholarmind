@@ -73,7 +73,7 @@ def violin_chart(data, title: str, x_label: str, y_label: str, **kwargs) -> Figu
 
     groups = list(data.keys())
     values = [data[g] for g in groups]
-    palette = {g: ACADEMIC_COLORS[i % len(ACADEMIC_COLORS)] for i, g in enumerate(groups)}
+    {g: ACADEMIC_COLORS[i % len(ACADEMIC_COLORS)] for i, g in enumerate(groups)}
 
     parts = ax.violinplot(values, showmeans=False, showmedians=False, showextrema=False)
 
@@ -87,11 +87,11 @@ def violin_chart(data, title: str, x_label: str, y_label: str, **kwargs) -> Figu
     # 内嵌箱线图
     for i, vals in enumerate(values):
         q1 = np.percentile(vals, 25)
-        q2 = np.percentile(vals, 50)
+        np.percentile(vals, 50)
         q3 = np.percentile(vals, 75)
         iqr = q3 - q1
-        whisker_lo = max(np.min(vals), q1 - 1.5 * iqr)
-        whisker_hi = min(np.max(vals), q3 + 1.5 * iqr)
+        max(np.min(vals), q1 - 1.5 * iqr)
+        min(np.max(vals), q3 + 1.5 * iqr)
         pos = i + 1
         ax.boxplot(
             [vals], positions=[pos], widths=0.15,
@@ -126,12 +126,12 @@ def alluvial_chart(data, title: str, x_label: str, y_label: str, **kwargs) -> Fi
     targets = list(dict.fromkeys([t for s, t, v in data]))
 
     n_src = len(sources)
-    n_tgt = len(targets)
+    len(targets)
 
     # 左侧节点位置
     src_y = {}
     src_offset = {}
-    total_src = sum(v for s, t, v in data if s == sources[0]) if sources else 1
+    sum(v for s, t, v in data if s == sources[0]) if sources else 1
     for i, s in enumerate(sources):
         src_y[s] = i
         src_offset[s] = 0
@@ -183,7 +183,6 @@ def alluvial_chart(data, title: str, x_label: str, y_label: str, **kwargs) -> Fi
         n_pts = 50
         xs = np.linspace(0.05, 0.95, n_pts)
         for y_s, y_e in [(y_src_start, y_tgt_start), (y_src_end, y_tgt_end)]:
-            mid_x = 0.5
             ys = (1 - xs) * y_s + xs * y_e + 0.3 * np.sin(np.pi * xs) * (y_e - y_s) * 0.1
             ax.plot(xs, ys, color=color, linewidth=0.8, alpha=0.6)
 
@@ -310,7 +309,7 @@ def surface3d_chart(data, title: str, x_label: str, y_label: str, **kwargs) -> F
         # (x, y, z) tuples
         xs = arr[:, 0]
         ys = arr[:, 1]
-        zs = arr[:, 2]
+        arr[:, 2]
         # 创建网格
         x_unique = np.unique(xs)
         y_unique = np.unique(ys)
@@ -425,7 +424,7 @@ def contour_chart(data, title: str, x_label: str, y_label: str, **kwargs) -> Fig
     if arr.ndim == 2 and arr.shape[1] == 3:
         xs = arr[:, 0]
         ys = arr[:, 1]
-        zs = arr[:, 2]
+        arr[:, 2]
         x_unique = np.unique(xs)
         y_unique = np.unique(ys)
         X, Y = np.meshgrid(x_unique, y_unique)
@@ -466,7 +465,7 @@ def swarm_chart(data, title: str, x_label: str, y_label: str, **kwargs) -> Figur
     fig, ax = _make_figure(width, height, dpi)
 
     groups = list(data.keys())
-    values = [data[g] for g in groups]
+    [data[g] for g in groups]
     palette = [ACADEMIC_COLORS[i % len(ACADEMIC_COLORS)] for i in range(len(groups))]
 
     # 构造 DataFrame
@@ -598,7 +597,7 @@ def chord_chart(data, title: str, x_label: str, y_label: str, **kwargs) -> Figur
         if s not in angles or t not in angles:
             continue
         s_idx = nodes.index(s)
-        t_idx = nodes.index(t)
+        nodes.index(t)
 
         s_mid = sum(angles[s]) / 2
         t_mid = sum(angles[t]) / 2

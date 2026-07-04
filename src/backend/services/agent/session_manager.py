@@ -6,13 +6,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from ...config import settings
 from ...core.logging_config import get_logger
 
 if __import__('typing').TYPE_CHECKING:
-    from ...db.repository.conversation import ConversationRepository
+    pass
 
 logger = get_logger(__name__)
 
@@ -66,8 +65,10 @@ class SessionManager:
             del self.conversations[session_id]
             filepath = CONVERSATIONS_DIR / f'{session_id}.json'
             if filepath.exists():
-                try: filepath.unlink()
-                except Exception as e: logger.warning(f'Failed to delete: {e}')
+                try:
+                    filepath.unlink()
+                except Exception as e:
+                    logger.warning(f'Failed to delete: {e}')
             return True
         return False
 
@@ -82,7 +83,8 @@ class SessionManager:
             return await self.conversation_repo.list_sessions_with_meta(user_id, agent_id, limit)
         sessions = []
         for sid, msgs in self.conversations.items():
-            if not msgs: continue
+            if not msgs:
+                continue
             first_msg = msgs[0] if msgs else {}
             title = first_msg.get('content', 'Unnamed')[:30]
             sessions.append({'session_id': sid, 'agent_id': 'unknown', 'title': title, 'message_count': len(msgs), 'last_message_at': None, 'created_at': None})
@@ -101,7 +103,9 @@ class SessionManager:
             del self.conversations[session_id]
             filepath = CONVERSATIONS_DIR / f'{session_id}.json'
             if filepath.exists():
-                try: filepath.unlink()
-                except Exception as e: logger.warning(f'Failed to delete: {e}')
+                try:
+                    filepath.unlink()
+                except Exception as e:
+                    logger.warning(f'Failed to delete: {e}')
             return msg_count
         return 0

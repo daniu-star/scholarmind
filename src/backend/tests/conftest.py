@@ -21,11 +21,10 @@ from typing import AsyncGenerator
 
 from httpx import ASGITransport, AsyncClient
 
-from ..db.session import create_async_engine_from_url, create_async_sessionmaker_from_engine, init_db, Base
+from ..db.session import create_async_engine_from_url, create_async_sessionmaker_from_engine, init_db
 from ..db.repository.conversation import ConversationRepository
 from ..db.repository.skill import SkillRepository
 from ..db.repository.chart import ChartRepository
-from ..models.orm import Conversation, Skill, ChartRecord
 
 
 # ── 测试数据库 ──────────────────────────────────────────────

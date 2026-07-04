@@ -14,7 +14,7 @@ import pytest
 import pytest_asyncio
 
 from ...db import pipeline_state_repo as repo_module
-from ...db.pipeline_state_repo import PipelineStateRepo, get_pipeline_state_repo
+from ...db.pipeline_state_repo import get_pipeline_state_repo
 from ...utils import redis_client
 
 

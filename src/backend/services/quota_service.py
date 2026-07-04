@@ -1,6 +1,6 @@
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..models.orm import UserQuota, Order
+from ..models.orm import UserQuota
 from ..config import settings
 from datetime import datetime, timezone, timedelta
 

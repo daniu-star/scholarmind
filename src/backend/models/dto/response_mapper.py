@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from ..db.session import Base
 from ..models.orm import Conversation, Skill, ChartRecord
 
 

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import structlog
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket
 
 from ..config import settings
 from ..middleware.rate_limit import _extract_user_id_from_jwt, _extract_trusted_client_ip

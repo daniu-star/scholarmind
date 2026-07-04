@@ -118,7 +118,7 @@ async def create_and_send_code(
     db: AsyncSession, target: str, purpose: str = "login"
 ) -> dict:
     """创建验证码并发送邮件。含限频检查。"""
-    from ..services.email_service import send_verification_email, EmailSendError
+    from ..services.email_service import send_verification_email
 
     # 限频检查（用 first() 避免多行报错）
     cutoff = datetime.now(timezone.utc) - timedelta(
@@ -168,7 +168,7 @@ async def verify_code_and_login(
     failed_count = await db.scalar(
         select(func.count(VerificationCode.id)).where(
             VerificationCode.target == target,
-            VerificationCode.used == True,
+            VerificationCode.used,
             VerificationCode.created_at >= failed_window,
         )
     )
@@ -180,7 +180,7 @@ async def verify_code_and_login(
         .where(
             VerificationCode.target == target,
             VerificationCode.code == code,
-            VerificationCode.used == False,
+            not VerificationCode.used,
             VerificationCode.expires_at > now,
         )
         .order_by(VerificationCode.created_at.desc())

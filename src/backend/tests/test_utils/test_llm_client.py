@@ -10,7 +10,6 @@ LLM Client 单元测试
 """
 from __future__ import annotations
 
-import json
 import time
 
 import httpx
@@ -19,7 +18,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 from openai import (
     APIConnectionError,
-    APITimeoutError,
     RateLimitError,
     AuthenticationError,
 )

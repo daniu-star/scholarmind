@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 import pandas as pd
 from typing import Any
 
-from .chart_style import get_origin_style, _apply_origin_style
+from .chart_style import _apply_origin_style
 
 logger = structlog.get_logger(__name__)
 

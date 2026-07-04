@@ -63,9 +63,6 @@ def _check_color_contrast(html: str) -> list[RuleViolation]:
     violations = []
 
     # 检测 #333 on #fff 或类似低对比度组合
-    low_contrast_patterns = [
-        (r"color:\s*#?([0-9a-fA-F]{6}).*?background[^;]*#?([0-9a-fA-F]{6})", "低对比度颜色组合"),
-    ]
 
     # 检测过浅的文字颜色
     light_colors = ["#999", "#aaa", "#bbb", "#ccc", "#ddd", "#eee", "#f0f0f0"]

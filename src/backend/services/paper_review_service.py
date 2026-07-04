@@ -379,7 +379,7 @@ class PaperReviewService:
     async def _run_review_async(self, review_id: str, config: dict, paper_text: str):
         """异步执行审稿任务（P0 修复: 并发控制 + 超时保护 + 取消支持）"""
         try:
-            acquired = await asyncio.wait_for(
+            await asyncio.wait_for(
                 _REVIEW_SEMAPHORE.acquire(), timeout=30.0
             )
         except asyncio.TimeoutError:

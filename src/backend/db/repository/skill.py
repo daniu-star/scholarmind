@@ -30,7 +30,7 @@ class SkillRepository(BaseRepository[Skill]):
     async def list_enabled(self) -> Sequence[Skill]:
         """获取所有已启用的技能"""
         result = await self.db.execute(
-            select(Skill).where(Skill.enabled == True)
+            select(Skill).where(Skill.enabled)
         )
         return result.scalars().all()
 
@@ -39,7 +39,7 @@ class SkillRepository(BaseRepository[Skill]):
         result = await self.db.execute(
             select(Skill)
             .where(
-                Skill.enabled == True,
+                Skill.enabled,
                 Skill.agents.contains(agent_id),
             )
         )

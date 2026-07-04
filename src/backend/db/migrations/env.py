@@ -16,11 +16,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.backend.config import settings
-from src.backend.db.session import Base
+from src.backend.config import settings  # noqa: E402
+from src.backend.db.session import Base  # noqa: E402
 # 导入所有 ORM 模型以确保它们被注册到 Base.metadata
 # 导入所有 ORM 模型以确保 Alembic autogenerate 能检测到完整 schema
-from src.backend.models.orm import (  # noqa: F401
+from src.backend.models.orm import (  # noqa: F401, E402
     Conversation, Skill, ChartRecord,
     User, UserQuota, Order, EntitlementGrant, VerificationCode,
     AdminAuditLog, AgentExecutionLog, LoginAttempt,

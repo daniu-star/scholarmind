@@ -286,9 +286,6 @@ def test_high_cost_path_has_lower_limit(enable_rate_limit):
         _path_cost,
         _is_fail_closed,
         _path_class,
-        PATH_COST_WEIGHTS,
-        FAIL_CLOSED_PATHS,
-        FAIL_CLOSED_PREFIXES,
     )
 
     # 模块级常量与函数

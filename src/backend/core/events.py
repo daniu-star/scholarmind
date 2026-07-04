@@ -6,9 +6,8 @@ from __future__ import annotations
 
 import secrets
 from pathlib import Path
-from typing import Optional
 from fastapi import FastAPI
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..config import settings
 from .logging_config import configure_logging, get_logger
@@ -77,7 +76,7 @@ async def startup(app: FastAPI) -> None:
 
     # 初始化现有的 DatabaseService（爬虫相关）
     from ..services.db_service import get_db_service
-    db = get_db_service()
+    get_db_service()
     logger.info("Database service (legacy SQLite) initialized")
 
     # VectorService 后台预热（fire-and-forget，不阻塞 startup）

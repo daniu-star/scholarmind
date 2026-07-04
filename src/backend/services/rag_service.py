@@ -152,7 +152,6 @@ class RAGService:
         if not results:
             return {"context": "", "degraded": degraded, "reason": reason}
 
-        import json
         lines = []
         for i, r in enumerate(results, 1):
             title = r.get("title", "无标题")

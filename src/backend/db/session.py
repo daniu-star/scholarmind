@@ -6,7 +6,6 @@ from __future__ import annotations
 
 from typing import AsyncGenerator
 
-from sqlalchemy import create_engine as _create_sync_engine
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,

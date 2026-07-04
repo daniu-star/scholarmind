@@ -18,7 +18,7 @@ from ..models.schemas.paper_pipeline import (
     PipelineResultResponse,
     PipelineListResponse,
 )
-from ..core.exceptions import AppException, ValidationError, NotFoundError
+from ..core.exceptions import NotFoundError
 # P0 Task 3.3：强制鉴权（替代 get_optional_user_id 可选鉴权）
 from ..core.dependencies import get_current_user, get_db
 from ..services.entitlement_service import EntitlementError, EntitlementService

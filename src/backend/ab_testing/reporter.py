@@ -37,7 +37,7 @@ def generate_report(final_state: dict, output_dir: str) -> str:
     report_file = output_path / f"{timestamp}_report.md"
 
     lines: list[str] = []
-    lines.append(f"# ScholarMind A/B 测试报告")
+    lines.append("# ScholarMind A/B 测试报告")
     lines.append(f"\n> 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append("")
 

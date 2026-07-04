@@ -40,7 +40,7 @@ _ORDER_EXPIRE_MINUTES = 15                        # 订单过期时间
 
 async def _mark_order_paid(db: AsyncSession, order_no: str, trade_no: str) -> bool:
     """原子地将订单置为 paid 并发放权益（复用 payment.py 的核心逻辑）"""
-    from .entitlement_service import EntitlementService, PRODUCTS
+    from .entitlement_service import EntitlementService
 
     now = datetime.now(timezone.utc)
     # SELECT ... FOR UPDATE 暂不支持 SQLite，使用条件 UPDATE 保证幂等
@@ -198,7 +198,7 @@ class PaymentPoller:
         if result.get("is_paid"):
             # 支付成功！
             trade_no = result.get("trade_no") or f"POLLED_{order.order_no}"
-            ok = await _mark_order_paid(db, order.order_no, trade_no)
+            await _mark_order_paid(db, order.order_no, trade_no)
             self._poll_counts.pop(order.order_no, None)
             logger.info(
                 f"payment_poller_confirmed order_no={order.order_no} "

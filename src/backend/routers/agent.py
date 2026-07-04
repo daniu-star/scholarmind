@@ -1,21 +1,18 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
-from typing import Optional, Dict, Any
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import settings
-from ..services.agent_service import AgentService, VALID_AGENTS
+from ..services.agent_service import VALID_AGENTS
 from ..core.exceptions import AppException, AgentNotFoundError, AgentChatFailedError, ValidationError, NotFoundError
 from ..services.interfaces import IAgentService
 from ..models.schemas.agent import (
     ChatRequest,
     ChatResponse,
-    AgentInfo,
     AgentListResponse,
     ConversationHistoryResponse,
     ClearConversationResponse,
-    SessionItem,
     SessionListResponse,
     SessionRenameRequest,
     SessionRenameResponse,

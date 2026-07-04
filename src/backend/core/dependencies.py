@@ -11,7 +11,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
-from ..core.exceptions import AgentChatFailedError
 from ..db.session import get_db as _get_db
 from ..db.unit_of_work import UnitOfWork
 from ..services.interfaces import IAgentService

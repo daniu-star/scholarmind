@@ -3,7 +3,6 @@
 import asyncio
 import sqlite3
 import uuid
-import json
 import structlog
 from datetime import datetime, timedelta
 from typing import Optional

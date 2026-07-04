@@ -27,7 +27,7 @@ from ..db.session import (
     init_db,
 )
 from ..db.repository.conversation import ConversationRepository
-from ..db.pipeline_state_repo import PipelineStateRepo, get_pipeline_state_repo
+from ..db.pipeline_state_repo import get_pipeline_state_repo
 from ..models.orm import User, UserQuota
 from ..services.auth_service import (
     create_access_token,

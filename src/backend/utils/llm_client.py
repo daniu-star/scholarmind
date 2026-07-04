@@ -24,7 +24,6 @@ import structlog
 from openai import (
     AsyncOpenAI,
     APIConnectionError,
-    APIError,
     APITimeoutError,
     RateLimitError,
 )
@@ -263,7 +262,7 @@ class LLMClient:
                     if chunk.choices and chunk.choices[0].delta.content:
                         yield chunk.choices[0].delta.content
                 deepseek_circuit_breaker.record_success()
-            except _RETRYABLE_EXCEPTIONS as e:
+            except _RETRYABLE_EXCEPTIONS:
                 deepseek_circuit_breaker.record_failure()
                 raise
         else:

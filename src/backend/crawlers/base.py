@@ -8,7 +8,6 @@ import uuid
 import random
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional
 
 from ..config import settings
 

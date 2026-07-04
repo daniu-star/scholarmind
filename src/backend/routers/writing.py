@@ -5,7 +5,7 @@ ScholarMind 写作分析 API 路由
 import re
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 
 from ..core.dependencies import get_current_user
 

@@ -4,7 +4,6 @@ import aiohttp
 import asyncio
 import difflib
 import re
-import json
 import structlog
 import random
 import time

@@ -1,8 +1,9 @@
-import os, json, yaml
+import yaml
 import structlog
 from pathlib import Path
-from typing import Optional, Sequence
 from datetime import datetime, timezone
+
+from sqlalchemy import select
 
 from ..config import settings
 
@@ -77,14 +78,14 @@ class SkillsService:
                 from sqlalchemy import select
 
                 result = await self.repository.db.execute(
-                    select(Skill).where(Skill.is_preset == False)
+                    select(Skill).where(not Skill.is_preset)
                 )
                 db_custom = result.scalars().all()
                 custom = [_skill_orm_to_dict(s) for s in db_custom]
 
                 # 同时同步预设技能的 enabled 状态(从 DB 读取最新状态)
                 db_presets_result = await self.repository.db.execute(
-                    select(Skill).where(Skill.is_preset == True)
+                    select(Skill).where(Skill.is_preset)
                 )
                 db_presets = {s.skill_id: s for s in db_presets_result.scalars().all()}
                 for p in preset:
