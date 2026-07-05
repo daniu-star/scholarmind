@@ -19,11 +19,15 @@ _repo_root = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
 if _repo_root not in _sys.path:
     _sys.path.insert(0, _repo_root)
 
-# Vercel 环境覆盖：使用 /tmp 目录（唯一可写位置），关闭需要外部服务的功能
+# Vercel 环境覆盖：所有文件路径重定向到 /tmp/（唯一可写目录），关闭外部服务
 _os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 _os.environ.setdefault("DB_PATH", "/tmp/scholarmind.db")
 _os.environ.setdefault("CHROMA_DIR", "/tmp/chroma")
 _os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:////tmp/scholarmind_orm.db")
+_os.environ.setdefault("UPLOAD_DIR", "/tmp/uploads")
+_os.environ.setdefault("SKILLS_DIR", "/tmp/skills")
+_os.environ.setdefault("CHARTS_DIR", "/tmp/charts")
+_os.environ.setdefault("CONVERSATIONS_DIR", "/tmp/conversations")
 
 from src.backend.app import create_app
 
