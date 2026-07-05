@@ -69,4 +69,4 @@ ScholarMind-*.md
 *审计报告*.md
 *审计*.md
 AI产品.docx
-prototypes/
+# prototypes/  # Vercel 部署需要前端原型文件，必须入库

@@ -6,14 +6,17 @@ import pytest
 
 @pytest.mark.asyncio
 async def test_agent_service_init():
-    """测试 AgentService 初始化"""
+    """测试 AgentService 初始化
+
+    P0 Task 1：已删除 self.client = AsyncOpenAI(...)，统一使用 llm_client 单例，
+    因此不再断言 service.client 属性。
+    """
     from ...services.agent_service import AgentService
     service = AgentService(
         api_key="test-key",
         base_url="https://api.deepseek.com",
     )
     assert service.model == "deepseek-chat"
-    assert service.client is not None
 
 
 @pytest.mark.asyncio

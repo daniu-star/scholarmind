@@ -23,7 +23,6 @@ import structlog
 from pathlib import Path
 from typing import Optional
 
-import magic
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, status
 
 from ..config import settings
@@ -85,6 +84,8 @@ def _validate_magic_byte(file_path: str, expected_ext: str) -> bool:
         # 未在映射表中登记的扩展名，跳过 magic 校验（不阻断已知白名单扩展名）
         return True
     try:
+        # 懒加载：python-magic 未安装时优雅降级（已通过扩展名白名单 + 大小校验）
+        import magic
         actual_mime = magic.from_file(file_path, mime=True) or ""
     except Exception as e:
         # magic 库不可用或读取失败：保守放行（已通过扩展名白名单 + 大小校验）

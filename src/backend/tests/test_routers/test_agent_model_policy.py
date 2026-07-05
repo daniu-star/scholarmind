@@ -106,19 +106,19 @@ async def policy_client(tmp_path, monkeypatch):
     session_factory = create_async_sessionmaker_from_engine(engine)
     free_user_id, pro_user_id = await _seed_users(session_factory)
 
-    # 捕获 llm_client.chat 的 model 参数
+    # 捕获 llm_client.chat_messages 的 model 参数
     captured: list[str] = []
 
-    async def _mock_chat(system, user, *, temperature=0.7, max_tokens=2048,
-                         response_format=None, model=None):
+    async def _mock_chat_messages(messages, *, temperature=0.7, max_tokens=2048,
+                                  response_format=None, model=None, stream=False):
         captured.append(model)
         # 返回最小可用的 LLMResponse；内容不含 chart/cnki 触发词，避免技能副作用
         from src.backend.utils.llm_client import LLMResponse
         return LLMResponse(content="已收到您的消息，这是模拟回复。")
 
-    # patch 全局 llm_client 单例的 chat 方法（AgentService 持有同一引用）
+    # patch 全局 llm_client 单例的 chat_messages 方法（AgentService.chat 实际调用此方法）
     from src.backend.utils.llm_client import llm_client as _llm_client_singleton
-    monkeypatch.setattr(_llm_client_singleton, "chat", _mock_chat)
+    monkeypatch.setattr(_llm_client_singleton, "chat_messages", _mock_chat_messages)
 
     from src.backend.app import create_app
 

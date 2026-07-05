@@ -111,7 +111,7 @@ def test_validate_session_id_accepts_valid():
     ],
 )
 async def test_path_traversal_rejected_via_http(
-    async_client: AsyncClient,
+    authed_async_client: AsyncClient,
     malicious_session_id: str,
     tmp_path: Path,
     monkeypatch,
@@ -122,10 +122,13 @@ async def test_path_traversal_rejected_via_http(
     此时路由不匹配返回 404——这同样是"被拒"且更早（请求根本到不了 handler）。
     对于无法被规范化的（如反斜杠 ..\\..\\windows），到达 handler 后被
     validate_session_id 拒绝返回 400。两种情况都不应创建穿越目录。
+
+    P1 Task 12：upload 端点改为强制鉴权，本测试改用 authed_async_client
+    通过 dependency_overrides 覆盖 get_current_user 返回 user_id=1。
     """
     monkeypatch.setattr("src.backend.routers.upload.settings.UPLOAD_DIR", str(tmp_path))
 
-    response = await async_client.post(
+    response = await authed_async_client.post(
         f"/api/v1/upload/{malicious_session_id}",
         files=[("files", ("sample.txt", io.BytesIO(b"hello"), "text/plain"))],
     )
@@ -149,7 +152,7 @@ async def test_path_traversal_rejected_via_http(
 
 @pytest.mark.asyncio
 async def test_oversized_upload_no_part_residue(
-    async_client: AsyncClient,
+    authed_async_client: AsyncClient,
     tmp_path: Path,
     monkeypatch,
 ):
@@ -158,7 +161,7 @@ async def test_oversized_upload_no_part_residue(
     # MAX_FILE_SIZE_MB 默认 20，上传 21MB 触发超限
     oversized_bytes = b"\x00" * (21 * 1024 * 1024)
 
-    response = await async_client.post(
+    response = await authed_async_client.post(
         f"/api/v1/upload/{VALID_SESSION_ID}",
         files=[("files", ("big.bin", io.BytesIO(oversized_bytes), "application/octet-stream"))],
     )
@@ -178,7 +181,7 @@ async def test_oversized_upload_no_part_residue(
 
 @pytest.mark.asyncio
 async def test_file_count_limit_enforced(
-    async_client: AsyncClient,
+    authed_async_client: AsyncClient,
     tmp_path: Path,
     monkeypatch,
 ):
@@ -192,7 +195,7 @@ async def test_file_count_limit_enforced(
         ("files", (f"file{i}.txt", io.BytesIO(f"content{i}".encode()), "text/plain"))
         for i in range(3)
     ]
-    response = await async_client.post(
+    response = await authed_async_client.post(
         f"/api/v1/upload/{VALID_SESSION_ID}",
         files=files_batch,
     )
@@ -200,7 +203,7 @@ async def test_file_count_limit_enforced(
     assert response.json()["count"] == 3
 
     # 再次上传 1 个文件，应被拒（413）
-    response2 = await async_client.post(
+    response2 = await authed_async_client.post(
         f"/api/v1/upload/{VALID_SESSION_ID}",
         files=[("files", ("overflow.txt", io.BytesIO(b"overflow"), "text/plain"))],
     )

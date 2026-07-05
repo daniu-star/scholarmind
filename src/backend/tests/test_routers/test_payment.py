@@ -177,11 +177,19 @@ async def test_payment_disabled_by_default_wechat(async_client: AsyncClient):
 
 
 @pytest.mark.asyncio
-async def test_alipay_notify_no_signature_rejected(payment_client: AsyncClient):
-    """PAYMENT_ENABLED=true，verify_alipay_signature 骨架返回 False → "failure"
+async def test_alipay_notify_no_signature_rejected(payment_client: AsyncClient, monkeypatch):
+    """PAYMENT_ENABLED=true，verify_alipay_signature 返回 False → "failure"
 
     订单状态必须保持 pending，不升级套餐。
+
+    P1 修复：原测试假设 verify_alipay_signature 是 P0 骨架（恒返回 False），
+    但 P1 接入官方 SDK 后会真实调用 RSA 验签，因测试环境 ALIPAY_PRIVATE_KEY
+    是占位符导致 RSA key format 异常。此处 monkeypatch 为 False 模拟验签失败。
     """
+    monkeypatch.setattr(
+        "src.backend.routers.payment.verify_alipay_signature",
+        lambda data: False,
+    )
     order_no = payment_client._order_no  # type: ignore[attr-defined]
     response = await payment_client.post(
         "/api/v1/payment/alipay/notify",

@@ -69,13 +69,74 @@ async def chart_repo(test_db):
 
 @pytest_asyncio.fixture(scope="function")
 async def async_client() -> AsyncGenerator[AsyncClient, None]:
-    """异步 HTTP 测试客户端"""
+    """异步 HTTP 测试客户端（匿名，未鉴权）"""
     from ..app import create_app
 
     app = create_app()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+@pytest_asyncio.fixture(scope="function")
+async def authed_async_client() -> AsyncGenerator[AsyncClient, None]:
+    """异步 HTTP 测试客户端（已鉴权，user_id=1）
+
+    P1 Task 12 修复：upload 端点改为强制鉴权后，原 async_client 未带 token
+    会被 401 拦截。此 fixture 创建独立 app + SQLite + 种子用户，生成 access
+    token 并设置为默认 Authorization header，专供 upload_security 等安全回归测试使用。
+    """
+    import tempfile
+    from ..app import create_app
+    from ..db.session import (
+        create_async_engine_from_url,
+        create_async_sessionmaker_from_engine,
+        init_db,
+    )
+    from ..models.orm import User
+    from ..services.auth_service import create_access_token, get_password_hash
+
+    # 独立临时 SQLite（避免污染 test_scholarmind.db）
+    tmp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    tmp_db.close()
+    db_url = f"sqlite+aiosqlite:///{tmp_db.name}"
+
+    import os as _os
+    _os.environ["DATABASE_URL"] = db_url
+
+    engine = create_async_engine_from_url(db_url)
+    await init_db(engine)
+    session_factory = create_async_sessionmaker_from_engine(engine)
+
+    # 种子测试用户
+    async with session_factory() as session:
+        test_user = User(
+            username="upload_test_user",
+            password_hash=get_password_hash("test_pass_123"),
+            nickname="UploadTestUser",
+            is_active=True,
+            plan="free",
+        )
+        session.add(test_user)
+        await session.commit()
+        await session.refresh(test_user)
+        user_id = test_user.id
+
+    app = create_app()
+    app.state.db_engine = engine
+    app.state.db_session_factory = session_factory
+
+    token = create_access_token({"sub": str(user_id), "username": "upload_test_user"})
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as client:
+        yield client
+
+    await engine.dispose()
+    _os.unlink(tmp_db.name)
 
 
 # ── Mock 服务 ────────────────────────────────────────────────

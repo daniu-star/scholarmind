@@ -31,7 +31,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    continue-on-error: true
     services:
       redis:
         image: redis:7-alpine
@@ -67,7 +66,7 @@ jobs:
       - run: safety check --full-report || true
 
   build:
-    needs: [lint]
+    needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -158,7 +158,7 @@ class AgentService(IAgentService):
         if context is None:
             context = {}
         context["last_message"] = message
-        system_prompt = self._build_system_prompt(agent_id, context)
+        system_prompt = await self._build_system_prompt(agent_id, context)
 
         # Load file upload context (P0: path_safety applied)
         upload_context = self._load_upload_context(session_id)
@@ -440,7 +440,7 @@ class AgentService(IAgentService):
 
     # ── System prompt building with skills injection ──────
 
-    def _build_system_prompt(
+    async def _build_system_prompt(
         self, agent_id: str, context: Optional[dict] = None
     ) -> str:
         """Build system prompt for the agent using Jinja2 template engine.
@@ -448,6 +448,10 @@ class AgentService(IAgentService):
         性能优化：
         - base prompt 按 agent_id 缓存（仅首次或模板文件变化时重新加载）
         - RAG 上下文检索延迟到首次需要时，且使用轻量查询
+
+        Task 27 修复：改为 async 以正确 await 异步的 _load_skills_for_agent
+        （原 sync 版本调用 async SkillsService.list_all() 返回 coroutine 导致
+        'coroutine' object is not iterable）
         """
         from .agent.prompt_builder import get_prompt_builder
 
@@ -466,7 +470,7 @@ class AgentService(IAgentService):
         # 技能规则（带缓存，减少 DB 查询）
         # Task 27: 调用合并后的 _load_skills_for_agent（缓存由 @cache_result 装饰器实现）
         skills_rules_text = ""
-        skills_list = self._load_skills_for_agent(agent_id)
+        skills_list = await self._load_skills_for_agent(agent_id)
         if skills_list:
             skills_parts = []
             for skill in skills_list:
@@ -506,13 +510,16 @@ class AgentService(IAgentService):
         )
 
     @cache_result(ttl=300)
-    def _load_skills_for_agent(self, agent_id: str) -> list[dict]:
+    async def _load_skills_for_agent(self, agent_id: str) -> list[dict]:
         """Load enabled skills associated with the given agent_id
 
         Task 27: 合并原 `_load_skills_for_agent_cached` 与 `_load_skills_for_agent`，
         缓存由 `@cache_result` 装饰器统一实现（共享 default_cache LRU+TTL）。
+
+        注意：原 sync 版本误将 async 的 SkillsService.list_all() 当成同步调用，
+        返回 coroutine 导致 'coroutine' object is not iterable。改为 async 后正确 await。
         """
-        all_skills = self.skills_service.list_all()
+        all_skills = await self.skills_service.list_all()
         matched = []
         for skill in all_skills:
             if not skill.get("enabled", False):

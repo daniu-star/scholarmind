@@ -1,0 +1,13 @@
+{
+  "name": "scholarmind",
+  "version": "3.0.0",
+  "description": "ScholarMind Agent - 基于 RAG + Langgraph + 6层企业架构的智能学术研究助手",
+  "private": true,
+  "scripts": {
+    "build:frontend": "node scripts/build-frontend.js",
+    "build:frontend:dev": "cross-env VITE_API_BASE=http://localhost:8000 node scripts/build-frontend.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

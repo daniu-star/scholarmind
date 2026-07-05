@@ -91,7 +91,6 @@ class Settings(BaseSettings):
         "http://localhost:5173", "http://127.0.0.1:5173",  # Vite 前端
         "http://localhost:8080", "http://127.0.0.1:8080",  # 备用
         "http://localhost:8000", "http://127.0.0.1:8000",  # 后端直连
-        "https://www.quannengyanjiu.cn", "https://quannengyanjiu.cn",  # 生产前端
     ]
     CORS_ALLOW_ALL_IN_DEV: bool = False  # P0 修复：默认关闭全放通，开发环境显式开启
 
@@ -415,6 +414,22 @@ class Settings(BaseSettings):
         # P1 修复: 生产环境禁止使用 SQLite
         if "sqlite" in self.DATABASE_URL.lower():
             errors.append("生产环境禁止使用 SQLite，请配置 PostgreSQL DATABASE_URL")
+        # P1 修复: 支付回调 URL 显式检测 your-domain.com 占位符（_is_placeholder_key 只识别 YOUR_/XXXX，识别不到 your-domain.com）
+        for url_field in ("ALIPAY_NOTIFY_URL", "WECHAT_PAY_NOTIFY_URL", "ALIPAY_RETURN_URL"):
+            url_value = getattr(self, url_field, "")
+            if url_value and "your-domain.com" in url_value:
+                errors.append(f"{url_field} 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）")
+        # P1 修复: 生产环境 CORS_ORIGINS 必须包含真实公网域名，不得仅 localhost
+        cors_origins_lower = [o.lower() for o in self.CORS_ORIGINS]
+        has_public_origin = any(
+            o.startswith("https://") and "localhost" not in o and "127.0.0.1" not in o
+            for o in cors_origins_lower
+        )
+        if not has_public_origin:
+            errors.append(
+                "CORS_ORIGINS 在生产环境必须包含真实公网 HTTPS 域名"
+                "（如 https://quannengyanjiu.cn），不得仅含 localhost"
+            )
         if errors:
             raise RuntimeError("生产环境配置校验失败:\n  " + "\n  ".join(errors))
 

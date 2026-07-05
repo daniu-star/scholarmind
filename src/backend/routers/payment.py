@@ -229,9 +229,25 @@ async def alipay_notify(request: Request, db: AsyncSession = Depends(get_db)):
         return "failure"
     if data.get("trade_status") not in {"TRADE_SUCCESS", "TRADE_FINISHED"}:
         return "failure"
+    # P1 安全加固：app_id 与 total_amount 必须与配置/订单匹配，防止伪造回调
+    if data.get("app_id") != settings.ALIPAY_APP_ID:
+        logger.warning(f"alipay app_id mismatch order_no={order_no} got={data.get('app_id')}")
+        return "failure"
     result = await db.execute(select(Order).where(Order.order_no == order_no))
     order = result.scalar_one_or_none()
     if order is None or order.payment_method != "alipay":
+        return "failure"
+    # 金额校验：total_amount（元，字符串）必须与订单 amount_cents/100 一致
+    try:
+        notify_amount_yuan = float(data.get("total_amount", "0"))
+    except (TypeError, ValueError):
+        logger.warning(f"alipay total_amount invalid order_no={order_no} value={data.get('total_amount')!r}")
+        return "failure"
+    expected_amount_yuan = order.amount / 100.0
+    if abs(notify_amount_yuan - expected_amount_yuan) > 0.001:
+        logger.warning(
+            f"alipay amount mismatch order_no={order_no} expected={expected_amount_yuan} got={notify_amount_yuan}"
+        )
         return "failure"
     try:
         outcome = await mark_order_paid(

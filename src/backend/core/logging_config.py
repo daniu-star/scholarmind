@@ -53,9 +53,10 @@ def configure_logging():
     file_handler.setFormatter(logging.Formatter("%(message)s"))
 
     # 设置根日志级别：stdout + 文件落盘并列
+    # 注意：Python 3.14 起 basicConfig 不允许同时传 stream 和 handlers，
+    # 这里只通过 handlers 列表同时挂载 stdout 与文件 handler。
     logging.basicConfig(
         format="%(message)s",
-        stream=sys.stdout,
         level=logging.INFO,
         handlers=[logging.StreamHandler(sys.stdout), file_handler],
     )
