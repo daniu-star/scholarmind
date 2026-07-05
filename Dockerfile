@@ -23,12 +23,12 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # - data/ 是运行时挂载的持久化卷，构建期不需要
 COPY src/backend/ ./src/backend/
 
-# 创建非 root 用户 + 预创建数据卷子目录（避免首次启动报错）
-RUN useradd --create-home --shell /bin/bash scholarmind && \
-    mkdir -p /app/data/uploads /app/data/chroma /app/data/skills \
-             /app/data/conversations /app/data/charts /app/logs && \
-    chown -R scholarmind:scholarmind /app
-USER scholarmind
+# 预创建数据卷子目录（避免首次启动报错）
+# 注意：Railway 挂载 volume 到 /app/data 时会以 root 属主覆盖构建期权限，
+# 因此容器需以 root 运行（不设 USER），确保能写入 volume 挂载点。
+# 安全性由 Railway 容器隔离保证；后续可通过 entrypoint+gosu 降权优化。
+RUN mkdir -p /app/data/uploads /app/data/chroma /app/data/skills \
+             /app/data/conversations /app/data/charts /app/logs
 
 EXPOSE 8000
 
