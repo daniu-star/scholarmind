@@ -46,3 +46,5 @@ cryptography>=42.0.0
 tiktoken
 # ── 新增：LLM 客户端鲁棒性 ─────────────────────
 tenacity>=8.2.0
+# ── 新增：Prometheus 监控指标 ───────────────────
+prometheus-client>=0.20.0
