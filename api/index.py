@@ -95,7 +95,11 @@ ROUTES = {
 
 def application(environ, start_response):
     method = environ.get("REQUEST_METHOD","GET")
-    path = environ.get("PATH_INFO","/").rstrip("/")
+    # Vercel rewrite 将 /api/* 都映射到 /api/index，PATH_INFO 始终为 /api/index
+    # 需要从 header 获取原始路径
+    path = (environ.get("HTTP_X_VERCEL_ORIGINAL_PATH") or
+            environ.get("HTTP_X_FORWARDED_PATH") or
+            environ.get("PATH_INFO","/")).rstrip("/")
     auth = environ.get("HTTP_AUTHORIZATION","")
     if method == "OPTIONS":
         start_response("200 OK", [("Access-Control-Allow-Origin","*"),("Access-Control-Allow-Methods","GET,POST,OPTIONS"),("Access-Control-Allow-Headers","Content-Type,Authorization")])
@@ -108,6 +112,10 @@ def application(environ, start_response):
     try:
         if method == "GET" and path == "/api/v1/auth/me":
             status, headers, resp_body = me(auth)
+        # Debug: 返回所有请求信息用于排查
+        elif method == "GET" and path == "/api/v1/debug":
+            info = {k: str(v) for k, v in environ.items() if k.startswith(("HTTP_","PATH_","REQUEST_","SERVER_"))}
+            status, headers, resp_body = _json("200 OK", {"status":"ok","path":path,"environ":info})
         elif method == "GET" and path in ("/api/v1/health","/api/index"):
             status, headers, resp_body = _json("200 OK", {"status":"ok","version":"3.0.0-vercel"})
         elif (method, path) in ROUTES:
