@@ -8721,15 +8721,24 @@ function showAuthDialog(initialMode) {
     sendCodeBtn.disabled = true;
     sendCodeBtn.textContent = '发送中…';
     try {
-      await _accountApi('/api/v1/auth/send-code', {
+      var result = await _accountApi('/api/v1/auth/send-code', {
         method: 'POST',
         body: JSON.stringify({target: target, purpose: mode})
       });
       sendCodeBtn.classList.add('counting');
       errorEl.textContent = '';
-      emailHint.textContent = '验证码已发送至 ' + target + '，请查收（含垃圾邮件箱）';
-      emailHint.style.color = 'var(--accent-green)';
-      showToast('验证码已发送，请查收邮箱', 'success');
+      // 如果 API 直接返回了验证码（SMTP 未配置/发送失败），自动填入并提示
+      if (result && result.code) {
+        codeInput.value = result.code;
+        var smtpMsg = result.smtp_error ? '（' + result.smtp_error + '）' : '';
+        emailHint.textContent = '验证码：' + result.code + '（直接显示，无需查收邮件）';
+        emailHint.style.color = 'var(--accent-green)';
+        showToast('验证码：' + result.code, 'info');
+      } else {
+        emailHint.textContent = '验证码已发送至 ' + target + '，请查收（含垃圾邮件箱）';
+        emailHint.style.color = 'var(--accent-green)';
+        showToast('验证码已发送，请查收邮箱', 'success');
+      }
       codeInput.focus();
       // 60秒倒计时
       _codeCountdown = 60;
