@@ -23,8 +23,13 @@ class Base(DeclarativeBase):
 
 
 def create_async_engine_from_url(url: str | None = None) -> AsyncEngine:
-    """创建异步 SQLAlchemy 引擎"""
+    """创建异步 SQLAlchemy 引擎
+
+    自动将 postgresql:// 转为 postgresql+asyncpg://，兼容 Railway 注入的原始 URL。
+    """
     database_url = url or settings.DATABASE_URL
+    if database_url.startswith("postgresql://"):
+        database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return create_async_engine(
         database_url,
         echo=False,

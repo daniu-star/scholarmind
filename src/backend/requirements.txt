@@ -30,6 +30,8 @@ fake-useragent>=1.4.0
 sqlalchemy[asyncio]>=2.0
 aiosqlite>=0.19.0
 alembic>=1.13.0
+# PostgreSQL 异步驱动（Railway PostgreSQL 插件）
+asyncpg>=0.29.0
 # ── 新增：结构化日志 ───────────────────────────
 structlog>=24.1.0
 # ── 新增：测试依赖 ─────────────────────────────
