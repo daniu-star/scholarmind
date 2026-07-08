@@ -20,63 +20,41 @@ ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
 
 async def _ensure_schema_columns(engine) -> None:
-    """自动补全数据库中缺失的列（Alembic 不可用时的兜底方案）。
+    """自动补全数据库中缺失的列。
 
-    当 Alembic 迁移失败（如 Railway 缺少 psycopg2），create_all() 仅创建新表，
-    不会修改已存在的表。此函数检测并补全 ORM 模型声明的列与实际表结构之间的差异。
-    任何异常都被捕获并记录，不阻止应用启动。
+    使用原始 SQL 直接执行 ALTER TABLE，避免 SQLAlchemy inspector 兼容性问题。
+    任何异常都被静默捕获，不阻止应用启动。
     """
     from sqlalchemy import text as sa_text
 
+    # 列定义：(表名, 列名, SQL类型, 默认值)
+    migrations = [
+        ("users", "email", "VARCHAR(128)", None),
+        ("users", "email_verified", "BOOLEAN", "FALSE"),
+        ("users", "failed_login_attempts", "INTEGER", "0"),
+        ("users", "locked_until", "TIMESTAMP WITH TIME ZONE", None),
+    ]
+
     try:
         async with engine.connect() as conn:
-
-            def _get_existing_cols(sync_conn, table_name):
-                """同步检查表中已有列"""
-                from sqlalchemy import inspect as sa_inspect
-                inspector = sa_inspect(sync_conn)
+            for table, col, col_type, default_val in migrations:
+                default_clause = f" DEFAULT {default_val}" if default_val else ""
                 try:
-                    return {c["name"] for c in inspector.get_columns(table_name)}
+                    sql = f'ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {col_type}{default_clause}'
+                    await conn.execute(sa_text(sql))
+                    await conn.commit()
+                    logger.info(f"schema_auto_fix: ensured {table}.{col} exists")
                 except Exception:
-                    return set()
-
-            def _add_missing_col(sync_conn, table_name, col_name, col_type):
-                """同步执行 ALTER TABLE ADD COLUMN"""
-                try:
-                    sql = f'ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type}'
-                    sync_conn.execute(sa_text(sql))
-                    sync_conn.commit()
-                    logger.info(f"schema_auto_fix: added {table_name}.{col_name} ({col_type})")
-                except Exception as e:
-                    # PostgreSQL 不支持 IF NOT EXISTS 时回退到标准语法
-                    if "syntax error" in str(e).lower() or "IF NOT EXISTS" in str(e):
-                        sql = f'ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}'
-                        sync_conn.execute(sa_text(sql))
-                        sync_conn.commit()
-                        logger.info(f"schema_auto_fix: added {table_name}.{col_name} ({col_type})")
-                    else:
-                        raise
-
-            # 需要检查的表及预期列（列名 → 类型字符串）
-            expected_columns: dict[str, dict[str, str]] = {
-                "users": {
-                    "email": "VARCHAR(128)",
-                    "email_verified": "BOOLEAN DEFAULT FALSE",
-                    "failed_login_attempts": "INTEGER DEFAULT 0",
-                    "locked_until": "TIMESTAMP WITH TIME ZONE",
-                },
-            }
-
-            for table_name, columns in expected_columns.items():
-                existing_cols = await conn.run_sync(_get_existing_cols, table_name)
-                if not existing_cols:
-                    continue
-
-                for col_name, col_type in columns.items():
-                    if col_name not in existing_cols:
-                        await conn.run_sync(_add_missing_col, table_name, col_name, col_type)
+                    # PostgreSQL 旧版不支持 IF NOT EXISTS，回退标准语法
+                    try:
+                        sql2 = f'ALTER TABLE {table} ADD COLUMN {col} {col_type}{default_clause}'
+                        await conn.execute(sa_text(sql2))
+                        await conn.commit()
+                        logger.info(f"schema_auto_fix: added {table}.{col}")
+                    except Exception:
+                        pass  # 列已存在或其他非致命错误
     except Exception as e:
-        logger.warning(f"schema_auto_fix overall failed (non-fatal): {e}")
+        logger.warning(f"schema_auto_fix non-fatal failure: {e}")
 
 
 async def startup(app: FastAPI) -> None:
