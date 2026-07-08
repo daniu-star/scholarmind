@@ -139,6 +139,8 @@ def create_app() -> FastAPI:
             "service": "ScholarMind API",
             "version": settings.VERSION,
             "environment": settings.ENVIRONMENT,
+            "llm_reachable": getattr(request.app.state, "llm_reachable", False),
+            "deepseek_key_configured": bool(settings.DEEPSEEK_API_KEY),
         }
 
     @app.get("/api/v1/readyz")  # readiness: 检查 DB 连通性
