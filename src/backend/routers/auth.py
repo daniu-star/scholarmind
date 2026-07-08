@@ -13,15 +13,17 @@ from sqlalchemy.exc import IntegrityError
 from ..config import settings
 from ..core.dependencies import get_db
 from ..models.orm import User, LoginAttempt
+import asyncio
 from ..services.auth_service import (
     authenticate_user,
     create_access_token,
-    create_and_send_code,
+    create_code,
     create_refresh_token,
     decode_token,
     get_user_by_id,
     normalize_phone,
     register_user,
+    send_code_background,
     verify_code_and_login,
 )
 from ..services.entitlement_service import EntitlementService
@@ -159,14 +161,16 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
     """
     target = req.target.strip()
     if "@" in target:
-        # 邮箱验证码
+        # 邮箱验证码：先存码→立即返回，邮件后台发送（fire-and-forget）
         try:
-            result = await create_and_send_code(db, target, req.purpose)
-            return {"success": True, "message": "验证码已发送到您的邮箱", **result}
+            code = await create_code(db, target, req.purpose)
         except ValueError as e:
             raise HTTPException(status_code=429, detail=str(e))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"邮件发送失败：{e}")
+        await db.commit()
+        # 后台发送邮件，不阻塞 HTTP 响应
+        asyncio.create_task(send_code_background(code, target))
+        return {"success": True, "message": "验证码已发送到您的邮箱",
+                "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60}
 
     # 手机号：先归一化，检查是否关联了邮箱
     try:
@@ -179,12 +183,13 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
     user = user_result.scalar_one_or_none()
     if user and user.email:
         try:
-            result = await create_and_send_code(db, user.email, req.purpose)
-            return {"success": True, "message": "验证码已发送到您绑定的邮箱", **result}
+            code = await create_code(db, user.email, req.purpose)
         except ValueError as e:
             raise HTTPException(status_code=429, detail=str(e))
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"邮件发送失败：{e}")
+        await db.commit()
+        asyncio.create_task(send_code_background(code, user.email))
+        return {"success": True, "message": "验证码已发送到您绑定的邮箱",
+                "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60}
 
     # 无绑定邮箱：统一返回成功提示，防止用户枚举
     return {"success": True, "message": "验证码已发送（如该手机号已注册且绑定邮箱）"}
@@ -208,24 +213,35 @@ async def register(req: RegisterRequest, db=Depends(get_db)):
         await db.commit()
         return await _token_response(db, user)
 
-    # 密码注册（原有逻辑）
+    # 密码注册（支持邮箱和手机号，register_user 自动识别）
     if not req.password or len(req.password) < settings.PASSWORD_MIN_LENGTH:
         raise HTTPException(
             status_code=400,
             detail=f"密码至少 {settings.PASSWORD_MIN_LENGTH} 位",
         )
-    phone = req.normalized_phone()
-    existing = await db.execute(select(User).where(User.phone == phone))
+    reg_identifier = req.identifier  # email 优先，其次 phone
+    if not reg_identifier:
+        raise HTTPException(status_code=422, detail="请提供邮箱或手机号")
+
+    # 检查重复注册
+    is_email = "@" in reg_identifier
+    existing = await db.execute(
+        select(User).where(
+            User.email == reg_identifier if is_email else User.phone == req.normalized_phone()
+        )
+    )
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="该手机号已注册")
+        raise HTTPException(status_code=409, detail="该邮箱已注册" if is_email else "该手机号已注册")
+
+    user = await register_user(db, reg_identifier, req.password, req.nickname or "")
+
     try:
-        user = await register_user(db, phone, req.password, req.nickname or "")
         response = await _token_response(db, user)
         await db.commit()
         return response
     except IntegrityError as exc:
         await db.rollback()
-        raise HTTPException(status_code=409, detail="该手机号已注册") from exc
+        raise HTTPException(status_code=409, detail="用户已存在") from exc
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -258,24 +274,27 @@ async def login(req: LoginRequest, db=Depends(get_db)):
         db.add(LoginAttempt(identifier=identifier, success=True))
         return await _token_response(db, user)
 
-    # 密码登录（向后兼容）
+    # 密码登录（支持手机号和邮箱）
     if not req.password:
         raise HTTPException(status_code=422, detail="请提供密码")
-    phone = req.normalized_phone()
-    user = await authenticate_user(db, phone, req.password)
+    auth_identifier = req.identifier  # email 优先，其次 phone，其次 username
+    if not auth_identifier:
+        raise HTTPException(status_code=422, detail="请提供邮箱或手机号")
+    user = await authenticate_user(db, auth_identifier, req.password)
     if not user or not user.is_active:
-        # P1: 记录登录失败审计日志
         db.add(LoginAttempt(identifier=identifier, success=False,
             failure_reason="locked" if (user and not user.is_active) else "invalid_password"))
-        # P0 修复: 记录登录失败并锁定（5 次失败后锁定 15 分钟）
-        user_result = await db.execute(select(User).where(User.phone == phone))
+        # 记录登录失败并锁定（5 次失败后锁定 15 分钟）
+        user_result = await db.execute(
+            select(User).where((User.phone == auth_identifier) | (User.email == auth_identifier))
+        )
         failed_user = user_result.scalar_one_or_none()
         if failed_user:
             failed_user.failed_login_attempts = (failed_user.failed_login_attempts or 0) + 1
             if failed_user.failed_login_attempts >= 5:
                 failed_user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
             await db.commit()
-        raise HTTPException(status_code=401, detail="手机号或密码错误")
+        raise HTTPException(status_code=401, detail="邮箱/手机号或密码错误")
     # 登录成功：重置失败计数 + 记录审计日志
     if user.failed_login_attempts > 0:
         user.failed_login_attempts = 0

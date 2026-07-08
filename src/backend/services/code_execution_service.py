@@ -251,15 +251,21 @@ class CodeExecutionService:
             except Exception:
                 pass
 
+    # P0 Task 1.4: pip install 已永久禁用。路由端点已移除，此方法不再被任何代码路径调用。
+    # 保留原实现供归档参考，但始终返回禁用响应。如需在受控环境安装依赖，
+    # 请在 Dockerfile 构建阶段固化到 requirements.txt。
+    _PIP_INSTALL_ENABLED: bool = False
+
     async def execute_pip_install(self, package: str) -> dict[str, Any]:
-        """执行 pip install
-
-        Args:
-            package: 要安装的包名(可带版本号,如 "requests>=2.28.0")
-
-        Returns:
-            dict: {success, message, stdout, stderr}
-        """
+        """执行 pip install（已永久禁用）"""
+        if not self._PIP_INSTALL_ENABLED:
+            return {
+                "success": False,
+                "message": "pip install 端点已永久禁用",
+                "stdout": "",
+                "stderr": "pip_install_permanently_disabled",
+            }
+        # ----- 以下原始实现仅供存档，_PIP_INSTALL_ENABLED=False 时不可达 -----
         # 安全检查: 禁止本地路径安装
         if package.startswith(("/", "\\", ".")) or "://" in package:
             return {

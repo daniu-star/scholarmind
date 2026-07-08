@@ -88,9 +88,10 @@ def _validate_magic_byte(file_path: str, expected_ext: str) -> bool:
         import magic
         actual_mime = magic.from_file(file_path, mime=True) or ""
     except Exception as e:
-        # magic 库不可用或读取失败：保守放行（已通过扩展名白名单 + 大小校验）
-        logger.warning(f"magic_check_unavailable file={file_path} error={e}")
-        return True
+        # magic 库不可用或读取失败：fail closed 拒绝文件
+        # （扩展名白名单+大小校验不足以阻止伪装文件类型攻击）
+        logger.error(f"magic_check_unavailable file={file_path} error={e}")
+        return False
 
     # text/* 灵活匹配（不同 OS/库对文本类返回 charset 差异大，统一前缀匹配）
     if expected_mime.startswith("text/") and actual_mime.startswith("text/"):

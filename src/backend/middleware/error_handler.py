@@ -39,6 +39,15 @@ def error_response(
     return resp
 
 
+def _cors_headers(request: Request) -> dict:
+    """为错误响应生成 CORS 头，确保浏览器不因跨域阻止错误信息。"""
+    origin = request.headers.get("origin", "")
+    if origin:
+        return {"Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true"}
+    return {"Access-Control-Allow-Origin": "*"}
+
+
 def register_error_handlers(app: FastAPI) -> None:
     """注册统一异常处理器到 FastAPI 应用"""
 
@@ -53,7 +62,8 @@ def register_error_handlers(app: FastAPI) -> None:
         body = exc.to_response()
         if request_id:
             body["error"]["request_id"] = request_id
-        return JSONResponse(status_code=exc.status_code, content=body)
+        return JSONResponse(status_code=exc.status_code, content=body,
+                           headers=_cors_headers(request))
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
@@ -76,6 +86,7 @@ def register_error_handlers(app: FastAPI) -> None:
                 details={"fields": errors},
                 request_id=request_id,
             ),
+            headers=_cors_headers(request),
         )
 
     @app.exception_handler(HTTPException)
@@ -115,6 +126,7 @@ def register_error_handlers(app: FastAPI) -> None:
                 details=details,
                 request_id=request_id,
             ),
+            headers=_cors_headers(request),
         )
 
     @app.exception_handler(Exception)
@@ -128,7 +140,8 @@ def register_error_handlers(app: FastAPI) -> None:
             logger.debug(f"Request cancelled by client request_id={request_id}")
             # P1 Task 10：客户端断开时返回 499 而非触发 500（原 return 不返回 Response
             # 会导致 Starlette 抛 RuntimeError:Caught handled exception）
-            return PlainTextResponse("client disconnected", status_code=499)
+            return PlainTextResponse("client disconnected", status_code=499,
+                                     headers=_cors_headers(request))
         logger.exception(
             f"Unhandled exception: {exc} request_id={request_id}"
         )
@@ -147,4 +160,5 @@ def register_error_handlers(app: FastAPI) -> None:
                 details=details,
                 request_id=request_id,
             ),
+            headers=_cors_headers(request),
         )

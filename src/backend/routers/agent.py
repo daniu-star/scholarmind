@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -104,6 +104,7 @@ async def chat_with_agent(
 @router.post("/stream")
 async def stream_chat_with_agent(
     request: ChatRequest,
+    http_req: Request,
     service: IAgentService = Depends(get_agent_service),
     user_id: int = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -138,6 +139,10 @@ async def stream_chat_with_agent(
 
     reservation = await _reserve_chat(db, user_id, request.agent_id, request.context)
 
+    # 获取会话工厂用于 SSE 生成器中的独立 DB 会话
+    # event_generator() 在 StreamingResponse 消费时才执行，此时 get_db 已关闭请求级会话
+    _session_factory = getattr(http_req.app.state, "db_session_factory", None)
+
     async def event_generator():
         try:
             async for chunk in service.stream_chat(
@@ -148,12 +153,18 @@ async def stream_chat_with_agent(
                 user_id=user_id,
                 model=model,
             ):
-                # SSE 格式：data: {json}\n\n
                 yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
         except Exception as e:
-            await EntitlementService.refund_chat(
-                db, user_id, reservation.get("consumed", "")
-            )
+            # 使用独立 DB 会话退还已消费的额度（请求级 db 已关闭）
+            if _session_factory is not None:
+                try:
+                    async with _session_factory() as fallback_db:
+                        await EntitlementService.refund_chat(
+                            fallback_db, user_id, reservation.get("consumed", "")
+                        )
+                        await fallback_db.commit()
+                except Exception:
+                    pass  # 退还不应阻断错误通知
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)}, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

@@ -47,7 +47,7 @@ async def get_current_user_id(
 
     if not credentials:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "未提供认证凭证")
-    payload = decode_token(credentials.credentials)
+    payload = decode_token(credentials.credentials, expected_type="access")
     if not payload:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "认证凭证无效或已过期")
     try:
@@ -76,7 +76,7 @@ async def get_optional_user_id(
 
     if not credentials:
         return None
-    payload = decode_token(credentials.credentials)
+    payload = decode_token(credentials.credentials, expected_type="access")
     if not payload:
         return None
     try:
