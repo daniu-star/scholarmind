@@ -12,69 +12,47 @@ from sqlalchemy.exc import IntegrityError
 
 from ..config import settings
 from ..core.dependencies import get_db
-from ..models.orm import User, LoginAttempt
+from ..models.orm import User, LoginAttempt, VerificationCode
 import asyncio
-# 分步导入——若 auth_service 模块因 Railway 环境差异无法加载全部符号，
-# 则逐函数回退，避免 ImportError 导致整个 auth 路由不可用
-_auth_service_imports = {}
-try:
-    from ..services.auth_service import (
-        authenticate_user,
-        create_access_token,
-        create_code,
-        create_refresh_token,
-        decode_token,
-        get_user_by_id,
-        normalize_phone,
-        register_user,
-        send_code_background,
-        verify_code_and_login,
-    )
-    _auth_service_imports = {
-        "authenticate_user": authenticate_user,
-        "create_access_token": create_access_token,
-        "create_code": create_code,
-        "create_refresh_token": create_refresh_token,
-        "decode_token": decode_token,
-        "get_user_by_id": get_user_by_id,
-        "normalize_phone": normalize_phone,
-        "register_user": register_user,
-        "send_code_background": send_code_background,
-        "verify_code_and_login": verify_code_and_login,
-    }
-except ImportError as _import_err:
-    import sys as _sys
-    import structlog as _structlog
-    _log = _structlog.get_logger(__name__)
-    _log.error(f"auth_service bulk import failed: {_import_err}, attempting per-function fallback")
-    # 逐个尝试导入
-    _func_names = [
-        "authenticate_user", "create_access_token", "create_code",
-        "create_refresh_token", "decode_token", "get_user_by_id",
-        "normalize_phone", "register_user", "send_code_background",
-        "verify_code_and_login",
-    ]
-    for _name in _func_names:
-        try:
-            _mod = __import__(
-                f"src.backend.services.auth_service", fromlist=[_name]
-            )
-            _auth_service_imports[_name] = getattr(_mod, _name)
-        except Exception as _fn_err:
-            _log.warning(f"Failed to import {_name}: {_fn_err}")
-            # 延迟到实际调用时报错，而非导入时
+from ..services.auth_service import (
+    authenticate_user,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    get_user_by_id,
+    normalize_phone,
+    register_user,
+    send_code_background,
+    verify_code_and_login,
+)
 
-# 将成功导入的函数注入模块命名空间
-authenticate_user = _auth_service_imports.get("authenticate_user")
-create_access_token = _auth_service_imports.get("create_access_token")
-create_code = _auth_service_imports.get("create_code")
-create_refresh_token = _auth_service_imports.get("create_refresh_token")
-decode_token = _auth_service_imports.get("decode_token")
-get_user_by_id = _auth_service_imports.get("get_user_by_id")
-normalize_phone = _auth_service_imports.get("normalize_phone")
-register_user = _auth_service_imports.get("register_user")
-send_code_background = _auth_service_imports.get("send_code_background")
-verify_code_and_login = _auth_service_imports.get("verify_code_and_login")
+# create_code 内联定义于此（避免 Railway Python 3.12 对 auth_service 的深层导入失败）
+async def create_code(db, target: str, purpose: str = "login") -> str:
+    """创建邮箱验证码并存入数据库。Railway 兼容版本：直接内联。"""
+    import secrets
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import select
+
+    cutoff = datetime.now(timezone.utc) - timedelta(
+        seconds=settings.VERIFICATION_CODE_RATE_LIMIT_SECONDS
+    )
+    recent = await db.execute(
+        select(VerificationCode)
+        .where(VerificationCode.target == target, VerificationCode.created_at >= cutoff)
+        .limit(1)
+    )
+    if recent.scalars().first():
+        raise ValueError("验证码发送过于频繁，请稍后再试")
+
+    code = str(secrets.randbelow(900000) + 100000)
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES
+    )
+    db.add(VerificationCode(
+        target=target, code=code, purpose=purpose, expires_at=expires_at
+    ))
+    await db.flush()
+    return code
 from ..services.entitlement_service import EntitlementService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
