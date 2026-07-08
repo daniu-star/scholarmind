@@ -23,6 +23,14 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # - data/ 是运行时挂载的持久化卷，构建期不需要
 COPY src/backend/ ./src/backend/
 
+# 复制 Pipeline 技能（cyclical-paper-generation / cyclical-paper-review）
+# 这些技能在运行时被 pipeline_llm_bridge 加载，必须存在于容器内
+COPY skills/cyclical-paper-generation/ /app/data/skills/cyclical-paper-generation/
+COPY skills/cyclical-paper-review/ /app/data/skills/cyclical-paper-review/
+
+# 设置技能目录环境变量（pipeline_llm_bridge / paper_pipeline_service 统一使用）
+ENV SKILLS_DIR=/app/data/skills
+
 # 预创建数据卷子目录（避免首次启动报错）
 # 注意：Railway 挂载 volume 到 /app/data 时会以 root 属主覆盖构建期权限，
 # 因此容器需以 root 运行（不设 USER），确保能写入 volume 挂载点。
