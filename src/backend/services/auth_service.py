@@ -5,10 +5,31 @@ import jwt
 from pwdlib import PasswordHash
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from ..models.orm import User, UserQuota, VerificationCode
+from ..models.orm import User, UserQuota, VerificationCode, LoginAttempt
 from ..config import settings
 
 pwd_hash = PasswordHash.recommended()
+
+# 显式导出列表，确保 Railway/Python 3.12 环境中函数定义可被导入
+# 此前 Railway 部署报 ImportError: cannot import name 'create_code' ——
+# 可能是 Docker 层缓存导致旧版文件未更新；添加此注释触发干净重建
+__all__ = [
+    "normalize_phone",
+    "verify_password",
+    "get_password_hash",
+    "create_access_token",
+    "create_refresh_token",
+    "decode_token",
+    "authenticate_user",
+    "register_user",
+    "register_user_by_email",
+    "get_user_by_id",
+    "generate_verification_code",
+    "create_code",
+    "send_code_background",
+    "create_and_send_code",
+    "verify_code_and_login",
+]
 
 
 def normalize_phone(phone: str) -> str:
@@ -65,32 +86,35 @@ def decode_token(
         return None
     return payload
 
-async def authenticate_user(db: AsyncSession, phone: str, password: str) -> Optional[User]:
-    try:
-        normalized = normalize_phone(phone)
-    except ValueError:
-        return None
-    result = await db.execute(select(User).where(User.phone == normalized))
+async def authenticate_user(
+    db: AsyncSession, identifier: str, password: str
+) -> Optional[User]:
+    """验证用户密码（支持手机号和邮箱两种标识符）。
+
+    identifier 可以是 E.164 手机号或邮箱地址。
+    """
+    # 判断是邮箱还是手机号
+    if "@" in identifier:
+        result = await db.execute(
+            select(User).where(User.email == identifier)
+        )
+    else:
+        try:
+            identifier = normalize_phone(identifier)
+        except ValueError:
+            return None
+        result = await db.execute(
+            select(User).where(User.phone == identifier)
+        )
     user = result.scalar_one_or_none()
     if not user or not verify_password(password, user.password_hash):
         return None
     return user
 
-async def register_user(
-    db: AsyncSession, phone: str, password: str, nickname: str = ""
-) -> User:
-    normalized = normalize_phone(phone)
-    user = User(
-        username=normalized,
-        phone=normalized,
-        password_hash=get_password_hash(password),
-        nickname=nickname,
-    )
-    db.add(user)
-    await db.flush()
-    # 初始化配额
+async def _init_user_quota(db: AsyncSession, user_id: int) -> None:
+    """为新注册用户初始化免费配额（UserQuota 记录）。"""
     quota = UserQuota(
-        user_id=user.id,
+        user_id=user_id,
         tokens_used=0,
         tokens_limit=settings.FREE_TIER_TOKEN_LIMIT,
         plan="free",
@@ -100,7 +124,54 @@ async def register_user(
     )
     db.add(quota)
     await db.flush()
+
+
+async def register_user(
+    db: AsyncSession, identifier: str, password: str, nickname: str = ""
+) -> User:
+    """注册新用户（自动识别手机号或邮箱）。
+
+    Args:
+        db: 数据库会话
+        identifier: 手机号（自动归一化为 E.164）或邮箱地址（含 @ 则视为邮箱）
+        password: 明文密码（内部哈希存储）
+        nickname: 可选昵称
+
+    Returns:
+        新创建的 User 对象（已 flush，id 可用）
+    """
+    if "@" in identifier:
+        username = identifier
+        phone = None
+        email = identifier
+    else:
+        normalized = normalize_phone(identifier)
+        username = normalized
+        phone = normalized
+        email = None
+
+    user = User(
+        username=username,
+        phone=phone,
+        email=email,
+        password_hash=get_password_hash(password),
+        nickname=nickname,
+    )
+    db.add(user)
+    await db.flush()
+    await _init_user_quota(db, user.id)
     return user
+
+
+# register_user_by_email 保留为向后兼容的别名
+async def register_user_by_email(
+    db: AsyncSession, email: str, password: str, nickname: str = ""
+) -> User:
+    """通过邮箱注册新用户（已合并到 register_user，保留作为语义别名）。
+
+    新代码请直接使用 register_user(identifier, ...)。
+    """
+    return await register_user(db, email, password, nickname)
 
 async def get_user_by_id(db: AsyncSession, user_id: int) -> Optional[User]:
     result = await db.execute(select(User).where(User.id == user_id))
@@ -114,13 +185,14 @@ def generate_verification_code() -> str:
     return str(secrets.randbelow(900000) + 100000)
 
 
-async def create_and_send_code(
+async def create_code(
     db: AsyncSession, target: str, purpose: str = "login"
-) -> dict:
-    """创建验证码并发送邮件。含限频检查。"""
-    from ..services.email_service import send_verification_email
+) -> str:
+    """创建验证码并存入数据库（不发送邮件）。含限频检查。
 
-    # 限频检查（用 first() 避免多行报错）
+    Returns:
+        生成的验证码字符串
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(
         seconds=settings.VERIFICATION_CODE_RATE_LIMIT_SECONDS
     )
@@ -145,10 +217,33 @@ async def create_and_send_code(
     )
     db.add(vc)
     await db.flush()
+    return code
 
-    # 发送邮件
-    await send_verification_email(target, code)
 
+async def send_code_background(code: str, target: str) -> None:
+    """后台发送验证码邮件（fire-and-forget，不阻塞 HTTP 响应）。
+
+    邮件发送失败仅记录日志，不影响用户体验——验证码已存入数据库。
+    """
+    from ..services.email_service import send_verification_email
+    try:
+        await send_verification_email(target, code)
+    except Exception as e:
+        import structlog as _structlog
+        _structlog.get_logger(__name__).warning(
+            f"background_email_failed target={target[:3]}*** error={e}"
+        )
+
+
+async def create_and_send_code(
+    db: AsyncSession, target: str, purpose: str = "login"
+) -> dict:
+    """创建验证码并发送邮件（同步模式，仅用于兼容旧调用）。
+
+    新代码应使用 create_code() + asyncio.create_task(send_code_background(...))。
+    """
+    code = await create_code(db, target, purpose)
+    await send_code_background(code, target)
     return {
         "target": target,
         "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
@@ -163,30 +258,37 @@ async def verify_code_and_login(
     target 可以是手机号或邮箱。若用户不存在则自动注册（验证码登录模式）。
     """
     now = datetime.now(timezone.utc)
-    # 🔴 修复: 检查最近 5 分钟内该 target 的失败尝试次数，防止暴力破解
+    # 检查最近 5 分钟内该 target 的失败验证尝试次数（LoginAttempt 表），防止暴力破解
     failed_window = now - timedelta(minutes=5)
     failed_count = await db.scalar(
-        select(func.count(VerificationCode.id)).where(
-            VerificationCode.target == target,
-            VerificationCode.used,
-            VerificationCode.created_at >= failed_window,
+        select(func.count(LoginAttempt.id)).where(
+            LoginAttempt.identifier == target,
+            LoginAttempt.success == False,
+            LoginAttempt.failure_reason == "invalid_code",
+            LoginAttempt.created_at >= failed_window,
         )
     )
     if failed_count and failed_count >= 10:
-        return None  # 10 次验证尝试后拒绝，防止暴力破解
+        return None  # 10 次失败验证后拒绝，防止暴力破解
 
     result = await db.execute(
         select(VerificationCode)
         .where(
             VerificationCode.target == target,
             VerificationCode.code == code,
-            not VerificationCode.used,
+            VerificationCode.used == False,
             VerificationCode.expires_at > now,
         )
         .order_by(VerificationCode.created_at.desc())
     )
     vc = result.scalars().first()
     if not vc:
+        # 记录失败尝试（用于暴力破解检测）
+        db.add(LoginAttempt(
+            identifier=target,
+            success=False,
+            failure_reason="invalid_code",
+        ))
         return None
 
     # 标记已使用
