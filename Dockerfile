@@ -37,4 +37,4 @@ EXPOSE 8000
 # - backend:        python -m uvicorn src.backend.app:create_app --factory --host 0.0.0.0 --port $PORT
 # - celery-worker:  python -m celery -A src.backend.scheduler.celery_app worker -l info -Q celery,charts
 # - celery-beat:    python -m celery -A src.backend.scheduler.celery_app beat -l info
-CMD ["sh", "-c", "uvicorn src.backend.app:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "python -m src.backend.scripts.prestart && uvicorn src.backend.app:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]
