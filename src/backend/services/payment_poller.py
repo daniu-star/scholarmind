@@ -41,12 +41,14 @@ _ORDER_EXPIRE_MINUTES = 15                        # 订单过期时间
 async def _mark_order_paid(db: AsyncSession, order_no: str, trade_no: str) -> bool:
     """原子地将订单置为 paid 并发放权益（复用 payment.py 的核心逻辑）"""
     from .entitlement_service import EntitlementService
+    from ..models.orm import User, UserQuota
+    from ..config import settings
 
     now = datetime.now(timezone.utc)
     # SELECT ... FOR UPDATE 暂不支持 SQLite，使用条件 UPDATE 保证幂等
     result = await db.execute(
         update(Order)
-        .where(Order.order_no == order_no, Order.status == "pending")
+        .where(Order.order_no == order_no, Order.status.in_(["pending", "reviewing"]))
         .values(status="paid", trade_no=trade_no, paid_at=now)
     )
     if result.rowcount != 1:
@@ -65,6 +67,21 @@ async def _mark_order_paid(db: AsyncSession, order_no: str, trade_no: str) -> bo
         .where(Order.id == order.id)
         .values(entitlements_granted_at=now)
     )
+
+    # Fix #3: 同步更新 UserQuota.plan / tokens_limit / User.plan
+    # （与 routers/payment.py:mark_order_paid 保持一致）
+    if order.plan in {"monthly_all", "monthly_pro", "pro_monthly", "pro_yearly"}:
+        await db.execute(
+            update(UserQuota)
+            .where(UserQuota.user_id == order.user_id)
+            .values(
+                plan=order.plan,
+                tokens_limit=settings.PRO_TIER_TOKEN_LIMIT,
+            )
+        )
+        await db.execute(
+            update(User).where(User.id == order.user_id).values(plan=order.plan)
+        )
     return True
 
 
@@ -185,6 +202,9 @@ class PaymentPoller:
             return
         except PaymentProviderError as e:
             logger.warning(f"payment_query_failed order_no={order.order_no} err={e}")
+            # Fix #9: 即使查询失败也递增计数 + 更新时间戳，避免 5s 无限重试
+            self._poll_counts[order.order_no] = count + 1
+            order.updated_at = now
             return
 
         # 更新轮询计数和订单时间戳

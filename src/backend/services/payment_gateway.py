@@ -41,13 +41,51 @@ class PaymentProviderError(RuntimeError):
 
 
 def _load_secret(value: str) -> str:
+    """加载密钥/证书，自动处理多种格式。
+
+    支持的格式：
+    1. 空字符串 — 返回空字符串
+    2. 文件路径 — 如果字符串是存在的文件路径，读出内容
+    3. PEM 格式（含 -----BEGIN ...----- 头尾）— 直接返回
+    4. 裸 base64（无 PEM 头尾、无换行）— 自动补全 PEM 头尾
+    """
     value = (value or "").strip()
     if not value:
         return ""
+
+    # 有时密钥存储为文件路径（优先检测，路径通常含目录分隔符）
     path = Path(value)
     if "-----BEGIN" not in value and path.is_file():
-        return path.read_text(encoding="utf-8")
-    return value.replace("\\n", "\n")
+        return path.read_text(encoding="utf-8").strip()
+
+    # 修复被 .env / dotenv 转义的换行符
+    value = value.replace("\\n", "\n").strip()
+
+    # 已经有 PEM 头尾 → 直接返回
+    if "-----BEGIN" in value:
+        return value
+
+    # 裸 base64 密钥（无 PEM 头尾、无真实换行、不是已有文件）→ 自动补全 PEM 头尾
+    # 注意：base64 可含 / + = 字符，不能用 / 来区分文件路径
+    if "\n" not in value:
+        # 尝试通过 base64 前缀判断密钥类型
+        # PKCS#1 私钥 DER 以 0x30 0x82 → base64 "MII" 开头
+        if value.startswith("MII"):
+            wrapped = (
+                "-----BEGIN RSA PRIVATE KEY-----\n"
+                + "\n".join(value[i:i + 64] for i in range(0, len(value), 64))
+                + "\n-----END RSA PRIVATE KEY-----"
+            )
+            return wrapped
+        # 公钥 SPKI DER 通常较短，以 MIGf / MIIB 开头；统一用 PUBLIC KEY 包裹
+        wrapped = (
+            "-----BEGIN PUBLIC KEY-----\n"
+            + "\n".join(value[i:i + 64] for i in range(0, len(value), 64))
+            + "\n-----END PUBLIC KEY-----"
+        )
+        return wrapped
+
+    return value
 
 
 class AlipayGateway:
@@ -76,7 +114,14 @@ class AlipayGateway:
     async def create_payment(
         self, order_no: str, amount_cents: int, subject: str
     ) -> str:
-        client = self._client()
+        try:
+            client = self._client()
+        except PaymentConfigurationError:
+            raise
+        except Exception as exc:
+            raise PaymentConfigurationError(
+                f"支付宝客户端初始化失败（请检查密钥格式）: {exc}"
+            ) from exc
         order_string = client.api_alipay_trade_page_pay(
             out_trade_no=order_no,
             total_amount=f"{amount_cents / 100:.2f}",
@@ -97,7 +142,12 @@ class AlipayGateway:
         用于回调丢失时的兜底轮询。返回 None 表示查询失败（非终态），
         返回 dict 包含 trade_no / trade_status / total_amount 等字段。
         """
-        client = self._client()
+        try:
+            client = self._client()
+        except PaymentConfigurationError:
+            raise
+        except Exception as exc:
+            raise PaymentProviderError(f"支付宝客户端初始化失败: {exc}") from exc
         try:
             result = client.api_alipay_trade_query(out_trade_no=order_no)
         except Exception as e:
@@ -209,7 +259,13 @@ class WeChatGateway:
             raise PaymentProviderError(
                 f"微信支付下单失败 ({response.status_code})：{response.text[:300]}"
             )
-        code_url = response.json().get("code_url")
+        try:
+            data = response.json()
+        except Exception as exc:
+            raise PaymentProviderError(
+                f"微信支付响应解析失败：{exc}"
+            ) from exc
+        code_url = data.get("code_url")
         if not code_url:
             raise PaymentProviderError("微信支付响应缺少 code_url")
         return code_url
@@ -233,7 +289,10 @@ class WeChatGateway:
             response = await client.get(f"{self.api_base}{full_path}", headers=headers)
         if response.status_code != 200:
             return None
-        data = response.json()
+        try:
+            data = response.json()
+        except Exception:
+            return None
         trade_state = data.get("trade_state", "")
         amount_info = data.get("amount") or {}
         return {

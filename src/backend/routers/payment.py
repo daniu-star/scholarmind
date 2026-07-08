@@ -16,7 +16,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import settings
-from ..core.dependencies import get_db
+from ..core.dependencies import get_db, require_admin
 from ..core.logging_config import get_logger
 from ..models.orm import Order, User, UserQuota
 from ..services.entitlement_service import (
@@ -64,12 +64,13 @@ async def mark_order_paid(
     if order.status == "paid":
         return "success"
     if order.status != "pending":
-        return "failure"
+        # 已失败/过期/拒绝的订单：返回 success 让支付宝停止重试
+        return "success"
 
     now = datetime.now(timezone.utc)
     claimed = await db.execute(
         sa_update(Order)
-        .where(Order.id == order.id, Order.status == "pending")
+        .where(Order.id == order.id, Order.status.in_(["pending", "reviewing"]))
         .values(
             status="paid",
             trade_no=trade_no,
@@ -90,7 +91,7 @@ async def mark_order_paid(
         .values(entitlements_granted_at=now)
     )
 
-    if order.plan in {"pro_monthly", "pro_yearly"}:
+    if order.plan in {"monthly_all", "monthly_pro", "pro_monthly", "pro_yearly"}:
         await db.execute(
             sa_update(UserQuota)
             .where(UserQuota.user_id == order.user_id)
@@ -150,7 +151,9 @@ async def create_order(
             detail="支付尚未启用。请在服务端配置商户凭证并设置 PAYMENT_ENABLED=true",
         )
 
-    product = PRODUCTS[req.product_id]
+    product = PRODUCTS.get(req.product_id)
+    if product is None:
+        raise HTTPException(status_code=400, detail=f"未知产品: {req.product_id}")
 
     # 防滥用
     one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -232,6 +235,12 @@ async def alipay_notify(request: Request, db: AsyncSession = Depends(get_db)):
     # P1 安全加固：app_id 与 total_amount 必须与配置/订单匹配，防止伪造回调
     if data.get("app_id") != settings.ALIPAY_APP_ID:
         logger.warning(f"alipay app_id mismatch order_no={order_no} got={data.get('app_id')}")
+        return "failure"
+    if settings.ALIPAY_SELLER_ID and data.get("seller_id") != settings.ALIPAY_SELLER_ID:
+        logger.warning(
+            f"alipay seller_id mismatch order_no={order_no} "
+            f"expected={settings.ALIPAY_SELLER_ID} got={data.get('seller_id')}"
+        )
         return "failure"
     result = await db.execute(select(Order).where(Order.order_no == order_no))
     order = result.scalar_one_or_none()
@@ -392,3 +401,116 @@ async def query_order_payment(
         "trade_status": query_result.get("trade_status") or query_result.get("trade_state"),
         "message": "支付尚未完成",
     }
+
+
+# ── 付款凭证上传（个人收款码模式） ──
+# C1: 前端 paymentApi.confirmPayment() 调用的端点，之前缺失导致 404
+
+class ConfirmPaymentRequest(BaseModel):
+    order_no: str
+
+
+@router.post("/confirm")
+async def confirm_payment(
+    req: ConfirmPaymentRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """上传付款凭证，标记订单为待审核。
+
+    用户完成支付后调用此端点确认。后台 Poller 或管理员审核后完成订单。
+    """
+    result = await db.execute(
+        select(Order).where(Order.order_no == req.order_no, Order.user_id == user.id)
+    )
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.status != "pending":
+        return {"order_no": req.order_no, "status": order.status, "message": "订单已处理"}
+
+    # 标记为待人工审核
+    order.status = "reviewing"
+    await db.commit()
+    logger.info(f"payment_confirm_reviewing order_no={req.order_no} user_id={user.id}")
+    return {"order_no": req.order_no, "status": "reviewing", "message": "已提交审核，请等待管理员确认"}
+
+
+# ── 管理员支付审核端点 ──
+# C2: 前端 paymentApi.getAdminPending/approveOrder/rejectOrder 调用的端点，之前缺失导致 404
+
+
+@router.get("/admin/pending")
+async def list_pending_orders(
+    db: AsyncSession = Depends(get_db),
+    admin_id: int = Depends(require_admin),
+):
+    """管理员：列出所有待审核订单（pending + reviewing 状态）"""
+    _ = admin_id  # 仅鉴权用
+    result = await db.execute(
+        select(Order)
+        .where(Order.status.in_(["pending", "reviewing"]))
+        .order_by(Order.created_at.desc())
+        .limit(50)
+    )
+    orders = result.scalars().all()
+    return {
+        "total": len(orders),
+        "orders": [
+            {
+                "order_no": o.order_no,
+                "status": o.status,
+                "plan": o.plan,
+                "amount_cents": o.amount,
+                "payment_method": o.payment_method,
+                "user_id": o.user_id,
+                "created_at": o.created_at.isoformat() if o.created_at else None,
+                "expires_at": o.expires_at.isoformat() if o.expires_at else None,
+            }
+            for o in orders
+        ],
+    }
+
+
+@router.post("/admin/{order_no}/approve")
+async def approve_order(
+    order_no: str,
+    db: AsyncSession = Depends(get_db),
+    admin_id: int = Depends(require_admin),
+):
+    """管理员：手动批准订单（完成支付确认）。
+    支持 pending 和 reviewing 状态的订单。"""
+    _ = admin_id
+    # 先查询订单状态
+    result = await db.execute(select(Order).where(Order.order_no == order_no))
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.status not in ("pending", "reviewing"):
+        raise HTTPException(status_code=400, detail="订单状态不允许批准")
+    ok = await _mark_order_paid(db, order_no, f"ADMIN_APPROVED_{order_no}")
+    await db.commit()
+    if ok:
+        logger.info(f"admin_approved_order order_no={order_no} admin_id={admin_id}")
+        return {"order_no": order_no, "status": "paid", "message": "已批准"}
+    raise HTTPException(status_code=404, detail="订单不存在或无法批准")
+
+
+@router.post("/admin/{order_no}/reject")
+async def reject_order(
+    order_no: str,
+    db: AsyncSession = Depends(get_db),
+    admin_id: int = Depends(require_admin),
+):
+    """管理员：拒绝订单"""
+    _ = admin_id
+    result = await db.execute(select(Order).where(Order.order_no == order_no))
+    order = result.scalar_one_or_none()
+    if order is None:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    if order.status not in ("pending", "reviewing"):
+        raise HTTPException(status_code=400, detail="订单状态不允许拒绝")
+    order.status = "rejected"
+    await db.commit()
+    logger.info(f"admin_rejected_order order_no={order_no} admin_id={admin_id}")
+    return {"order_no": order_no, "status": "rejected", "message": "已拒绝"}
