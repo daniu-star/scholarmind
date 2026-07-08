@@ -14,18 +14,67 @@ from ..config import settings
 from ..core.dependencies import get_db
 from ..models.orm import User, LoginAttempt
 import asyncio
-from ..services.auth_service import (
-    authenticate_user,
-    create_access_token,
-    create_code,
-    create_refresh_token,
-    decode_token,
-    get_user_by_id,
-    normalize_phone,
-    register_user,
-    send_code_background,
-    verify_code_and_login,
-)
+# 分步导入——若 auth_service 模块因 Railway 环境差异无法加载全部符号，
+# 则逐函数回退，避免 ImportError 导致整个 auth 路由不可用
+_auth_service_imports = {}
+try:
+    from ..services.auth_service import (
+        authenticate_user,
+        create_access_token,
+        create_code,
+        create_refresh_token,
+        decode_token,
+        get_user_by_id,
+        normalize_phone,
+        register_user,
+        send_code_background,
+        verify_code_and_login,
+    )
+    _auth_service_imports = {
+        "authenticate_user": authenticate_user,
+        "create_access_token": create_access_token,
+        "create_code": create_code,
+        "create_refresh_token": create_refresh_token,
+        "decode_token": decode_token,
+        "get_user_by_id": get_user_by_id,
+        "normalize_phone": normalize_phone,
+        "register_user": register_user,
+        "send_code_background": send_code_background,
+        "verify_code_and_login": verify_code_and_login,
+    }
+except ImportError as _import_err:
+    import sys as _sys
+    import structlog as _structlog
+    _log = _structlog.get_logger(__name__)
+    _log.error(f"auth_service bulk import failed: {_import_err}, attempting per-function fallback")
+    # 逐个尝试导入
+    _func_names = [
+        "authenticate_user", "create_access_token", "create_code",
+        "create_refresh_token", "decode_token", "get_user_by_id",
+        "normalize_phone", "register_user", "send_code_background",
+        "verify_code_and_login",
+    ]
+    for _name in _func_names:
+        try:
+            _mod = __import__(
+                f"src.backend.services.auth_service", fromlist=[_name]
+            )
+            _auth_service_imports[_name] = getattr(_mod, _name)
+        except Exception as _fn_err:
+            _log.warning(f"Failed to import {_name}: {_fn_err}")
+            # 延迟到实际调用时报错，而非导入时
+
+# 将成功导入的函数注入模块命名空间
+authenticate_user = _auth_service_imports.get("authenticate_user")
+create_access_token = _auth_service_imports.get("create_access_token")
+create_code = _auth_service_imports.get("create_code")
+create_refresh_token = _auth_service_imports.get("create_refresh_token")
+decode_token = _auth_service_imports.get("decode_token")
+get_user_by_id = _auth_service_imports.get("get_user_by_id")
+normalize_phone = _auth_service_imports.get("normalize_phone")
+register_user = _auth_service_imports.get("register_user")
+send_code_background = _auth_service_imports.get("send_code_background")
+verify_code_and_login = _auth_service_imports.get("verify_code_and_login")
 from ..services.entitlement_service import EntitlementService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
