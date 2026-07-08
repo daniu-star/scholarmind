@@ -24,37 +24,59 @@ async def _ensure_schema_columns(engine) -> None:
 
     当 Alembic 迁移失败（如 Railway 缺少 psycopg2），create_all() 仅创建新表，
     不会修改已存在的表。此函数检测并补全 ORM 模型声明的列与实际表结构之间的差异。
+    任何异常都被捕获并记录，不阻止应用启动。
     """
-    from sqlalchemy import inspect as sa_inspect, text as sa_text
+    from sqlalchemy import text as sa_text
 
-    async with engine.connect() as conn:
-        inspector = sa_inspect(engine.sync_engine)
+    try:
+        async with engine.connect() as conn:
 
-        # 需要检查的表及预期列（列名 → 类型字符串）
-        expected_columns: dict[str, dict[str, str]] = {
-            "users": {
-                "email": "VARCHAR(128)",
-                "email_verified": "BOOLEAN DEFAULT FALSE",
-                "failed_login_attempts": "INTEGER DEFAULT 0",
-                "locked_until": "TIMESTAMP WITH TIME ZONE",
-            },
-        }
+            def _get_existing_cols(sync_conn, table_name):
+                """同步检查表中已有列"""
+                from sqlalchemy import inspect as sa_inspect
+                inspector = sa_inspect(sync_conn)
+                try:
+                    return {c["name"] for c in inspector.get_columns(table_name)}
+                except Exception:
+                    return set()
 
-        for table_name, columns in expected_columns.items():
-            try:
-                existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
-            except Exception:
-                continue  # 表不存在则跳过
-
-            for col_name, col_type in columns.items():
-                if col_name not in existing_cols:
-                    try:
+            def _add_missing_col(sync_conn, table_name, col_name, col_type):
+                """同步执行 ALTER TABLE ADD COLUMN"""
+                try:
+                    sql = f'ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type}'
+                    sync_conn.execute(sa_text(sql))
+                    sync_conn.commit()
+                    logger.info(f"schema_auto_fix: added {table_name}.{col_name} ({col_type})")
+                except Exception as e:
+                    # PostgreSQL 不支持 IF NOT EXISTS 时回退到标准语法
+                    if "syntax error" in str(e).lower() or "IF NOT EXISTS" in str(e):
                         sql = f'ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}'
-                        await conn.execute(sa_text(sql))
-                        await conn.commit()
+                        sync_conn.execute(sa_text(sql))
+                        sync_conn.commit()
                         logger.info(f"schema_auto_fix: added {table_name}.{col_name} ({col_type})")
-                    except Exception as e:
-                        logger.warning(f"schema_auto_fix failed for {table_name}.{col_name}: {e}")
+                    else:
+                        raise
+
+            # 需要检查的表及预期列（列名 → 类型字符串）
+            expected_columns: dict[str, dict[str, str]] = {
+                "users": {
+                    "email": "VARCHAR(128)",
+                    "email_verified": "BOOLEAN DEFAULT FALSE",
+                    "failed_login_attempts": "INTEGER DEFAULT 0",
+                    "locked_until": "TIMESTAMP WITH TIME ZONE",
+                },
+            }
+
+            for table_name, columns in expected_columns.items():
+                existing_cols = await conn.run_sync(_get_existing_cols, table_name)
+                if not existing_cols:
+                    continue
+
+                for col_name, col_type in columns.items():
+                    if col_name not in existing_cols:
+                        await conn.run_sync(_add_missing_col, table_name, col_name, col_type)
+    except Exception as e:
+        logger.warning(f"schema_auto_fix overall failed (non-fatal): {e}")
 
 
 async def startup(app: FastAPI) -> None:
