@@ -16,6 +16,9 @@ export const paperPipelineApi = {
     const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
     return api.get(`${BASE}/paper-pipeline${qs}`);
   },
+  cancelPipeline(pipelineId) {
+    return api.post(`${BASE}/paper-pipeline/${pipelineId}/cancel`);
+  },
 };
 
 export const paperReviewApi = {
@@ -31,5 +34,8 @@ export const paperReviewApi = {
   listReviews(sessionId) {
     const qs = sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : '';
     return api.get(`${BASE}/paper-review${qs}`);
+  },
+  cancelReview(reviewId) {
+    return api.post(`${BASE}/paper-review/${reviewId}/cancel`);
   },
 };

@@ -14,10 +14,11 @@ export const authApi = {
   registerWithCode: (target, code, nickname) =>
     api.post('/api/v1/auth/register', {
       phone: target, username: target, code,
-      password: 'code_auth_' + Date.now(),
       nickname: nickname || undefined,
     }),
   sendCode: (target, purpose = 'login') =>
     api.post('/api/v1/auth/send-code', { target, purpose }),
   me: () => api.get('/api/v1/auth/me'),
+  refresh: (refreshToken) =>
+    api.post('/api/v1/auth/refresh', { refresh_token: refreshToken }),
 };

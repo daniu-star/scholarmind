@@ -224,7 +224,7 @@ class LLMClient:
             logger.error(f"llm_stream_error error={e} error_type={type(e).__name__}")
             raise
 
-    async def chat_messages(
+    def chat_messages(
         self,
         messages: list[dict],
         *,
@@ -236,8 +236,8 @@ class LLMClient:
     ):
         """多轮对话（支持完整消息列表）
 
-        P1: 供 AgentService 使用，统一走 tenacity 重试 + 熔断器保护。
-        当 stream=True 时返回异步迭代器；否则返回 LLMResponse。
+        当 stream=True 时返回异步生成器（async for 直接迭代）；
+        当 stream=False 时返回 coroutine（需 await 获取 LLMResponse）。
         """
         if not settings.DEEPSEEK_API_KEY:
             raise RuntimeError("DEEPSEEK_API_KEY 未配置")
@@ -256,7 +256,7 @@ class LLMClient:
 
         if stream:
             return self._chat_messages_stream(client, **kwargs)
-        return await self._chat_messages_sync(client, **kwargs)
+        return self._chat_messages_sync(client, **kwargs)
 
     async def _chat_messages_stream(self, client, **kwargs):
         """流式对话（异步生成器）"""

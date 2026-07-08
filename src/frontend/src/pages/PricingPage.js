@@ -33,11 +33,8 @@ export function PricingPage() {
 
     {
       const btns = createElement('div', { className: 'pricing-actions' });
-      const wechatBtn = createElement('button', { className: 'btn btn-primary' }, '微信支付');
-      wechatBtn.addEventListener('click', () => createOrder(pkg.id, 'wechat'));
-      const alipayBtn = createElement('button', { className: 'btn btn-outline' }, '支付宝');
+      const alipayBtn = createElement('button', { className: 'btn btn-primary' }, '支付宝支付');
       alipayBtn.addEventListener('click', () => createOrder(pkg.id, 'alipay'));
-      btns.appendChild(wechatBtn);
       btns.appendChild(alipayBtn);
       card.appendChild(btns);
     }
@@ -49,16 +46,12 @@ export function PricingPage() {
     try {
       const res = await paymentApi.createOrder(plan, method);
       // 检查是否为个人收款码模式
-      if (res.wechat_qr_url || res.alipay_qr_url) {
+      if (res.alipay_qr_url) {
         showPersonalQRModal(res);
         return;
       }
-      if (method === 'wechat') {
-        showQRCode(res.pay_url, res.order_no);
-      } else {
-        window.open(res.pay_url, '_blank');
-        pollOrderStatus(res.order_no);
-      }
+      window.open(res.pay_url, '_blank');
+      pollOrderStatus(res.order_no);
     } catch (err) {
       showToast('创建订单失败：' + (err.message || '请先登录'), 'error');
     }
@@ -67,7 +60,6 @@ export function PricingPage() {
   function showPersonalQRModal(order) {
     const modal = createElement('div', { className: 'qr-modal' });
     const qrImages = [];
-    if (order.wechat_qr_url) qrImages.push(`<div style="text-align:center"><img src="${order.wechat_qr_url}" style="width:160px;height:160px;border-radius:10px;background:#fff;padding:8px" alt="微信收款码"><div style="font-size:.74rem;margin-top:4px">微信支付</div></div>`);
     if (order.alipay_qr_url) qrImages.push(`<div style="text-align:center"><img src="${order.alipay_qr_url}" style="width:160px;height:160px;border-radius:10px;background:#fff;padding:8px" alt="支付宝收款码"><div style="font-size:.74rem;margin-top:4px">支付宝</div></div>`);
 
     modal.innerHTML =
@@ -100,14 +92,6 @@ export function PricingPage() {
         showToast('确认失败：' + (err.message || ''), 'error');
       }
     });
-  }
-
-  function showQRCode(url, orderNo) {
-    const modal = createElement('div', { className: 'qr-modal' });
-    modal.innerHTML = `<div class="qr-modal-content"><h3>微信扫码支付</h3><div class="qr-placeholder">请用微信扫描支付码<br/><small>${url}</small><br/>订单号: ${orderNo}</div><button class="btn btn-outline">关闭</button></div>`;
-    modal.querySelector('button').addEventListener('click', () => { modal.remove(); pollOrderStatus(orderNo); });
-    document.body.appendChild(modal);
-    pollOrderStatus(orderNo);
   }
 
   async function pollOrderStatus(orderNo) {

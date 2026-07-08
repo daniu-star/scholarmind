@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Sequence
 
-from ..models.orm import Conversation, Skill, ChartRecord
+from ..orm import Conversation, Skill, ChartRecord
 
 
 class ResponseMapper:

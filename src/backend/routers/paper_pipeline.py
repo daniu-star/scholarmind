@@ -18,6 +18,7 @@ from ..models.schemas.paper_pipeline import (
     PipelineResultResponse,
     PipelineListResponse,
 )
+from ..config import settings
 from ..core.exceptions import NotFoundError
 # P0 Task 3.3：强制鉴权（替代 get_optional_user_id 可选鉴权）
 from ..core.dependencies import get_current_user, get_db
@@ -39,14 +40,18 @@ async def start_pipeline(
     接收引导流程收集的数据，启动 13 Agent 循环式论文生成 Pipeline。
     Pipeline 在后台异步执行，返回 pipeline_id 用于后续状态查询。
     """
-    try:
-        reservation = await EntitlementService.consume_pipeline(
-            db, user_id, "generation"
-        )
-    except EntitlementError as exc:
-        raise HTTPException(
-            status_code=402, detail={"code": exc.code, "message": exc.message}
-        ) from exc
+    # 开发模式：PAYMENT_ENABLED=false 时跳过额度检查，允许无限使用
+    if settings.PAYMENT_ENABLED:
+        try:
+            reservation = await EntitlementService.consume_pipeline(
+                db, user_id, "generation"
+            )
+        except EntitlementError as exc:
+            raise HTTPException(
+                status_code=402, detail={"code": exc.code, "message": exc.message}
+            ) from exc
+    else:
+        reservation = {"consumed": "dev_mode", "capability": "generation"}
 
     service = get_paper_pipeline_service()
     try:

@@ -55,10 +55,20 @@ Desktop.ini
 *.swp
 *.swo
 
+# ========== 部署脚本存档（含一次性调试脚本）==========
+scripts/deploy/archive/
+
 # ========== 临时文件 ==========
 临时/
 *.tmp
 *.bak
+tmp/
+
+# ========== CNKI Downloader 运行时数据 ==========
+cnki-downloader/js_bundles/
+cnki-downloader/storage/
+cnki-downloader/*.html
+cnki-downloader/*.json
 
 # ========== 大文件 & 非源码资源 ==========
 数据库/
@@ -70,3 +80,6 @@ ScholarMind-*.md
 *审计*.md
 AI产品.docx
 # prototypes/  # Vercel 部署需要前端原型文件，必须入库
+
+.vercel
+.env*

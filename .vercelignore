@@ -1,0 +1,66 @@
+# ═══════════════════════════════════════════════════════════════
+# Vercel 部署排除清单
+# Vercel 仅构建前端 SPA (prototypes/ → dist/)，后端由 Railway 托管
+# ═══════════════════════════════════════════════════════════════
+
+# Python 后端（由 Railway Dockerfile 部署）
+src/
+.venv/
+requirements*.txt
+
+# 数据文件
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# 爬虫工具
+cnki-downloader/
+
+# 临时文件
+tmp/
+temp/
+
+# Node 依赖
+node_modules/
+src/frontend/node_modules/
+
+# 构建产物（Vercel 自己构建）
+dist/
+.vite/
+
+# IDE / 工具配置
+.git/
+.github/
+.vscode/
+.idea/
+.codex/
+
+# 环境配置（仅需 vercel.json）
+.env
+.env.*
+.mcp.json
+
+# 文档
+docs/
+*.md
+!README.md
+
+# 部署配置（仅供 Railway 使用）
+Dockerfile
+railway.json
+docker-compose*.yml
+
+# 脚本（仅 build-frontend.js 需要）
+scripts/configure-*.py
+scripts/configure-*.ps1
+scripts/windows/
+
+# 日志
+logs/
+*.log
+
+# 备份
+recovery_backups/

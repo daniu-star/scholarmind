@@ -31,17 +31,61 @@ const errorListeners = [];
 function onGlobalError(fn) { errorListeners.push(fn); return () => { const i = errorListeners.indexOf(fn); if (i >= 0) errorListeners.splice(i, 1); }; }
 function emitGlobalError(error) { errorListeners.forEach(fn => { try { fn(error); } catch {} }); }
 
+// ── Token 刷新状态机 ──
+let _isRefreshing = false;
+let _refreshPromise = null;
+
+async function _tryRefreshToken() {
+  const refreshToken = localStorage.getItem('sm_refresh_token');
+  if (!refreshToken) return false;
+
+  if (_isRefreshing) {
+    // 已有刷新进行中，等待其结果
+    try { await _refreshPromise; } catch { /* ignore */ }
+    return !!localStorage.getItem('sm_token');
+  }
+
+  _isRefreshing = true;
+  _refreshPromise = (async () => {
+    try {
+      const base = getBaseUrl();
+      const res = await fetch(`${base}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
+      if (!res.ok) throw new Error('refresh failed');
+      const data = await res.json();
+      localStorage.setItem('sm_token', data.access_token);
+      localStorage.setItem('sm_refresh_token', data.refresh_token);
+      if (data.user) localStorage.setItem('sm_user', JSON.stringify(data.user));
+      // 同步到 store
+      if (state.auth) {
+        state.auth.token = data.access_token;
+        state.auth.user = data.user || null;
+        state.auth.isAuthenticated = true;
+      }
+      return true;
+    } catch {
+      localStorage.removeItem('sm_token');
+      localStorage.removeItem('sm_refresh_token');
+      localStorage.removeItem('sm_user');
+      return false;
+    } finally {
+      _isRefreshing = false;
+      _refreshPromise = null;
+    }
+  })();
+
+  try { return await _refreshPromise; } catch { return false; }
+}
+
 async function request(method, path, body = null, options = {}) {
   const url = `${getBaseUrl()}${path}`;
   const headers = { ...options.headers };
   const storedToken = localStorage.getItem('sm_token');
   if (storedToken && !headers.Authorization) {
-    try {
-      const token = JSON.parse(storedToken);
-      if (token) headers.Authorization = `Bearer ${token}`;
-    } catch {
-      headers.Authorization = `Bearer ${storedToken}`;
-    }
+    headers.Authorization = `Bearer ${storedToken}`;
   }
 
   if (!(body instanceof FormData)) {
@@ -66,8 +110,39 @@ async function request(method, path, body = null, options = {}) {
   if (!res.ok) {
     let errData;
     try { errData = await res.json(); } catch { errData = null; }
+
+    // C3: 401 时先尝试自动刷新 Token，而非直接踢出
+    if (res.status === 401 && path !== '/api/v1/auth/refresh') {
+      const refreshed = await _tryRefreshToken();
+      if (refreshed) {
+        // 刷新成功：用新 token 重试原请求
+        const newToken = localStorage.getItem('sm_token');
+        if (newToken) headers.Authorization = `Bearer ${newToken}`;
+        try {
+          const retryRes = await fetch(url, {
+            method,
+            headers,
+            body: body instanceof FormData ? body : (body ? JSON.stringify(body) : null),
+            signal: options.signal,
+          });
+          if (retryRes.ok) {
+            const ct = retryRes.headers.get('content-type');
+            if (ct && (ct.includes('image/png') || ct.includes('image/jpeg'))) {
+              const blob = await retryRes.blob();
+              return { blob, url: URL.createObjectURL(blob) };
+            }
+            return retryRes.json();
+          }
+          // 重试仍然失败，记录新的错误
+          try { errData = await retryRes.json(); } catch { errData = null; }
+          res = retryRes;
+        } catch { /* 网络错误，继续使用原始 401 错误 */ }
+      }
+    }
+
     if (res.status === 401) {
       localStorage.removeItem('sm_token');
+      localStorage.removeItem('sm_refresh_token');
       localStorage.removeItem('sm_user');
       emitGlobalError(new ApiError(401, '登录已过期，请重新登录'));
     }

@@ -1,6 +1,10 @@
 """
 ScholarMind WebSocket 路由
 提供实时流式对话能力
+
+⚠ DEV-ONLY: 此端点仅在本地开发环境可用（Vite 代理 ws://localhost:8000）。
+生产环境 Vercel Serverless Functions 不支持 WebSocket 长连接，
+请使用 SSE 端点 /agent/stream 替代。
 """
 from __future__ import annotations
 

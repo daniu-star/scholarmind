@@ -20,6 +20,15 @@ from src.backend.config import settings
 
 logger = structlog.get_logger(__name__)
 
+
+def _mask_redis_url(url: str) -> str:
+    """脱敏 Redis URL 中的密码，避免日志泄露。
+
+    redis://user:password@host:6379/0 → redis://user:***@host:6379/0
+    """
+    import re
+    return re.sub(r"://([^:]*):([^@]*)@", r"://\1:***@", url)
+
 # redis.asyncio 在 Python 3.8+ 可用
 try:
     import redis.asyncio as aioredis
@@ -63,13 +72,13 @@ async def get_redis() -> Optional["aioredis.Redis"]:
         )
         await _redis_client.ping()
         _redis_available = True
-        logger.info(f"redis_connected url={settings.REDIS_URL}")
+        logger.info(f"redis_connected url={_mask_redis_url(settings.REDIS_URL)}")
         return _redis_client
     except Exception as e:
         _redis_available = False
         _redis_client = None
         logger.warning(
-            f"redis_unavailable url={settings.REDIS_URL} error={e} hint=Pipeline 状态将降级为内存模式"
+            f"redis_unavailable url={_mask_redis_url(settings.REDIS_URL)} error={e} hint=Pipeline 状态将降级为内存模式"
         )
         return None
 

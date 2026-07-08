@@ -1,30 +1,14 @@
 """Celery scheduled tasks for academic resource crawling and maintenance."""
 
-import asyncio
 import structlog
 import uuid
 from datetime import datetime
 
 from .celery_app import celery_app
 from ..models.orm import Order  # noqa: F401 — used in expire_stale_orders
+from ..utils.async_bridge import run_async
 
 logger = structlog.get_logger(__name__)
-
-
-def _run_async(coro):
-    """Run an async coroutine from sync Celery task context."""
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
-    if loop and loop.is_running():
-        # If there's already a running loop, create a new one in a thread
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, coro)
-            return future.result()
-    else:
-        return asyncio.run(coro)
 
 
 def _get_crawler(source_db: str):
@@ -76,7 +60,7 @@ def crawl_source(self, source_db: str, task_type: str, count: int = 50):
         else:
             raise ValueError(f"Unknown task_type: {task_type}")
 
-        results = _run_async(coro)
+        results = run_async(coro)
         items_found = len(results)
 
         # Save to database
@@ -165,7 +149,7 @@ def cleanup_old_data():
 def crawl_by_keyword(source_db: str, keyword: str, count: int = 20):
     """Manually trigger a keyword crawl for a specific source."""
     crawler = _get_crawler(source_db)
-    results = _run_async(crawler.crawl_by_keyword(keyword, count))
+    results = run_async(crawler.crawl_by_keyword(keyword, count))
 
     db = _get_db_service()
     items_saved = db.save_resources_batch(results)
@@ -204,6 +188,6 @@ def expire_stale_orders():
             await db.commit()
             return result.rowcount
 
-    expired_count = _run_async(_expire())
+    expired_count = run_async(_expire())
     logger.info(f"expire_stale_orders done expired_count={expired_count}")
     return {"expired_count": expired_count}

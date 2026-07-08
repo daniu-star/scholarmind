@@ -23,25 +23,6 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.backend.config import settings  # noqa: E402
 
 
-def _is_placeholder_key(key: str) -> bool:
-    """判断 API key 是否为占位符（未配置真实密钥）
-
-    占位符特征：含 YOUR_ / _HERE / REPLACE / xxxx / 全 x / 明显的示例 key
-    """
-    if not key:
-        return True
-    k = key.strip()
-    if not k:
-        return True
-    upper = k.upper()
-    if "YOUR_" in upper or "_HERE" in upper or "REPLACE" in upper or "XXXX" in upper:
-        return True
-    # 全 x（如 xxxxxxxxxxxxxx）
-    if set(k.replace("-", "").replace("_", "")) == {"x"}:
-        return True
-    return False
-
-
 def create_app() -> FastAPI:
     """应用工厂函数：组装全部中间件、路由、异常处理器"""
 
@@ -64,6 +45,8 @@ def create_app() -> FastAPI:
         description="基于 RAG + Langgraph + 6层企业架构的智能学术研究助手",
         version=settings.VERSION,
         lifespan=lifespan,
+        # I4: 全局请求体大小限制 10MB（防止恶意大 payload 耗尽内存）
+        request_body_max_size=10 * 1024 * 1024,
     )
     app.debug = settings.DEBUG
 
@@ -124,6 +107,7 @@ def create_app() -> FastAPI:
         allow_credentials=cors_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
+        max_age=600,  # I3: 缓存 CORS 预检结果 10 分钟，减少 OPTIONS 往返
     )
 
     # CORS 配置日志警告

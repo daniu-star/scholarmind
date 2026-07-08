@@ -3,6 +3,7 @@ __pycache__/
 *.so
 .env
 *.db
+.chrome-profile/
 logs/
 sessions/
 models/*.onnx

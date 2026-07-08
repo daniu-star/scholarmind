@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .base import BaseRepository
@@ -59,9 +59,8 @@ class ChartRepository(BaseRepository[ChartRecord]):
         return await self.create(record)
 
     async def count_by_type(self, chart_type: str) -> int:
-        """统计某类型图表的生成数量"""
+        """统计某类型图表的生成数量（使用 COUNT 避免全表加载）"""
         result = await self.db.execute(
-            select(ChartRecord)
-            .where(ChartRecord.chart_type == chart_type)
+            select(func.count()).where(ChartRecord.chart_type == chart_type)
         )
-        return len(result.scalars().all())
+        return result.scalar() or 0

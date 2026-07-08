@@ -1,17 +1,19 @@
 """
 LLM 客户端封装 — 所有 Agent 共用的 LLM 调用接口
 
-复用项目已有的 DeepSeek/OpenAI 配置,提供统一的 chat_completion 方法。
-支持重试、超时、JSON 输出解析。
+复用项目统一的 settings 配置（pydantic-settings），提供 chat_completion 方法。
+注意：AB testing 模块是独立 CLI 子系统，为保持独立性不使用 utils/llm_client 单例。
+如需生产级重试/熔断，请考虑迁移至 utils/llm_client。
 """
 
 from __future__ import annotations
 
 import json
 import structlog
-import os
 import re
 from typing import Any
+
+from src.backend.config import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -20,12 +22,9 @@ class LLMClient:
     """统一的 LLM 客户端"""
 
     def __init__(self, model: str | None = None):
-        self._model = model or os.getenv("LLM_MODEL", "deepseek-chat")
-        self._api_key = os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY", "")
-        self._base_url = os.getenv(
-            "DEEPSEEK_BASE_URL",
-            os.getenv("OPENAI_BASE_URL", "https://api.deepseek.com/v1"),
-        )
+        self._model = model or settings.DEEPSEEK_MODEL
+        self._api_key = settings.DEEPSEEK_API_KEY
+        self._base_url = settings.DEEPSEEK_BASE_URL
         self._client = None
 
     @property

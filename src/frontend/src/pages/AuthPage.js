@@ -209,7 +209,8 @@ export function AuthPage() {
       }
 
       state.auth = { user: res.user, token: res.access_token, isAuthenticated: true, entitlements: res.entitlements };
-      localStorage.setItem('sm_token', JSON.stringify(res.access_token));
+      localStorage.setItem('sm_token', res.access_token);
+      localStorage.setItem('sm_refresh_token', res.refresh_token);
       localStorage.setItem('sm_user', JSON.stringify(res.user));
       localStorage.setItem('sm_entitlements', JSON.stringify(res.entitlements));
 

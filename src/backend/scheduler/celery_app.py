@@ -14,7 +14,7 @@ from src.backend.config import settings  # noqa: E402
 
 celery_app = Celery(
     "scholarmind",
-    include=["src.backend.tasks.chart_tasks"],
+    include=["src.backend.scheduler.chart_tasks"],
 )
 
 celery_app.conf.update(
@@ -80,7 +80,7 @@ celery_app.conf.update(
 # P1: 合并 tasks/ 的 chart 任务路由
 celery_app.conf.update(
     task_routes={
-        "src.backend.tasks.chart_tasks.*": {"queue": "charts"},
+        "src.backend.scheduler.chart_tasks.*": {"queue": "charts"},
     },
     task_time_limit=300,
     task_soft_time_limit=240,
@@ -90,7 +90,7 @@ celery_app.conf.update(
 )
 
 # Auto-discover tasks
-celery_app.autodiscover_tasks(["src.backend.scheduler", "src.backend.tasks"])
+celery_app.autodiscover_tasks(["src.backend.scheduler"])
 
 
 def is_available() -> bool:

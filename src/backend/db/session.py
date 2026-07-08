@@ -26,18 +26,37 @@ def create_async_engine_from_url(url: str | None = None) -> AsyncEngine:
     """创建异步 SQLAlchemy 引擎
 
     自动将 postgresql:// 转为 postgresql+asyncpg://，兼容 Railway 注入的原始 URL。
+    SQLite 引擎设置 busy_timeout=30s，避免并发写入时 database is locked 错误。
     """
     database_url = url or settings.DATABASE_URL
     if database_url.startswith("postgresql://"):
         database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    return create_async_engine(
+
+    connect_args: dict = {}
+    if "sqlite" in database_url:
+        connect_args["timeout"] = 30  # SQLite 等待锁的最长时间（秒）
+
+    engine = create_async_engine(
         database_url,
         echo=False,
         pool_size=5,
         max_overflow=10,
         pool_recycle=3600,
         pool_pre_ping=True,
+        connect_args=connect_args if connect_args else None,
     )
+
+    # SQLite: 为每个新连接启用 WAL 模式 + 外键约束
+    if "sqlite" in database_url:
+        from sqlalchemy import event
+        @event.listens_for(engine.sync_engine, "connect")
+        def _on_connect(dbapi_connection, _):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+    return engine
 
 
 def create_async_sessionmaker_from_engine(
