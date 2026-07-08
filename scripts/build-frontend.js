@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
 
 // 后端 API 域名：优先读 VITE_API_BASE 环境变量，默认生产域名
-const apiBase = process.env.VITE_API_BASE || 'https://api.quannengyanjiu.cn';
+const apiBase = process.env.VITE_API_BASE || 'https://scholarmind-production-e56b.up.railway.app';
 
 console.log(`[build-frontend] VITE_API_BASE = ${apiBase}`);
 
