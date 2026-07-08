@@ -10,7 +10,9 @@ const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
 
 // 后端 API 域名：优先读 VITE_API_BASE 环境变量，默认生产域名
-const apiBase = process.env.VITE_API_BASE || 'https://scholarmind-production-e56b.up.railway.app';
+// API_BASE 为空字符串 → 前端使用相对路径（/api/...），经由 Vercel 代理到 Railway
+// 生产环境设置 VITE_API_BASE= 显式留空以绕过 api.quannengyanjiu.cn DNS 问题
+const apiBase = process.env.VITE_API_BASE || '';
 
 console.log(`[build-frontend] VITE_API_BASE = ${apiBase}`);
 
