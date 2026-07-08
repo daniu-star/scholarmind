@@ -45,6 +45,7 @@ PATH_COST_WEIGHTS: dict[str, int] = {
     "/api/v1/knowledge/search": 2,       # 学术搜索
     "/api/v1/knowledge/academic/search": 3,  # Task 28: 学术搜索深度端点（成本与 upload 一致）
     "/api/v1/auth/login": 2,             # 登录（防爆破）
+    "/api/v1/auth/register": 2,          # 注册（防批量注册）
     "/api/v1/auth/send-code": 5,        # 验证码发送（防短信/邮件轰炸）
     "/api/v1/ws/chat": 2,                # WebSocket 建连
 }
@@ -55,9 +56,9 @@ DEFAULT_COST = 1
 FAIL_CLOSED_PATHS: set[str] = {
     "/api/v1/agent/chat",
     "/api/v1/code-execution/run",
-    "/api/v1/paper-pipeline/start",
+    # paper-pipeline/start 已移除：Pipeline 仅启动后台任务，Redis 不可用时应降级到本地限流
 }
-FAIL_CLOSED_PREFIXES: tuple[str, ...] = ("/api/v1/payment/",)
+FAIL_CLOSED_PREFIXES: tuple[str, ...] = ("/api/v1/payment/admin/",)
 
 
 def _path_cost(path: str) -> int:

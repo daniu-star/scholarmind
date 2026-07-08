@@ -14,7 +14,6 @@ echo.
 echo ============================================================
 echo  ScholarMind Startup
 echo ============================================================
-echo.
 
 REM Step 1: Check Python
 echo [1/5] Checking Python...
@@ -101,7 +100,7 @@ echo       Browser will open automatically when ready.
 echo.
 
 REM P0 Task 5.8: Use factory mode (create_app) as app.py has no module-level 'app'.
-REM Enable rate limiting for local production-like default (dev override in start.dev.bat).
+REM Enable rate limiting for local production-like default.
 set "RATE_LIMIT_ENABLED=true"
 REM Use HuggingFace mirror to avoid model download timeouts in mainland China
 set "HF_ENDPOINT=https://hf-mirror.com"

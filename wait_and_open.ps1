@@ -2,8 +2,8 @@
 # Invoked by start.bat to avoid nested-quote issues in cmd.
 $ErrorActionPreference = 'SilentlyContinue'
 $ok = $false
-# Poll every 1s for up to 60s (backend starts in ~5s)
-for ($i = 0; $i -lt 60; $i++) {
+# Poll every 1s for up to 120s (backend with ML model download may take 60-90s)
+for ($i = 0; $i -lt 120; $i++) {
     try {
         $r = Invoke-WebRequest -Uri 'http://localhost:8000/api/v1/health' -UseBasicParsing -TimeoutSec 2
         if ($r.StatusCode -eq 200) {
