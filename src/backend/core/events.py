@@ -19,6 +19,44 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
 
 
+async def _ensure_schema_columns(engine) -> None:
+    """自动补全数据库中缺失的列（Alembic 不可用时的兜底方案）。
+
+    当 Alembic 迁移失败（如 Railway 缺少 psycopg2），create_all() 仅创建新表，
+    不会修改已存在的表。此函数检测并补全 ORM 模型声明的列与实际表结构之间的差异。
+    """
+    from sqlalchemy import inspect as sa_inspect, text as sa_text
+
+    async with engine.connect() as conn:
+        inspector = sa_inspect(engine.sync_engine)
+
+        # 需要检查的表及预期列（列名 → 类型字符串）
+        expected_columns: dict[str, dict[str, str]] = {
+            "users": {
+                "email": "VARCHAR(128)",
+                "email_verified": "BOOLEAN DEFAULT FALSE",
+                "failed_login_attempts": "INTEGER DEFAULT 0",
+                "locked_until": "TIMESTAMP WITH TIME ZONE",
+            },
+        }
+
+        for table_name, columns in expected_columns.items():
+            try:
+                existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+            except Exception:
+                continue  # 表不存在则跳过
+
+            for col_name, col_type in columns.items():
+                if col_name not in existing_cols:
+                    try:
+                        sql = f'ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}'
+                        await conn.execute(sa_text(sql))
+                        await conn.commit()
+                        logger.info(f"schema_auto_fix: added {table_name}.{col_name} ({col_type})")
+                    except Exception as e:
+                        logger.warning(f"schema_auto_fix failed for {table_name}.{col_name}: {e}")
+
+
 async def startup(app: FastAPI) -> None:
     """应用启动初始化
 
@@ -70,6 +108,9 @@ async def startup(app: FastAPI) -> None:
         from ..db.session import init_db
         await init_db(engine)
         logger.info("ORM tables created/verified (fallback)")
+
+    # 自动修复缺失的数据库列（Alembic 不可用时，create_all 不会修改已有表）
+    await _ensure_schema_columns(engine)
 
     # 初始化预设技能（seeder）
     await _seed_preset_skills(session_factory)
