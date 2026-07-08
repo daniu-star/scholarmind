@@ -116,6 +116,11 @@ class Settings(BaseSettings):
     WANFANG_BASE_URL: str = "https://www.wanfangdata.com.cn"
     WEIPU_BASE_URL: str = "https://qikan.cqvip.com"
 
+    # ── 本地论文库 ──
+    LOCAL_PAPERS_DIR: str = "C:/Users/13067/.trae-cn/数据库/论文"
+    LOCAL_MD_FILES_DIR: str = "C:/Users/13067/.trae-cn/数据库/md_files"
+    LOCAL_ANALYSIS_DIR: str = "C:/Users/13067/.trae-cn/数据库/scholar_analysis"
+
     # ── CNKI 反爬配置 ──
     CNKI_TLS_IMPERSONATE: str = Field(
         default="chrome124",
@@ -184,8 +189,14 @@ class Settings(BaseSettings):
     MAX_HISTORY_MESSAGES: int = 40
     PIPELINE_MAX_CONCURRENCY: int = 3
     PIPELINE_TIMEOUT_SECONDS: int = 600
+    PIPELINE_ROUND_TIMEOUT_SECONDS: int = 120
     PIPELINE_HEARTBEAT_INTERVAL_SECONDS: int = 15
     PIPELINE_PROGRESS_SYNC_INTERVAL_SECONDS: int = 3
+
+    # ── Paper Review Pipeline 配置 ──────────────────────────
+    REVIEW_MAX_CONCURRENCY: int = 2
+    REVIEW_TIMEOUT_SECONDS: int = 600
+    REVIEW_ROUND_TIMEOUT_SECONDS: int = 120
 
     # ── P0 Task 1.1：代码执行入口总开关 ─────────────────────
     # 默认 False：生产环境必须显式 CODE_EXECUTION_ENABLED=true 才注册
@@ -324,22 +335,17 @@ class Settings(BaseSettings):
         - 开发环境且 CORS_ALLOW_ALL_IN_DEV=True 时返回 ["*"](仅限非生产)
         - 测试环境使用 CORS_ORIGINS 白名单
         """
-        # 生产环境强制白名单,忽略 CORS_ALLOW_ALL_IN_DEV
         if self.ENVIRONMENT == "production":
             return self.CORS_ORIGINS
 
-        # 非生产环境,若显式开启且非 test,允许 ["*"](开发便利)
         if self.CORS_ALLOW_ALL_IN_DEV and self.ENVIRONMENT != "test":
-            import warnings
-            warnings.warn(
-                "CORS_ALLOW_ALL_IN_DEV=True 在非生产环境启用,"
-                "请确保生产环境不会启用此选项",
-                RuntimeWarning,
-                stacklevel=2,
-            )
             return ["*"]
 
-        return self.CORS_ORIGINS
+        # 开发环境：白名单 + null origin（file:/// 双击 HTML 本地调试）
+        origins = list(self.CORS_ORIGINS)
+        if "null" not in origins:
+            origins.append("null")
+        return origins
 
     def get_cors_allow_credentials(self) -> bool:
         """获取 CORS allow_credentials 配置

@@ -1,5 +1,10 @@
-"""ChromaDB vector database service for semantic search over academic papers."""
+"""ChromaDB vector database service for semantic search over academic papers.
 
+所有同步 ChromaDB 操作均提供对应的 async_* 包装方法（通过 asyncio.to_thread），
+确保在 async 上下文中调用不会阻塞事件循环。
+"""
+
+import asyncio
 import structlog
 from typing import Optional
 
@@ -46,14 +51,54 @@ class VectorService:
                 self.degraded = True
 
             # Get or create collection
-            self._collection = self._client.get_or_create_collection(
-                name=self.COLLECTION_NAME,
-                embedding_function=self._embedding_fn,
-                metadata={"hnsw:space": "cosine"},
-            )
+            needs_rebuild = False
+            try:
+                self._collection = self._client.get_or_create_collection(
+                    name=self.COLLECTION_NAME,
+                    embedding_function=self._embedding_fn,
+                    metadata={"hnsw:space": "cosine"},
+                )
+                # 健康检查：尝试 count() 确保 HNSW 索引可读
+                count = self._collection.count()
+                if count == 0:
+                    needs_rebuild = True
+            except Exception as get_err:
+                # ChromaDB 持久化索引在异常关闭后可能损坏（Windows 常见）
+                # 自动删除损坏的 collection 并重建
+                logger.warning(
+                    f"ChromaDB collection corrupted, recreating: {get_err}"
+                )
+                try:
+                    self._client.delete_collection(self.COLLECTION_NAME)
+                except Exception:
+                    pass
+                self._collection = self._client.create_collection(
+                    name=self.COLLECTION_NAME,
+                    embedding_function=self._embedding_fn,
+                    metadata={"hnsw:space": "cosine"},
+                )
+                needs_rebuild = True
+
+            doc_count = self._collection.count()
             logger.info(
-                f"ChromaDB initialized: {self._collection.count()} documents in '{self.COLLECTION_NAME}'"
+                f"ChromaDB initialized: {doc_count} documents in '{self.COLLECTION_NAME}'"
             )
+
+            # 如果 collection 为空（损坏恢复或首次启动）且 SQLite 有数据，自动重建
+            if needs_rebuild and doc_count == 0:
+                logger.info("ChromaDB empty, scheduling background rebuild from SQLite")
+                import threading
+                def _auto_rebuild():
+                    try:
+                        from ..services.db_service import get_db_service
+                        db = get_db_service()
+                        rebuilt = self.rebuild_from_db(db)
+                        logger.info(f"ChromaDB auto-rebuilt: {rebuilt} documents")
+                    except Exception as e:
+                        logger.warning(f"ChromaDB auto-rebuild failed: {e}")
+                threading.Thread(
+                    target=_auto_rebuild, daemon=True, name="chromadb-autorebuild"
+                ).start()
             return True
         except Exception as e:
             logger.error(f"Failed to initialize ChromaDB: {e}")
@@ -206,6 +251,23 @@ class VectorService:
             self._collection.delete(ids=ids)
         except Exception as e:
             logger.error(f"Failed to delete documents: {e}")
+
+    # ── 异步包装方法 ────────────────────────────────────────
+    # 将同步 ChromaDB 操作代理到 asyncio.to_thread，避免阻塞事件循环
+
+    async def async_add_documents(self, documents: list[dict]) -> None:
+        """异步版本：添加文档到向量集合。"""
+        await asyncio.to_thread(self.add_documents, documents)
+
+    async def async_search(
+        self, query: str, top_k: int = 5, filters: Optional[dict] = None
+    ) -> list[dict]:
+        """异步版本：语义搜索。"""
+        return await asyncio.to_thread(self.search, query, top_k, filters)
+
+    async def async_rebuild_from_db(self, db_service) -> int:
+        """异步版本：从 SQLite 重建向量索引。"""
+        return await asyncio.to_thread(self.rebuild_from_db, db_service)
 
 
 # Singleton instance
