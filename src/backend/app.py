@@ -146,6 +146,19 @@ def create_app() -> FastAPI:
                         "WHERE table_name='users' ORDER BY ordinal_position"
                     ))
                     db_diag["users_columns"] = [row[0] for row in r.fetchall()]
+                    r2 = await conn.execute(_t(
+                        "SELECT column_name, data_type FROM information_schema.columns "
+                        "WHERE table_name='user_quotas' ORDER BY ordinal_position"
+                    ))
+                    db_diag["user_quotas_columns"] = [row[0] for row in r2.fetchall()]
+                    # 尝试 INSERT 测试
+                    try:
+                        await conn.execute(_t("INSERT INTO users (username, password_hash) VALUES ('_diag_test_', '_')"))
+                        await conn.execute(_t("DELETE FROM users WHERE username='_diag_test_'"))
+                        await conn.commit()
+                        db_diag["insert_test"] = "ok"
+                    except Exception as ie:
+                        db_diag["insert_test"] = str(ie)
         except Exception as e:
             db_diag["error"] = str(e)
         return {
