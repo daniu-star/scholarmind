@@ -36,15 +36,18 @@ def create_async_engine_from_url(url: str | None = None) -> AsyncEngine:
     if "sqlite" in database_url:
         connect_args["timeout"] = 30  # SQLite 等待锁的最长时间（秒）
 
-    engine = create_async_engine(
-        database_url,
-        echo=False,
-        pool_size=5,
-        max_overflow=10,
-        pool_recycle=3600,
-        pool_pre_ping=True,
-        connect_args=connect_args if connect_args else None,
-    )
+    # 构建引擎参数，避免传递 None 值导致 SQLAlchemy immutabledict.union 报错
+    engine_kwargs: dict = {
+        "echo": False,
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_recycle": 3600,
+        "pool_pre_ping": True,
+    }
+    if connect_args:
+        engine_kwargs["connect_args"] = connect_args
+
+    engine = create_async_engine(database_url, **engine_kwargs)
 
     # SQLite: 为每个新连接启用 WAL 模式 + 外键约束
     if "sqlite" in database_url:
