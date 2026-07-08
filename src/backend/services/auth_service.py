@@ -129,7 +129,7 @@ async def _init_user_quota(db: AsyncSession, user_id: int) -> None:
 async def register_user(
     db: AsyncSession, identifier: str, password: str, nickname: str = ""
 ) -> User:
-    """注册新用户（自动识别手机号或邮箱）。
+    """注册新用户（自动识别手机号或邮箱）— 使用原始 SQL 确保 PostgreSQL 兼容。
 
     Args:
         db: 数据库会话
@@ -140,6 +140,8 @@ async def register_user(
     Returns:
         新创建的 User 对象（已 flush，id 可用）
     """
+    from sqlalchemy import text as _t
+
     if "@" in identifier:
         username = identifier
         phone = None
@@ -150,16 +152,41 @@ async def register_user(
         phone = normalized
         email = None
 
+    # 使用原始 SQL INSERT 确保 Railway PostgreSQL 兼容
+    pwd = get_password_hash(password)
+    nick = nickname or username[-8:] if len(username) > 8 else username
+
+    result = await db.execute(
+        _t(
+            "INSERT INTO users (username, phone, email, password_hash, nickname) "
+            "VALUES (:u, :p, :e, :pw, :n) RETURNING id"
+        ),
+        {"u": username, "p": phone, "e": email, "pw": pwd, "n": nick},
+    )
+    user_id = result.scalar_one()
+    await db.flush()
+
+    # 初始化配额
+    await db.execute(
+        _t(
+            "INSERT INTO user_quotas (user_id, tokens_used, tokens_limit, plan, "
+            "free_chats_used, free_chat_limit, model_tier) "
+            "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 'flash') "
+            "ON CONFLICT (user_id) DO NOTHING"
+        ),
+        {"uid": user_id, "limit": settings.FREE_TIER_TOKEN_LIMIT, "chat_limit": settings.FREE_CHAT_LIMIT},
+    )
+    await db.flush()
+
+    # 构造 User 对象返回
     user = User(
+        id=user_id,
         username=username,
         phone=phone,
         email=email,
-        password_hash=get_password_hash(password),
-        nickname=nickname,
+        password_hash=pwd,
+        nickname=nick,
     )
-    db.add(user)
-    await db.flush()
-    await _init_user_quota(db, user.id)
     return user
 
 

@@ -134,33 +134,6 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/health")
     @app.get("/api/v1/healthz")  # liveness: 仅检查进程存活
     async def health_check(request: Request):
-        # 诊断：探测 users 表列信息
-        db_diag = {}
-        try:
-            engine = getattr(request.app.state, "db_engine", None)
-            if engine:
-                async with engine.connect() as conn:
-                    from sqlalchemy import text as _t
-                    r = await conn.execute(_t(
-                        "SELECT column_name, data_type FROM information_schema.columns "
-                        "WHERE table_name='users' ORDER BY ordinal_position"
-                    ))
-                    db_diag["users_columns"] = [row[0] for row in r.fetchall()]
-                    r2 = await conn.execute(_t(
-                        "SELECT column_name, data_type FROM information_schema.columns "
-                        "WHERE table_name='user_quotas' ORDER BY ordinal_position"
-                    ))
-                    db_diag["user_quotas_columns"] = [row[0] for row in r2.fetchall()]
-                    # 尝试 INSERT 测试
-                    try:
-                        await conn.execute(_t("INSERT INTO users (username, password_hash) VALUES ('_diag_test_', '_')"))
-                        await conn.execute(_t("DELETE FROM users WHERE username='_diag_test_'"))
-                        await conn.commit()
-                        db_diag["insert_test"] = "ok"
-                    except Exception as ie:
-                        db_diag["insert_test"] = str(ie)
-        except Exception as e:
-            db_diag["error"] = str(e)
         return {
             "status": "ok",
             "service": "ScholarMind API",
@@ -168,7 +141,6 @@ def create_app() -> FastAPI:
             "environment": settings.ENVIRONMENT,
             "llm_reachable": getattr(request.app.state, "llm_reachable", False),
             "deepseek_key_configured": bool(settings.DEEPSEEK_API_KEY),
-            "db_diag": db_diag,
         }
 
     @app.get("/api/v1/readyz")  # readiness: 检查 DB 连通性
