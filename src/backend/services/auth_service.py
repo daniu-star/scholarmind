@@ -261,18 +261,12 @@ async def create_code(
 
 
 async def send_code_background(code: str, target: str) -> None:
-    """后台发送验证码邮件（fire-and-forget，不阻塞 HTTP 响应）。
+    """发送验证码邮件（同步模式——返回真实 SMTP 错误）。
 
-    邮件发送失败仅记录日志，不影响用户体验——验证码已存入数据库。
+    若 SMTP 配置可用，同步发送邮件；异常会向上传播由调用方处理。
     """
     from ..services.email_service import send_verification_email
-    try:
-        await send_verification_email(target, code)
-    except Exception as e:
-        import structlog as _structlog
-        _structlog.get_logger(__name__).warning(
-            f"background_email_failed target={target[:3]}*** error={e}"
-        )
+    await send_verification_email(target, code)
 
 
 async def create_and_send_code(

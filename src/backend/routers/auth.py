@@ -205,16 +205,26 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
     """
     target = req.target.strip()
     if "@" in target:
-        # 邮箱验证码：先存码→立即返回，邮件后台发送（fire-and-forget）
+        # 邮箱验证码：存码 → 发送邮件 → 返回结果
         try:
             code = await create_code(db, target, req.purpose)
         except ValueError as e:
             raise HTTPException(status_code=429, detail=str(e))
         await db.commit()
-        # 后台发送邮件，不阻塞 HTTP 响应
-        asyncio.create_task(send_code_background(code, target))
-        return {"success": True, "message": "验证码已发送到您的邮箱",
-                "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60}
+        # 同步发送邮件，捕获错误并返回给用户
+        email_sent = True
+        email_error = None
+        try:
+            await send_code_background(code, target)
+        except Exception as e:
+            email_sent = False
+            email_error = str(e)
+        return {
+            "success": True,
+            "message": "验证码已发送到您的邮箱" if email_sent else f"验证码已生成但邮件发送失败: {email_error}",
+            "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
+            "email_sent": email_sent,
+        }
 
     # 手机号：先归一化，检查是否关联了邮箱
     try:
@@ -231,9 +241,19 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
         except ValueError as e:
             raise HTTPException(status_code=429, detail=str(e))
         await db.commit()
-        asyncio.create_task(send_code_background(code, user.email))
-        return {"success": True, "message": "验证码已发送到您绑定的邮箱",
-                "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60}
+        email_sent = True
+        email_error = None
+        try:
+            await send_code_background(code, user.email)
+        except Exception as e:
+            email_sent = False
+            email_error = str(e)
+        return {
+            "success": True,
+            "message": "验证码已发送到您绑定的邮箱" if email_sent else f"验证码已生成但邮件发送失败: {email_error}",
+            "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
+            "email_sent": email_sent,
+        }
 
     # 无绑定邮箱：统一返回成功提示，防止用户枚举
     return {"success": True, "message": "验证码已发送（如该手机号已注册且绑定邮箱）"}
