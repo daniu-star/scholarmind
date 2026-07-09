@@ -156,10 +156,22 @@ async def register_user(
     pwd = get_password_hash(password)
     nick = nickname or username[-8:] if len(username) > 8 else username
 
+    # 先检查是否已存在
+    existing = await db.execute(
+        select(User).where(
+            (User.username == username) | ((User.email == email) if email else False)
+        )
+    )
+    existing_user = existing.scalar_one_or_none()
+    if existing_user:
+        return existing_user
+
     result = await db.execute(
         _t(
             "INSERT INTO users (username, phone, email, password_hash, nickname) "
-            "VALUES (:u, :p, :e, :pw, :n) RETURNING id"
+            "VALUES (:u, :p, :e, :pw, :n) "
+            "ON CONFLICT (username) DO NOTHING "
+            "RETURNING id"
         ),
         {"u": username, "p": phone, "e": email, "pw": pwd, "n": nick},
     )
