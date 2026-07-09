@@ -86,10 +86,14 @@ async def _send_via_resend(to_email: str, code: str) -> bool:
         return False
 
     import httpx
+    # Resend 免费模式限制：只能发往账户注册邮箱
+    # 域名验证完成后可移除此限制
+    actual_recipient = to_email  # 目标收件人
+    send_to = "muc18229499131@gmail.com"  # Resend 账户邮箱（免费模式限制）
     payload = {
         "from": f"{settings.SMTP_FROM_NAME} <onboarding@resend.dev>",
-        "to": [to_email],
-        "subject": f"[ScholarMind] 验证码：{code}",
+        "to": [send_to],
+        "subject": f"[ScholarMind] 验证码：{code}（收件人：{to_email}）",
         "html": f"""<div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif;color:#1a1a1a;background:#f0f7f1;border-radius:16px;padding:36px 28px">
 <div style="text-align:center;margin-bottom:24px">
 <div style="display:inline-block;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;font-size:28px;font-weight:700;padding:8px 20px;border-radius:10px">ScholarMind</div>
