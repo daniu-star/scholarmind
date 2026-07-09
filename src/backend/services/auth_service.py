@@ -323,15 +323,17 @@ async def verify_code_and_login(
     )
     vc = result.scalars().first()
     if not vc:
-        # 记录失败尝试（用于暴力破解检测）
-        db.add(LoginAttempt(
-            identifier=target,
-            success=False,
-            failure_reason="invalid_code",
-        ))
+        # 记录失败尝试（原始 SQL）
+        await db.execute(
+            _t(
+                "INSERT INTO login_attempts (identifier, success, failure_reason, created_at) "
+                "VALUES (:id, FALSE, :reason, NOW())"
+            ),
+            {"id": target, "reason": "invalid_code"},
+        )
         return None
 
-    # 标记已使用
+    # 标记已使用（UPDATE 安全）
     vc.used = True
     await db.flush()
 
@@ -344,26 +346,39 @@ async def verify_code_and_login(
     user = user_result.scalar_one_or_none()
 
     if user is None:
-        # 自动注册新用户
-        user = User(
-            username=target,
-            phone=target if "@" not in target else None,
-            email=target if "@" in target else None,
-            password_hash=get_password_hash(secrets.token_hex(16)),
+        # 自动注册新用户（原始 SQL）
+        pwd = get_password_hash(secrets.token_hex(16))
+        phone_val = target if "@" not in target else None
+        email_val = target if "@" in target else None
+        nick_val = target[-8:] if len(target) > 8 else target
+
+        ins_result = await db.execute(
+            _t(
+                "INSERT INTO users (username, phone, email, password_hash, nickname, "
+                "role, is_active, email_verified, failed_login_attempts, plan, created_at, updated_at) "
+                "VALUES (:u, :p, :e, :pw, :n, 'user', TRUE, FALSE, 0, 'free', NOW(), NOW()) "
+                "RETURNING id"
+            ),
+            {"u": target, "p": phone_val, "e": email_val, "pw": pwd, "n": nick_val},
         )
-        db.add(user)
+        uid = ins_result.scalar_one()
         await db.flush()
-        # 初始化配额
-        quota = UserQuota(
-            user_id=user.id,
-            tokens_used=0,
-            tokens_limit=settings.FREE_TIER_TOKEN_LIMIT,
-            plan="free",
-            free_chats_used=0,
-            free_chat_limit=settings.FREE_CHAT_LIMIT,
-            model_tier="flash",
+
+        # 初始化配额（原始 SQL）
+        await db.execute(
+            _t(
+                "INSERT INTO user_quotas (user_id, tokens_used, tokens_limit, plan, "
+                "free_chats_used, free_chat_limit, generation_credits, "
+                "shared_pipeline_credits, model_tier, created_at, updated_at) "
+                "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 0, 0, 'flash', NOW(), NOW())"
+            ),
+            {"uid": uid, "limit": settings.FREE_TIER_TOKEN_LIMIT, "chat_limit": settings.FREE_CHAT_LIMIT},
         )
-        db.add(quota)
         await db.flush()
+
+        # 查询构建 User 对象
+        result2 = await db.execute(select(User).where(User.id == uid))
+        user = result2.scalar_one()
+        return user
 
     return user

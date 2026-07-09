@@ -29,10 +29,10 @@ from ..services.entitlement_service import EntitlementService
 
 # create_code 内联定义于此（避免 Railway Python 3.12 对 auth_service 的深层导入失败）
 async def create_code(db, target: str, purpose: str = "login") -> str:
-    """创建邮箱验证码并存入数据库。Railway 兼容版本：直接内联。"""
+    """创建邮箱验证码并存入数据库 — 使用原始 SQL 确保 PostgreSQL 兼容。"""
     import secrets
     from datetime import datetime, timezone, timedelta
-    from sqlalchemy import select
+    from sqlalchemy import text as _t, select
 
     cutoff = datetime.now(timezone.utc) - timedelta(
         seconds=settings.VERIFICATION_CODE_RATE_LIMIT_SECONDS
@@ -49,9 +49,13 @@ async def create_code(db, target: str, purpose: str = "login") -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(
         minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES
     )
-    db.add(VerificationCode(
-        target=target, code=code, purpose=purpose, expires_at=expires_at
-    ))
+    await db.execute(
+        _t(
+            "INSERT INTO verification_codes (target, code, purpose, used, expires_at, created_at) "
+            "VALUES (:t, :c, :p, FALSE, :exp, NOW())"
+        ),
+        {"t": target, "c": code, "p": purpose, "exp": expires_at},
+    )
     await db.flush()
     return code
 
