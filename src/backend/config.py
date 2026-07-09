@@ -60,7 +60,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"  # "development" | "production" | "test"
     BASE_URL: str = "http://localhost:8000"  # P0: 生产环境必须配置为公网域名
     # P0 修复：默认 DEBUG=False（fail-secure），开发环境显式设置 DEBUG=true
-    DEBUG: bool = True  # 临时开启以诊断 IntegrityError
+    DEBUG: bool = False
     DEEPSEEK_API_KEY: str = ""
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
     DEEPSEEK_MODEL: str = "deepseek-chat"
