@@ -8518,11 +8518,10 @@ button:focus-visible {
 //   3. 同源（http/https 协议时，dev 走 Vite 代理或 Vercel rewrites）
 //   4. http://localhost:8000（file:// 协议 fallback，本地直接打开 HTML）
 const API_BASE = (function() {
-  var meta = document.querySelector('meta[name="api-base"]');
-  if (meta && meta.content) return meta.content;
-  if (typeof window !== 'undefined' && window.__API_BASE__) return window.__API_BASE__;
   if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
     return window.location.origin;
+  }
+  if (typeof window !== 'undefined' && window.__API_BASE__) return window.__API_BASE__;
   }
   return 'http://localhost:8000';
 })();
