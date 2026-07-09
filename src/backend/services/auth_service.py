@@ -182,8 +182,8 @@ async def register_user(
     await db.execute(
         _t(
             "INSERT INTO user_quotas (user_id, tokens_used, tokens_limit, plan, "
-            "free_chats_used, free_chat_limit, model_tier) "
-            "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 'flash') "
+            "free_chats_used, free_chat_limit, model_tier, created_at, updated_at) "
+            "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 'flash', NOW(), NOW()) "
             "ON CONFLICT (user_id) DO NOTHING"
         ),
         {"uid": user_id, "limit": settings.FREE_TIER_TOKEN_LIMIT, "chat_limit": settings.FREE_CHAT_LIMIT},
