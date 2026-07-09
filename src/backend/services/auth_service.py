@@ -179,12 +179,13 @@ async def register_user(
     user_id = result.scalar_one()
     await db.flush()
 
-    # 初始化配额
+    # 初始化配额（包含所有 NOT NULL 列）
     await db.execute(
         _t(
             "INSERT INTO user_quotas (user_id, tokens_used, tokens_limit, plan, "
-            "free_chats_used, free_chat_limit, model_tier, created_at, updated_at) "
-            "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 'flash', NOW(), NOW())"
+            "free_chats_used, free_chat_limit, generation_credits, "
+            "shared_pipeline_credits, model_tier, created_at, updated_at) "
+            "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 0, 0, 'flash', NOW(), NOW())"
         ),
         {"uid": user_id, "limit": settings.FREE_TIER_TOKEN_LIMIT, "chat_limit": settings.FREE_CHAT_LIMIT},
     )
