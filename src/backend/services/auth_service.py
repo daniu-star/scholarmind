@@ -303,7 +303,7 @@ async def verify_code_and_login(
     failed_count = await db.scalar(
         select(func.count(LoginAttempt.id)).where(
             LoginAttempt.identifier == target,
-            LoginAttempt.success == False,
+            LoginAttempt.success.is_(False),
             LoginAttempt.failure_reason == "invalid_code",
             LoginAttempt.created_at >= failed_window,
         )

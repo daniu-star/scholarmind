@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..config import settings
 from ..core.dependencies import get_db
-from ..models.orm import User, LoginAttempt, VerificationCode
+from ..models.orm import User, VerificationCode
 import asyncio
 from ..services.auth_service import (
     authenticate_user,
@@ -25,6 +25,7 @@ from ..services.auth_service import (
     send_code_background,
     verify_code_and_login,
 )
+from ..services.entitlement_service import EntitlementService
 
 # create_code 内联定义于此（避免 Railway Python 3.12 对 auth_service 的深层导入失败）
 async def create_code(db, target: str, purpose: str = "login") -> str:
@@ -53,7 +54,6 @@ async def create_code(db, target: str, purpose: str = "login") -> str:
     ))
     await db.flush()
     return code
-from ..services.entitlement_service import EntitlementService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer(auto_error=False)
