@@ -266,6 +266,7 @@ class Settings(BaseSettings):
     SMTP_USER: str = Field(default="", description="发件邮箱地址")
     SMTP_PASSWORD: str = Field(default="", description="邮箱授权码")
     SMTP_FROM_NAME: str = "ScholarMind"
+    RESEND_API_KEY: str = Field(default="", description="Resend API Key（绕过 Railway SMTP 限制）")
     VERIFICATION_CODE_EXPIRE_MINUTES: int = 5
     VERIFICATION_CODE_LENGTH: int = 6
     VERIFICATION_CODE_RATE_LIMIT_SECONDS: int = 60

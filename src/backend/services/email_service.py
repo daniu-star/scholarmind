@@ -67,6 +67,52 @@ class EmailSendError(RuntimeError):
     pass
 
 
+async def _send_via_resend(to_email: str, code: str) -> bool:
+    """通过 Resend HTTP API 发送邮件（绕过 Railway SMTP 封锁，走 HTTPS 443）。
+
+    Returns:
+        True 表示发送成功，False 表示不可用（未配置 API Key 或发送失败）
+    """
+    if not settings.RESEND_API_KEY:
+        return False
+
+    import httpx
+    payload = {
+        "from": f"{settings.SMTP_FROM_NAME} <onboarding@resend.dev>",
+        "to": [to_email],
+        "subject": f"[ScholarMind] 验证码：{code}",
+        "html": f"""<div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif;color:#1a1a1a;background:#f0f7f1;border-radius:16px;padding:36px 28px">
+<div style="text-align:center;margin-bottom:24px">
+<div style="display:inline-block;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;font-size:28px;font-weight:700;padding:8px 20px;border-radius:10px">ScholarMind</div>
+<div style="font-size:13px;color:#6b8e6f;margin-top:8px">智能学术研究助手 · 验证码</div>
+</div>
+<div style="background:#fff;border-radius:14px;padding:28px 24px;text-align:center">
+<div style="font-size:15px;color:#4a5b4c;margin-bottom:18px">您的验证码是</div>
+<div style="font-size:42px;font-weight:700;letter-spacing:10px;color:#2E7D32;margin-bottom:18px">{code}</div>
+<div style="display:inline-block;background:#f0f7f1;color:#5a8a5e;font-size:12px;padding:6px 14px;border-radius:20px">{settings.VERIFICATION_CODE_EXPIRE_MINUTES} 分钟内有效</div>
+</div>
+</div>""",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://api.resend.com/emails",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {settings.RESEND_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+            )
+            if resp.status_code in (200, 201):
+                logger.info(f"resend_email_sent to={_mask_email(to_email)}")
+                return True
+            logger.warning(f"resend_api_failed status={resp.status_code} body={resp.text[:200]}")
+            return False
+    except Exception as e:
+        logger.warning(f"resend_network_error error={e}")
+        return False
+
+
 def _detect_smtp(email: str) -> tuple[str, int, str]:
     """从发件邮箱域名自动检测 SMTP 服务器、端口和提供商名。
 
@@ -80,7 +126,13 @@ def _detect_smtp(email: str) -> tuple[str, int, str]:
 
 
 async def send_verification_email(target_email: str, code: str) -> None:
-    """发送验证码邮件 — 自动检测 SMTP 服务器（可手动覆盖）"""
+    """发送验证码邮件 — 优先 Resend API，回退 SMTP"""
+
+    # 优先尝试 Resend HTTP API（绕过 Railway SMTP 封锁）
+    if settings.RESEND_API_KEY:
+        if await _send_via_resend(target_email, code):
+            return
+        # Resend 失败，继续尝试 SMTP
 
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         raise EmailSendError(
