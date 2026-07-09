@@ -168,8 +168,9 @@ async def register_user(
 
     result = await db.execute(
         _t(
-            "INSERT INTO users (username, phone, email, password_hash, nickname) "
-            "VALUES (:u, :p, :e, :pw, :n) "
+            "INSERT INTO users (username, phone, email, password_hash, nickname, "
+            "role, is_active, plan, created_at, updated_at) "
+            "VALUES (:u, :p, :e, :pw, :n, 'user', TRUE, 'free', NOW(), NOW()) "
             "ON CONFLICT DO NOTHING RETURNING id"
         ),
         {"u": username, "p": phone, "e": email, "pw": pwd, "n": nick},
