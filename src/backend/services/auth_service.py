@@ -297,6 +297,7 @@ async def verify_code_and_login(
 
     target 可以是手机号或邮箱。若用户不存在则自动注册（验证码登录模式）。
     """
+    from sqlalchemy import text as _t
     # 使用 naive UTC datetime（兼容 PostgreSQL 无时区列）
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     # 检查最近 5 分钟内该 target 的失败验证尝试次数（LoginAttempt 表），防止暴力破解
