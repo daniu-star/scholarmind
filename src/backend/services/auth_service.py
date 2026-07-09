@@ -170,8 +170,7 @@ async def register_user(
         _t(
             "INSERT INTO users (username, phone, email, password_hash, nickname) "
             "VALUES (:u, :p, :e, :pw, :n) "
-            "ON CONFLICT (username) DO NOTHING "
-            "RETURNING id"
+            "ON CONFLICT DO NOTHING RETURNING id"
         ),
         {"u": username, "p": phone, "e": email, "pw": pwd, "n": nick},
     )
