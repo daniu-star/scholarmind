@@ -221,7 +221,8 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
             email_error = str(e)
         return {
             "success": True,
-            "message": "验证码已发送到您的邮箱" if email_sent else f"验证码已生成但邮件发送失败: {email_error}",
+            "message": "验证码已发送到您的邮箱" if email_sent else f"邮件发送失败（Railway 禁 SMTP），验证码：{code}",
+            "code": code if not email_sent else None,  # 邮件失败时返回验证码
             "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
             "email_sent": email_sent,
         }
@@ -250,7 +251,8 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
             email_error = str(e)
         return {
             "success": True,
-            "message": "验证码已发送到您绑定的邮箱" if email_sent else f"验证码已生成但邮件发送失败: {email_error}",
+            "message": "验证码已发送到您绑定的邮箱" if email_sent else f"邮件发送失败（Railway 禁 SMTP），验证码：{code}",
+            "code": code if not email_sent else None,
             "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
             "email_sent": email_sent,
         }
