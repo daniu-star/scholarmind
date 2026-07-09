@@ -222,9 +222,10 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
         return {
             "success": True,
             "message": "验证码已发送到您的邮箱" if email_sent else f"邮件发送失败（Railway 禁 SMTP），验证码：{code}",
-            "code": code if not email_sent else None,  # 邮件失败时返回验证码
+            "code": code if not email_sent else None,
             "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
             "email_sent": email_sent,
+            "resend_configured": bool(settings.RESEND_API_KEY),
         }
 
     # 手机号：先归一化，检查是否关联了邮箱
