@@ -297,7 +297,7 @@ async def login(req: LoginRequest, db=Depends(get_db)):
             select(User).where((User.phone == identifier) | (User.email == identifier))
         )
         user_record = existing.scalar_one_or_none()
-        if user_record and user_record.locked_until and user_record.locked_until > datetime.now(timezone.utc):
+        if user_record and user_record.locked_until and user_record.locked_until > datetime.now(timezone.utc).replace(tzinfo=None):
             raise HTTPException(status_code=429, detail="账户已被临时锁定，请15分钟后重试")
 
     if req.code:
@@ -338,7 +338,7 @@ async def login(req: LoginRequest, db=Depends(get_db)):
         failed_user = user_result.scalar_one_or_none()
         if failed_user:
             new_count = (failed_user.failed_login_attempts or 0) + 1
-            lock_time = datetime.now(timezone.utc) + timedelta(minutes=15) if new_count >= 5 else None
+            lock_time = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15) if new_count >= 5 else None
             await db.execute(
                 _t("UPDATE users SET failed_login_attempts=:c, locked_until=:lt WHERE id=:uid"),
                 {"c": new_count, "lt": lock_time, "uid": failed_user.id},

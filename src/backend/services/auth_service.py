@@ -233,7 +233,7 @@ async def create_code(
     Returns:
         生成的验证码字符串
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
         seconds=settings.VERIFICATION_CODE_RATE_LIMIT_SECONDS
     )
     recent = await db.execute(
@@ -245,7 +245,7 @@ async def create_code(
         raise ValueError("验证码发送过于频繁，请稍后再试")
 
     code = generate_verification_code()
-    expires_at = datetime.now(timezone.utc) + timedelta(
+    expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
         minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES
     )
 
@@ -297,7 +297,8 @@ async def verify_code_and_login(
 
     target 可以是手机号或邮箱。若用户不存在则自动注册（验证码登录模式）。
     """
-    now = datetime.now(timezone.utc)
+    # 使用 naive UTC datetime（兼容 PostgreSQL 无时区列）
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     # 检查最近 5 分钟内该 target 的失败验证尝试次数（LoginAttempt 表），防止暴力破解
     failed_window = now - timedelta(minutes=5)
     failed_count = await db.scalar(
