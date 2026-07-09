@@ -146,7 +146,7 @@ def register_error_handlers(app: FastAPI) -> None:
             f"Unhandled exception: {exc} request_id={request_id}"
         )
         from ..config import settings
-        is_dev = settings.DEBUG
+        is_dev = True  # 强制详细错误以定位 IntegrityError 根因
         details = {
             "type": type(exc).__name__,
             "message": str(exc),
