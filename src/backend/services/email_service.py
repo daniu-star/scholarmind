@@ -67,13 +67,22 @@ class EmailSendError(RuntimeError):
     pass
 
 
+_last_resend_error: str | None = None
+
+
+def get_last_resend_error() -> str | None:
+    return _last_resend_error
+
+
 async def _send_via_resend(to_email: str, code: str) -> bool:
     """通过 Resend HTTP API 发送邮件（绕过 Railway SMTP 封锁，走 HTTPS 443）。
 
     Returns:
         True 表示发送成功，False 表示不可用（未配置 API Key 或发送失败）
     """
+    global _last_resend_error
     if not settings.RESEND_API_KEY:
+        _last_resend_error = "RESEND_API_KEY not configured"
         return False
 
     import httpx
@@ -104,11 +113,14 @@ async def _send_via_resend(to_email: str, code: str) -> bool:
                 },
             )
             if resp.status_code in (200, 201):
+                _last_resend_error = None
                 logger.info(f"resend_email_sent to={_mask_email(to_email)}")
                 return True
+            _last_resend_error = f"Resend HTTP {resp.status_code}: {resp.text[:200]}"
             logger.warning(f"resend_api_failed status={resp.status_code} body={resp.text[:200]}")
             return False
     except Exception as e:
+        _last_resend_error = f"Resend network: {e}"
         logger.warning(f"resend_network_error error={e}")
         return False
 

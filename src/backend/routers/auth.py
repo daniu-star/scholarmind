@@ -226,6 +226,7 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
             "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
             "email_sent": email_sent,
             "resend_configured": bool(settings.RESEND_API_KEY),
+            "resend_error": None if email_sent else (__import__('src.backend.services.email_service', fromlist=['get_last_resend_error']).get_last_resend_error()),
         }
 
     # 手机号：先归一化，检查是否关联了邮箱
