@@ -34,7 +34,8 @@ async def create_code(db, target: str, purpose: str = "login") -> str:
     from datetime import datetime, timezone, timedelta
     from sqlalchemy import text as _t, select
 
-    cutoff = datetime.now(timezone.utc) - timedelta(
+    # 使用 naive UTC datetime（兼容 PostgreSQL DateTime 无时区列）
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
         seconds=settings.VERIFICATION_CODE_RATE_LIMIT_SECONDS
     )
     recent = await db.execute(
@@ -46,7 +47,7 @@ async def create_code(db, target: str, purpose: str = "login") -> str:
         raise ValueError("验证码发送过于频繁，请稍后再试")
 
     code = str(secrets.randbelow(900000) + 100000)
-    expires_at = datetime.now(timezone.utc) + timedelta(
+    expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(
         minutes=settings.VERIFICATION_CODE_EXPIRE_MINUTES
     )
     await db.execute(
