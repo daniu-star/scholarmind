@@ -68,13 +68,25 @@ class EntitlementService:
         )
         quota = result.scalar_one_or_none()
         if quota is None:
-            quota = UserQuota(
-                user_id=user_id,
-                free_chat_limit=settings.FREE_CHAT_LIMIT,
-                model_tier="flash",
+            # 使用原始 SQL 插入（避免 ORM 的 NOT NULL 默认值问题）
+            from sqlalchemy import text as _t
+            await db.execute(
+                _t(
+                    "INSERT INTO user_quotas (user_id, tokens_used, tokens_limit, plan, "
+                    "free_chats_used, free_chat_limit, generation_credits, "
+                    "shared_pipeline_credits, model_tier, created_at, updated_at) "
+                    "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 0, 0, 'flash', NOW(), NOW())"
+                    " ON CONFLICT (user_id) DO NOTHING"
+                ),
+                {"uid": user_id, "limit": settings.FREE_TIER_TOKEN_LIMIT,
+                 "chat_limit": settings.FREE_CHAT_LIMIT},
             )
-            db.add(quota)
             await db.flush()
+            # 重新查询以获取 ORM 对象
+            result2 = await db.execute(
+                select(UserQuota).where(UserQuota.user_id == user_id)
+            )
+            quota = result2.scalar_one()
         return quota
 
     @staticmethod

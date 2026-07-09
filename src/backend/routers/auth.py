@@ -137,6 +137,18 @@ def _public_user(user: User, entitlements: dict | None = None) -> dict:
     }
 
 
+async def _record_login_attempt(db, identifier: str, success: bool, reason: str | None = None) -> None:
+    """使用原始 SQL 记录登录尝试（避免 LoginAttempt ORM INSERT 的 NOT NULL 问题）"""
+    from sqlalchemy import text as _t
+    await db.execute(
+        _t(
+            "INSERT INTO login_attempts (identifier, success, failure_reason, created_at) "
+            "VALUES (:id, :ok, :reason, NOW())"
+        ),
+        {"id": identifier or "", "ok": success, "reason": reason},
+    )
+
+
 async def _token_response(db, user: User) -> TokenResponse:
     claims = {"sub": str(user.id)}
     entitlements = await EntitlementService.get_snapshot(db, user.id)
@@ -295,10 +307,10 @@ async def login(req: LoginRequest, db=Depends(get_db)):
             raise HTTPException(status_code=422, detail="请提供邮箱或手机号")
         user = await verify_code_and_login(db, target, req.code)
         if not user or not user.is_active:
-            db.add(LoginAttempt(identifier=identifier, success=False, failure_reason="invalid_code"))
+            await _record_login_attempt(db, identifier, False, "invalid_code")
             await db.commit()
             raise HTTPException(status_code=401, detail="验证码错误或已过期")
-        db.add(LoginAttempt(identifier=identifier, success=True))
+        await _record_login_attempt(db, identifier, True)
         return await _token_response(db, user)
 
     # 密码登录（支持手机号和邮箱）
@@ -309,24 +321,33 @@ async def login(req: LoginRequest, db=Depends(get_db)):
         raise HTTPException(status_code=422, detail="请提供邮箱或手机号")
     user = await authenticate_user(db, auth_identifier, req.password)
     if not user or not user.is_active:
-        db.add(LoginAttempt(identifier=identifier, success=False,
-            failure_reason="locked" if (user and not user.is_active) else "invalid_password"))
+        await _record_login_attempt(
+            db, identifier, False,
+            "locked" if (user and not user.is_active) else "invalid_password"
+        )
         # 记录登录失败并锁定（5 次失败后锁定 15 分钟）
+        from sqlalchemy import text as _t
         user_result = await db.execute(
             select(User).where((User.phone == auth_identifier) | (User.email == auth_identifier))
         )
         failed_user = user_result.scalar_one_or_none()
         if failed_user:
-            failed_user.failed_login_attempts = (failed_user.failed_login_attempts or 0) + 1
-            if failed_user.failed_login_attempts >= 5:
-                failed_user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+            new_count = (failed_user.failed_login_attempts or 0) + 1
+            lock_time = datetime.now(timezone.utc) + timedelta(minutes=15) if new_count >= 5 else None
+            await db.execute(
+                _t("UPDATE users SET failed_login_attempts=:c, locked_until=:lt WHERE id=:uid"),
+                {"c": new_count, "lt": lock_time, "uid": failed_user.id},
+            )
             await db.commit()
         raise HTTPException(status_code=401, detail="邮箱/手机号或密码错误")
     # 登录成功：重置失败计数 + 记录审计日志
+    from sqlalchemy import text as _t2
     if user.failed_login_attempts > 0:
-        user.failed_login_attempts = 0
-        user.locked_until = None
-    db.add(LoginAttempt(identifier=identifier, success=True))
+        await db.execute(
+            _t2("UPDATE users SET failed_login_attempts=0, locked_until=NULL WHERE id=:uid"),
+            {"uid": user.id},
+        )
+    await _record_login_attempt(db, identifier, True)
     return await _token_response(db, user)
 
 
