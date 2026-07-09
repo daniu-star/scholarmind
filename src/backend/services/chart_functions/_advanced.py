@@ -7,10 +7,7 @@ import structlog
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
-from matplotlib.colors import LinearSegmentedColormap
-from scipy.stats import gaussian_kde
 import seaborn as sns
 import pandas as pd
 

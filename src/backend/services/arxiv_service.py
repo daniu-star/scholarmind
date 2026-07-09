@@ -4,34 +4,18 @@ import asyncio
 import structlog
 import time
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass, asdict
 from typing import Optional
 
 import httpx
+
+from ..models.dto.scholar import AcademicPaper
+from ..utils.cache import CacheManager
 
 logger = structlog.get_logger(__name__)
 
 # arXiv Atom XML 命名空间
 _ATOM_NS = "{http://www.w3.org/2005/Atom}"
 _ARXIV_NS = "{http://arxiv.org/schemas/atom}"
-
-
-@dataclass
-class AcademicPaper:
-    """统一学术文献数据结构"""
-
-    title: str
-    authors: list[str]
-    year: Optional[int]
-    abstract: Optional[str]
-    citation_count: int  # arXiv 不提供引用数，固定为 0
-    url: str  # arXiv 摘要页 URL
-    source: str  # 固定为 "arxiv"
-    doi: Optional[str]
-    pdf_url: Optional[str]
-
-    def to_dict(self) -> dict:
-        return asdict(self)
 
 
 class ArxivService:
@@ -49,11 +33,13 @@ class ArxivService:
     def __init__(self) -> None:
         self._client: Optional[httpx.AsyncClient] = None
         self._last_request_time: float = 0.0
-        # 内存缓存：key -> (results, timestamp)
-        self._cache: dict[str, tuple[list[AcademicPaper], float]] = {}
+        self._cache = CacheManager(default_ttl=self.CACHE_TTL)
+
+    @staticmethod
+    def _cache_key(query: str, count: int) -> str:
+        return f"arxiv:{query}|{count}"
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """获取或创建 httpx 异步客户端"""
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(
                 timeout=self.TIMEOUT,
@@ -63,27 +49,6 @@ class ArxivService:
                 },
             )
         return self._client
-
-    def _cache_key(self, query: str, count: int) -> str:
-        """生成缓存键：查询词 + count"""
-        return f"arxiv:{query}|{count}"
-
-    def _get_cached(self, key: str) -> Optional[list[AcademicPaper]]:
-        """获取缓存结果"""
-        if key in self._cache:
-            results, ts = self._cache[key]
-            if time.time() - ts < self.CACHE_TTL:
-                return results
-            del self._cache[key]
-        return None
-
-    def _set_cached(self, key: str, results: list[AcademicPaper]) -> None:
-        """设置缓存，并清理过期条目"""
-        self._cache[key] = (results, time.time())
-        now = time.time()
-        expired = [k for k, (_, ts) in self._cache.items() if now - ts > self.CACHE_TTL]
-        for k in expired:
-            del self._cache[k]
 
     async def _enforce_rate_limit(self) -> None:
         """速率限制：确保请求间隔至少 3 秒"""
@@ -96,7 +61,7 @@ class ArxivService:
         """检索 arXiv"""
         # 检查缓存
         cache_key = self._cache_key(query, count)
-        cached = self._get_cached(cache_key)
+        cached = self._cache.get(cache_key)
         if cached is not None:
             logger.info(f"arXiv cache hit for query: {query}")
             return cached
@@ -132,7 +97,7 @@ class ArxivService:
             return []
 
         # 写入缓存
-        self._set_cached(cache_key, papers)
+        self._cache.set(cache_key, papers)
         logger.info(f"arXiv 检索返回 {len(papers)} 条结果（query={query}）")
         return papers
 

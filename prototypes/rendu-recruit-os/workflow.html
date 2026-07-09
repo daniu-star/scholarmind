@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="任度 AI 招聘中枢完整工作流。">
+  <title>完整工作流｜任度 AI 招聘中枢</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a>
+      <nav class="site-nav"><a class="nav-link" href="index.html">首页</a><a class="nav-link" href="screening.html">闪电筛</a><a class="nav-link" href="interview.html">急速面</a><a class="nav-link active" href="workflow.html">工作流</a><a class="nav-link" href="demo.html">演示中心</a></nav>
+      <div class="header-actions"><button class="button-quiet" type="button" data-login>登录</button><button class="button primary" type="button" data-start>开始体验<span data-icon="arrow"></span></button><button class="button-icon mobile-menu-button" type="button" aria-label="打开菜单"><span data-icon="menu"></span></button></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero workflow-hero">
+      <div class="shell">
+        <div class="eyebrow">One project, one evidence trail</div>
+        <h1 class="page-title">七个阶段，<br>一条不断裂的招聘主线</h1>
+        <p class="page-lead">每一步都明确区分用户动作、系统处理、AI 判断与交付物。用户不需要理解系统结构，只需要知道现在做什么、完成后会得到什么。</p>
+
+        <div class="workflow-map">
+          <div class="workflow-tabs" role="tablist" aria-label="招聘工作流">
+            <button class="workflow-tab active" type="button" data-workflow-tab='{"index":"01 / 07","title":"创建招聘项目","copy":"职位成为简历、候选人、面试与报告的共同上下文。","user":"填写职位名称与 JD","system":"建立项目与权限范围","output":"结构化招聘项目","next":"导入候选人简历"}'><span class="tab-node" data-icon="briefcase"></span><strong>创建职位</strong></button>
+            <button class="workflow-tab" type="button" data-workflow-tab='{"index":"02 / 07","title":"导入简历","copy":"本地文件与邮箱任务进入同一队列，状态始终可见。","user":"选择项目与导入方式","system":"上传、去重与排队","output":"待解析文件队列","next":"启动结构化解析"}'><span class="tab-node" data-icon="upload"></span><strong>导入简历</strong></button>
+            <button class="workflow-tab" type="button" data-workflow-tab='{"index":"03 / 07","title":"智能解析","copy":"提取履历字段，同时保留原文位置和异常状态。","user":"确认文件与异常项","system":"提取教育、经历与技能","output":"结构化候选人信息","next":"配置筛选条件"}'><span class="tab-node" data-icon="scan"></span><strong>智能解析</strong></button>
+            <button class="workflow-tab" type="button" data-workflow-tab='{"index":"04 / 07","title":"AI 匹配","copy":"规则保证底线，AI 判断经历与职位的真实相关性。","user":"确认条件并启动匹配","system":"规则预筛与语义分析","output":"排序、命中点与风险","next":"确认候选名单"}'><span class="tab-node" data-icon="spark"></span><strong>AI 匹配</strong></button>
+            <button class="workflow-tab" type="button" data-workflow-tab='{"index":"05 / 07","title":"候选入库","copy":"招聘团队确认值得进一步判断的人，并保留完整筛选上下文。","user":"加入候选库或忽略","system":"更新候选人阶段","output":"待面试候选名单","next":"安排 AI 面试"}'><span class="tab-node" data-icon="users"></span><strong>候选入库</strong></button>
+            <button class="workflow-tab" type="button" data-workflow-tab='{"index":"06 / 07","title":"AI 面试","copy":"围绕真实经历持续追问，将回答转化为可复核的能力证据。","user":"选择模式并发送邀请","system":"动态出题与状态记录","output":"问答记录与评分","next":"生成评估报告"}'><span class="tab-node" data-icon="message"></span><strong>AI 面试</strong></button>
+            <button class="workflow-tab" type="button" data-workflow-tab='{"index":"07 / 07","title":"证据链报告","copy":"结论、评分与风险都能回到对应简历或问答证据。","user":"查看、复核与分享","system":"组织结论和证据","output":"企业级评估报告","next":"终面或招聘决策"}'><span class="tab-node" data-icon="file"></span><strong>证据报告</strong></button>
+          </div>
+        </div>
+
+        <div class="workflow-detail" role="tabpanel">
+          <div class="workflow-detail-copy">
+            <span data-flow-index>01 / 07</span>
+            <h2 data-flow-title>创建招聘项目</h2>
+            <p data-flow-copy>职位成为简历、候选人、面试与报告的共同上下文。</p>
+          </div>
+          <div class="workflow-matrix">
+            <div class="matrix-cell"><small>用户动作</small><strong data-flow-user>填写职位名称与 JD</strong><p>只保留当前阶段需要的信息。</p></div>
+            <div class="matrix-cell"><small>系统动作</small><strong data-flow-system>建立项目与权限范围</strong><p>所有数据归入同一条招聘主线。</p></div>
+            <div class="matrix-cell"><small>阶段输出</small><strong data-flow-output>结构化招聘项目</strong><p>状态、负责人和目标清晰可见。</p></div>
+            <div class="matrix-cell"><small>下一步</small><strong data-flow-next>导入候选人简历</strong><p>页面始终给出明确主动作。</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section white">
+      <div class="shell editorial-split">
+        <div class="editorial-label">Design logic / 02</div>
+        <div class="editorial-content">
+          <h2>流程不是一条装饰性进度条，而是页面之间共享的任务上下文。</h2>
+          <p>用户在任何阶段都能看到当前项目、已完成数量、阻塞事项与下一步。完成简历导入后，主动作变为“开始 AI 匹配”；匹配完成后，主动作变为“确认候选人并发起面试”。</p>
+          <div class="detail-list">
+            <div class="detail-item"><span>01</span><strong>保持上下文</strong><p>项目、候选人、状态和筛选条件在页面切换中持续存在。</p></div>
+            <div class="detail-item"><span>02</span><strong>说明阻塞</strong><p>没有项目、没有简历或解析失败时，空状态说明原因与解决办法。</p></div>
+            <div class="detail-item"><span>03</span><strong>交付下一步</strong><p>每个阶段的结果都可以直接驱动下一个动作，而不是仅供查看。</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section"><div class="shell"><div class="cta-card"><div><h2>准备好从第一个招聘项目开始了吗？</h2><p>先看 5 步教程，再进入完整工作台。</p></div><div class="cta-actions"><button class="button light" type="button" data-start>开始体验<span data-icon="arrow"></span></button><a class="button-quiet" style="color:white" href="demo.html">观看演示</a></div></div></div></section>
+  </main>
+  <footer class="site-footer"><div class="shell"><div class="footer-bottom" style="margin-top:0"><a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a><span>一条流程 · 一条证据链</span><span>演示数据 · 不提交真实账号</span></div></div></footer>
+  <script src="site.js?v=2"></script>
+</body>
+</html>

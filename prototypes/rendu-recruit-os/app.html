@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="任度 AI 招聘工作台原型。">
+  <title>工作台｜任度 AI 招聘中枢</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body class="app-body">
+  <div class="app-layout">
+    <aside class="app-sidebar">
+      <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a>
+      <nav class="app-nav-section" aria-label="招聘流程">
+        <div class="app-nav-label">招聘流程</div>
+        <a class="app-nav-link active" href="app.html"><span data-icon="layout"></span><span>工作台</span></a>
+        <a class="app-nav-link" href="#" data-prototype-action data-message="招聘项目页将在下一轮扩展"><span data-icon="briefcase"></span><span>招聘项目</span></a>
+        <a class="app-nav-link" href="#" data-prototype-action data-message="简历导入页将在下一轮扩展"><span data-icon="upload"></span><span>简历导入</span></a>
+        <a class="app-nav-link" href="screening-workbench.html"><span data-icon="scan"></span><span>智能筛选</span></a>
+        <a class="app-nav-link" href="#" data-prototype-action data-message="AI 面试列表将在下一轮扩展"><span data-icon="message"></span><span>AI 面试</span></a>
+      </nav>
+      <nav class="app-nav-section" aria-label="人才资产">
+        <div class="app-nav-label">人才资产</div>
+        <a class="app-nav-link" href="#" data-prototype-action data-message="候选人库将在下一轮扩展"><span data-icon="users"></span><span>候选人库</span></a>
+        <a class="app-nav-link" href="report.html"><span data-icon="file"></span><span>报告中心</span></a>
+        <a class="app-nav-link" href="#" data-prototype-action data-message="数据看板将在下一轮扩展"><span data-icon="chart"></span><span>数据看板</span></a>
+      </nav>
+      <nav class="app-nav-section" aria-label="组织管理">
+        <div class="app-nav-label">组织管理</div>
+        <a class="app-nav-link" href="#" data-prototype-action data-message="额度与支付将在下一轮扩展"><span data-icon="wallet"></span><span>额度与支付</span></a>
+        <a class="app-nav-link" href="#" data-prototype-action data-message="组织设置将在下一轮扩展"><span data-icon="settings"></span><span>组织设置</span></a>
+      </nav>
+      <div class="app-sidebar-footer"><small>当前组织</small><strong>任度产品体验团队</strong></div>
+    </aside>
+
+    <main class="app-main">
+      <header class="app-topbar">
+        <button class="project-switcher" type="button" data-prototype-action data-message="已打开招聘项目切换器">
+          <span class="avatar-mini">AI</span><span><small>当前招聘项目</small><strong>AI 产品经理 · 北京</strong></span><span data-icon="chevron"></span>
+        </button>
+        <div class="topbar-actions">
+          <button class="button-icon" type="button" aria-label="帮助" data-replay-tutorial><span data-icon="help"></span></button>
+          <button class="button-icon" type="button" aria-label="通知" data-prototype-action data-message="暂无新的系统通知"><span data-icon="bell"></span></button>
+          <div class="user-chip"><span class="user-avatar">HR</span><span>林澈</span></div>
+        </div>
+      </header>
+
+      <div class="app-content">
+        <div class="app-page-head">
+          <div><h1>下午好，林澈</h1><p>AI 产品经理项目已完成简历解析，下一步需要确认匹配结果。</p></div>
+          <div class="app-head-actions"><button class="button light" type="button" data-replay-tutorial><span data-icon="play"></span>使用教程</button><button class="button primary" type="button" data-prototype-action data-message="已打开新建招聘项目流程"><span data-icon="briefcase"></span>新建项目</button></div>
+        </div>
+
+        <section class="next-action">
+          <div class="next-action-icon"><span data-icon="spark"></span></div>
+          <div><small>Recommended next action</small><strong>32 份简历已完成解析，可以开始 AI 匹配</strong></div>
+          <a class="button teal small" href="screening-workbench.html">开始匹配<span data-icon="arrow"></span></a>
+        </section>
+
+        <section class="app-pipeline" aria-label="招聘流程进度">
+          <div class="app-pipeline-step complete"><small>01</small><strong>创建职位</strong></div>
+          <div class="app-pipeline-step complete"><small>02</small><strong>导入简历</strong></div>
+          <div class="app-pipeline-step complete"><small>03</small><strong>智能解析</strong></div>
+          <div class="app-pipeline-step current"><small>04</small><strong>AI 匹配</strong></div>
+          <div class="app-pipeline-step"><small>05</small><strong>候选入库</strong></div>
+          <div class="app-pipeline-step"><small>06</small><strong>AI 面试</strong></div>
+          <div class="app-pipeline-step"><small>07</small><strong>证据报告</strong></div>
+        </section>
+
+        <section class="metric-grid">
+          <article class="metric-card"><div class="metric-card-head"><span>已导入简历</span><span data-icon="upload"></span></div><strong>128</strong><small>本周新增 32 份</small></article>
+          <article class="metric-card"><div class="metric-card-head"><span>已完成解析</span><span data-icon="scan"></span></div><strong>122</strong><small>6 份需要人工确认</small></article>
+          <article class="metric-card"><div class="metric-card-head"><span>推荐候选人</span><span data-icon="users"></span></div><strong>18</strong><small>5 人建议优先面试</small></article>
+          <article class="metric-card"><div class="metric-card-head"><span>已生成报告</span><span data-icon="file"></span></div><strong>7</strong><small>2 份等待业务复核</small></article>
+        </section>
+
+        <section class="dashboard-grid">
+          <article class="app-card">
+            <div class="app-card-head"><h2>今日待办</h2><button type="button" data-prototype-action data-message="已打开全部待办">查看全部</button></div>
+            <div class="task-row"><div class="task-icon"><span data-icon="scan"></span></div><div><strong>确认 AI 产品经理匹配结果</strong><small>系统已完成 32 份简历分析</small></div><span class="task-count">32</span></div>
+            <div class="task-row"><div class="task-icon"><span data-icon="message"></span></div><div><strong>发送面试邀请</strong><small>3 位候选人已进入待面试状态</small></div><span class="task-count">3</span></div>
+            <div class="task-row"><div class="task-icon"><span data-icon="file"></span></div><div><strong>复核面试报告</strong><small>报告包含 2 项风险复核建议</small></div><span class="task-count">2</span></div>
+          </article>
+
+          <article class="app-card">
+            <div class="app-card-head"><h2>项目节奏</h2><button type="button" data-prototype-action data-message="已打开项目数据详情">查看详情</button></div>
+            <div class="score-bars">
+              <div><div class="score-bar-label"><span>简历解析</span><strong>95%</strong></div><div class="score-bar-track"><i style="width:95%"></i></div></div>
+              <div><div class="score-bar-label"><span>匹配确认</span><strong>42%</strong></div><div class="score-bar-track"><i style="width:42%"></i></div></div>
+              <div><div class="score-bar-label"><span>面试完成</span><strong>18%</strong></div><div class="score-bar-track"><i style="width:18%"></i></div></div>
+              <div><div class="score-bar-label"><span>报告复核</span><strong>12%</strong></div><div class="score-bar-track"><i style="width:12%"></i></div></div>
+            </div>
+          </article>
+        </section>
+
+        <section class="app-card" style="margin-top:18px">
+          <div class="app-card-head"><h2>最近候选人</h2><a href="screening-workbench.html">进入智能筛选</a></div>
+          <div class="candidate-table-wrap">
+            <table class="candidate-table">
+              <thead><tr><th>候选人</th><th>目标职位</th><th>匹配度</th><th>当前状态</th><th>最近更新</th></tr></thead>
+              <tbody>
+                <tr><td><div class="table-person"><span class="avatar-mini">林</span><span>林屿</span></div></td><td>AI 产品经理</td><td><strong style="color:var(--blue)">92</strong></td><td><span class="status info">待确认</span></td><td>今天 14:32</td></tr>
+                <tr><td><div class="table-person"><span class="avatar-mini">陈</span><span>陈澄</span></div></td><td>AI 产品经理</td><td><strong style="color:var(--blue)">87</strong></td><td><span class="status success">待面试</span></td><td>今天 13:08</td></tr>
+                <tr><td><div class="table-person"><span class="avatar-mini">周</span><span>周岚</span></div></td><td>增长产品经理</td><td><strong style="color:var(--blue)">81</strong></td><td><span class="status warning">待复核</span></td><td>昨天 18:24</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="site.js?v=2"></script>
+</body>
+</html>

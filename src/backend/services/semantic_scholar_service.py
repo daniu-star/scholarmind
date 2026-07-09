@@ -9,31 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import structlog
-import time
-from dataclasses import dataclass, asdict
 from typing import Optional, Any
 
 import httpx
 
+from ..models.dto.scholar import AcademicPaper
+from ..utils.cache import CacheManager
+
 logger = structlog.get_logger(__name__)
-
-
-@dataclass
-class AcademicPaper:
-    """统一的学术文献数据结构"""
-
-    title: str
-    authors: list[str]
-    year: Optional[int]
-    abstract: Optional[str]
-    citation_count: int
-    url: str
-    source: str = "semantic_scholar"  # 固定为 "semantic_scholar"
-    doi: Optional[str] = None
-    pdf_url: Optional[str] = None
-
-    def to_dict(self) -> dict:
-        return asdict(self)
 
 
 class SemanticScholarService:
@@ -75,14 +58,10 @@ class SemanticScholarService:
         self.deepseek_base_url = deepseek_base_url.rstrip("/")
         self.deepseek_model = deepseek_model
 
-        # 内存缓存：key -> (results, timestamp)
-        self._cache: dict[str, tuple[list[AcademicPaper], float]] = {}
-
-        # 复用 httpx 异步客户端
+        self._cache = CacheManager(default_ttl=self.CACHE_TTL)
         self._client: Optional[httpx.AsyncClient] = None
 
     async def _get_client(self) -> httpx.AsyncClient:
-        """获取（或创建）复用的 httpx 异步客户端"""
         if self._client is None or self._client.is_closed:
             headers: dict[str, str] = {
                 "Accept": "application/json",
@@ -96,29 +75,9 @@ class SemanticScholarService:
             )
         return self._client
 
-    # ── 缓存相关 ────────────────────────────────────────────
-
-    def _cache_key(self, query: str, limit: int) -> str:
-        """生成缓存键：查询词 + limit"""
+    @staticmethod
+    def _cache_key(query: str, limit: int) -> str:
         return f"semantic_scholar:{query}|{limit}"
-
-    def _get_cached(self, key: str) -> Optional[list[AcademicPaper]]:
-        """获取缓存结果，过期则清除"""
-        if key not in self._cache:
-            return None
-        results, ts = self._cache[key]
-        if time.time() - ts < self.CACHE_TTL:
-            return results
-        del self._cache[key]
-        return None
-
-    def _set_cached(self, key: str, results: list[AcademicPaper]) -> None:
-        """设置缓存并清理过期项"""
-        self._cache[key] = (results, time.time())
-        now = time.time()
-        expired = [k for k, (_, ts) in self._cache.items() if now - ts > self.CACHE_TTL]
-        for k in expired:
-            del self._cache[k]
 
     # ── 中文关键词翻译 ──────────────────────────────────────
 
@@ -336,7 +295,7 @@ class SemanticScholarService:
 
         # 检查缓存
         cache_key = self._cache_key(query, limit)
-        cached = self._get_cached(cache_key)
+        cached = self._cache.get(cache_key)
         if cached is not None:
             logger.info(f"Semantic Scholar 缓存命中：{query!r}")
             return cached[:limit]
@@ -374,7 +333,7 @@ class SemanticScholarService:
             return []
 
         if results:
-            self._set_cached(cache_key, results)
+            self._cache.set(cache_key, results)
             logger.info(
                 f"Semantic Scholar 检索 {query!r} 返回 {len(results)} 条结果"
             )

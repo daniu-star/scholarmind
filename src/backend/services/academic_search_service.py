@@ -13,7 +13,6 @@ import time
 from datetime import datetime
 from typing import Any, Optional, TYPE_CHECKING
 
-from ..config import settings
 from ..utils.cache import CacheManager
 
 if TYPE_CHECKING:

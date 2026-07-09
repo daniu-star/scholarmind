@@ -23,46 +23,25 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any, Optional
 
+from ..config import settings
 from ..db.pipeline_state_repo import get_pipeline_state_repo
+from .pipeline_utils import (
+    RESEARCH_TYPE_MAP,
+    OUTPUT_FORMAT_MAP,
+    check_pipeline_ownership,
+)
 
 logger = structlog.get_logger(__name__)
 
-# P0 修复: 审稿 Pipeline 并发控制 + 超时
-_REVIEW_SEMAPHORE = asyncio.Semaphore(2)
-_REVIEW_TIMEOUT_SECONDS = 600
-_REVIEW_ROUND_TIMEOUT_SECONDS = 120
+# P0 修复: 审稿 Pipeline 并发控制 + 超时（从 config 读取）
+_REVIEW_SEMAPHORE = asyncio.Semaphore(settings.REVIEW_MAX_CONCURRENCY)
+_REVIEW_TIMEOUT_SECONDS = settings.REVIEW_TIMEOUT_SECONDS
+_REVIEW_ROUND_TIMEOUT_SECONDS = settings.REVIEW_ROUND_TIMEOUT_SECONDS
 
 # ── 技能目录路径（P4-T7：从环境变量读取，避免硬编码） ─────
 _SKILLS_BASE = os.environ.get('SKILLS_DIR', str(Path.home() / ".trae-cn" / "skills"))
 SKILL_DIR = Path(_SKILLS_BASE) / "cyclical-paper-review"
 PIPELINE_DIR = SKILL_DIR / "pipeline"
-
-# ── 研究类型映射（前端值 → Pipeline 值）──────────────────
-RESEARCH_TYPE_MAP = {
-    "quantitative": "quantitative",
-    "qualitative": "qualitative",
-    "mixed": "mixed",
-    "computational": "computational",
-    "theoretical": "theoretical",
-    "interview_report": "interview_report",
-    # 中文别名
-    "量化研究": "quantitative",
-    "质性研究": "qualitative",
-    "混合方法": "mixed",
-    "混合": "mixed",
-    "计算社会科学": "computational",
-    "理论论文": "theoretical",
-    "访谈报告": "interview_report",
-}
-
-# ── 输出格式映射（前端值 → Pipeline 值）──────────────────
-_OUTPUT_FORMAT_MAP = {
-    "docx": "word",
-    "word": "word",
-    "markdown": "markdown",
-    "md": "markdown",
-    "txt": "markdown",
-}
 
 # ── 9 Agent 执行顺序（用于进度计算）──────────────────────
 AGENT_EXECUTION_ORDER = [
@@ -89,9 +68,8 @@ _PipelineConfig = None
 def _try_import_pipeline() -> bool:
     """尝试导入 cyclical-paper-review 的 Pipeline 模块
 
-    修复历史 Bug：原代码导入 `create_review_pipeline, run_review_pipeline`，
-    但技能实际导出 `create_pipeline, run_pipeline`，导致静默 ImportError
-    永远降级为模拟模式。
+    使用 importlib 直接加载技能目录中的模块，避免与 cyclical-paper-generation
+    的 pipeline.loop_controller 发生模块名冲突。
     """
     global _PIPELINE_AVAILABLE, _pipeline_create, _pipeline_run, _PipelineConfig
 
@@ -103,19 +81,25 @@ def _try_import_pipeline() -> bool:
         return False
 
     try:
-        skill_path = str(SKILL_DIR)
-        if skill_path not in sys.path:
-            sys.path.insert(0, skill_path)
-
         import langgraph  # noqa: F401
 
-        # 修复：技能实际导出的是 create_pipeline / run_pipeline（与生成 Pipeline 同名）
+        _saved_path = list(sys.path)
+        _cleared = {}
+        for k in list(sys.modules.keys()):
+            if k.startswith("pipeline."):
+                _cleared[k] = sys.modules.pop(k)
+
+        skill_path = str(SKILL_DIR)
+        sys.path.insert(0, skill_path)
+
         from pipeline.loop_controller import create_pipeline, run_pipeline
         from pipeline.config import PipelineConfig
 
         _pipeline_create = create_pipeline
         _pipeline_run = run_pipeline
         _PipelineConfig = PipelineConfig
+
+        sys.path[:] = _saved_path
         _PIPELINE_AVAILABLE = True
         logger.info(f"cyclical_paper_review_pipeline_loaded version=v1.7 path={SKILL_DIR}")
         return True
@@ -189,7 +173,7 @@ class PaperReviewService:
             journal_style = "xwycbyj"
 
         # 输出格式映射
-        pipeline_output_format = _OUTPUT_FORMAT_MAP.get(output_format.lower(), "word")
+        pipeline_output_format = OUTPUT_FORMAT_MAP.get(output_format.lower(), "word")
 
         # 构建配置
         config = {
@@ -251,7 +235,7 @@ class PaperReviewService:
         r = await self._repo.get(review_id)
         if not r:
             return None
-        if user_id is not None and str(r.get("user_id")) != str(user_id):
+        if not check_pipeline_ownership(r, user_id):
             return None
 
         max_rounds = r["config"].get("max_rounds", 5)
@@ -300,7 +284,7 @@ class PaperReviewService:
         r = await self._repo.get(review_id)
         if not r:
             return None
-        if user_id is not None and str(r.get("user_id")) != str(user_id):
+        if not check_pipeline_ownership(r, user_id):
             return None
         return {
             "review_id": review_id,
@@ -353,7 +337,7 @@ class PaperReviewService:
         r = await self._repo.get(review_id)
         if not r:
             return False
-        if user_id is not None and str(r.get("user_id")) != str(user_id):
+        if not check_pipeline_ownership(r, user_id):
             return False
 
         # 设置取消事件（跨线程通知）
@@ -453,7 +437,7 @@ class PaperReviewService:
         """运行真实 Pipeline（取消支持）"""
         await self._repo.append_log(review_id, "启动真实审稿 Pipeline (v1.7)")
 
-        pipeline_output_format = _OUTPUT_FORMAT_MAP.get(
+        pipeline_output_format = OUTPUT_FORMAT_MAP.get(
             config["output_format"].lower(), "word"
         )
         pipeline_config = _PipelineConfig(

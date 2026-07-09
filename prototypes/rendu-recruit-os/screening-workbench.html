@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="闪电筛智能筛选工作台原型。">
+  <title>智能筛选｜任度 AI 招聘中枢</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body class="app-body">
+  <div class="app-layout">
+    <aside class="app-sidebar">
+      <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a>
+      <nav class="app-nav-section"><div class="app-nav-label">招聘流程</div><a class="app-nav-link" href="app.html"><span data-icon="layout"></span><span>工作台</span></a><a class="app-nav-link" href="#" data-prototype-action data-message="招聘项目页将在下一轮扩展"><span data-icon="briefcase"></span><span>招聘项目</span></a><a class="app-nav-link" href="#" data-prototype-action data-message="简历导入页将在下一轮扩展"><span data-icon="upload"></span><span>简历导入</span></a><a class="app-nav-link active" href="screening-workbench.html"><span data-icon="scan"></span><span>智能筛选</span></a><a class="app-nav-link" href="#" data-prototype-action data-message="AI 面试列表将在下一轮扩展"><span data-icon="message"></span><span>AI 面试</span></a></nav>
+      <nav class="app-nav-section"><div class="app-nav-label">人才资产</div><a class="app-nav-link" href="#" data-prototype-action data-message="候选人库将在下一轮扩展"><span data-icon="users"></span><span>候选人库</span></a><a class="app-nav-link" href="report.html"><span data-icon="file"></span><span>报告中心</span></a><a class="app-nav-link" href="#" data-prototype-action data-message="数据看板将在下一轮扩展"><span data-icon="chart"></span><span>数据看板</span></a></nav>
+      <div class="app-sidebar-footer"><small>当前组织</small><strong>任度产品体验团队</strong></div>
+    </aside>
+
+    <main class="app-main">
+      <header class="app-topbar">
+        <button class="project-switcher" type="button" data-prototype-action data-message="已打开招聘项目切换器"><span class="avatar-mini">AI</span><span><small>当前招聘项目</small><strong>AI 产品经理 · 北京</strong></span><span data-icon="chevron"></span></button>
+        <div class="topbar-actions"><button class="button-icon" type="button" aria-label="帮助" data-replay-tutorial data-target="screening-workbench.html"><span data-icon="help"></span></button><button class="button-icon" type="button" aria-label="通知" data-prototype-action data-message="暂无新的系统通知"><span data-icon="bell"></span></button><div class="user-chip"><span class="user-avatar">HR</span><span>林澈</span></div></div>
+      </header>
+
+      <div class="app-content">
+        <div class="app-page-head">
+          <div><h1>智能筛选</h1><p>规则保证基本条件，AI 进一步判断经历深度并解释推荐依据。</p></div>
+          <div class="app-head-actions"><button class="button light" type="button" data-prototype-action data-message="筛选条件已保存为项目模板"><span data-icon="file"></span>保存条件</button><button class="button primary" type="button" data-prototype-action data-message="AI 匹配任务已启动"><span data-icon="spark"></span>重新匹配</button></div>
+        </div>
+
+        <section class="app-pipeline" style="margin-bottom:14px">
+          <div class="app-pipeline-step complete"><small>01</small><strong>创建职位</strong></div><div class="app-pipeline-step complete"><small>02</small><strong>导入简历</strong></div><div class="app-pipeline-step complete"><small>03</small><strong>智能解析</strong></div><div class="app-pipeline-step current"><small>04</small><strong>AI 匹配</strong></div><div class="app-pipeline-step"><small>05</small><strong>候选入库</strong></div><div class="app-pipeline-step"><small>06</small><strong>AI 面试</strong></div><div class="app-pipeline-step"><small>07</small><strong>证据报告</strong></div>
+        </section>
+
+        <section class="workbench">
+          <aside class="workbench-panel">
+            <div class="workbench-panel-head"><strong>筛选条件</strong><button class="button-quiet" type="button" data-prototype-action data-message="筛选条件已重置" style="font-size:9px">重置</button></div>
+            <div class="filter-group">
+              <div class="filter-group-title"><strong>学历与学校</strong><span>2 项已设置</span></div>
+              <div class="compact-field"><label>最高学历</label><select><option>本科及以上</option><option>硕士及以上</option></select></div>
+              <div class="compact-field"><label>学校范围</label><select><option>不限制</option><option>985 / 211</option></select></div>
+            </div>
+            <div class="filter-group">
+              <div class="filter-group-title"><strong>经验与年限</strong><span>1 项已设置</span></div>
+              <div class="compact-field"><label>相关经验</label><select><option>3 年及以上</option><option>5 年及以上</option></select></div>
+              <div class="compact-field"><label>年龄范围</label><input value="不限"></div>
+            </div>
+            <div class="filter-group">
+              <div class="filter-group-title"><strong>专业与证书</strong><span>未设置</span></div>
+              <div class="compact-field"><label>专业关键词</label><input placeholder="例如：计算机、软件工程"></div>
+            </div>
+            <div class="filter-group">
+              <div class="filter-group-title"><strong>高级 AI 条件</strong><span>已启用</span></div>
+              <label class="checkbox-row" style="font-size:10px"><input type="checkbox" checked>分析项目主导程度</label>
+              <label class="checkbox-row" style="font-size:10px;margin-top:10px"><input type="checkbox" checked>识别经历逻辑风险</label>
+            </div>
+          </aside>
+
+          <div class="workbench-panel">
+            <div class="workbench-panel-head"><strong>匹配结果 · 32 人</strong><span class="status success">分析完成</span></div>
+            <div class="candidate-list-toolbar"><label class="search-box"><span data-icon="search"></span><input aria-label="搜索候选人" placeholder="搜索候选人"></label><button class="button-icon" type="button" aria-label="筛选"><span data-icon="filter"></span></button></div>
+            <div class="candidate-row selected" data-candidate-row data-name="林屿" data-role="AI 产品经理 · 6 年经验" data-score="92">
+              <div class="avatar-mini">林</div><div><strong>林屿</strong><small>AI 产品经理 · 6 年 · 北京</small></div><div><span class="status success">强推</span><div class="candidate-points"><span class="on"></span><span class="on"></span><span class="on"></span><span></span></div></div><div class="candidate-grade">92</div>
+            </div>
+            <div class="candidate-row" data-candidate-row data-name="陈澄" data-role="策略产品经理 · 5 年经验" data-score="87">
+              <div class="avatar-mini">陈</div><div><strong>陈澄</strong><small>策略产品经理 · 5 年 · 上海</small></div><div><span class="status info">可面</span><div class="candidate-points"><span class="on"></span><span class="on"></span><span></span><span></span></div></div><div class="candidate-grade">87</div>
+            </div>
+            <div class="candidate-row" data-candidate-row data-name="周岚" data-role="增长产品经理 · 4 年经验" data-score="81">
+              <div class="avatar-mini">周</div><div><strong>周岚</strong><small>增长产品经理 · 4 年 · 杭州</small></div><div><span class="status warning">观察</span><div class="candidate-points"><span class="on"></span><span></span><span></span><span></span></div></div><div class="candidate-grade">81</div>
+            </div>
+            <div class="candidate-row" data-candidate-row data-name="顾行" data-role="平台产品经理 · 7 年经验" data-score="78">
+              <div class="avatar-mini">顾</div><div><strong>顾行</strong><small>平台产品经理 · 7 年 · 深圳</small></div><div><span class="status warning">观察</span><div class="candidate-points"><span class="on"></span><span></span><span></span><span></span></div></div><div class="candidate-grade">78</div>
+            </div>
+          </div>
+
+          <aside class="workbench-panel">
+            <div class="workbench-panel-head"><strong>匹配解释</strong><span style="color:var(--blue);font-size:18px;font-weight:750" data-explanation-score>92</span></div>
+            <div class="explanation">
+              <div class="explanation-person" data-explanation-person><span class="avatar-mini">林</span><div><strong>林屿</strong><small>AI 产品经理 · 6 年经验</small></div></div>
+              <section class="explanation-section"><h3>核心命中</h3><div class="explanation-point">连续主导 3 个从 0 到 1 的 AI 产品项目。</div><div class="explanation-point">具备 RAG、工作流和评测体系落地经验。</div><div class="explanation-point">能说明项目目标、策略取舍和结果归因。</div></section>
+              <section class="explanation-section"><h3>待确认风险</h3><div class="explanation-point risk">商业化验证样本仍较小，建议面试核实规模化能力。</div><div class="explanation-point risk">最近一段经历不足 1 年，需要了解离职原因。</div></section>
+              <section class="explanation-section"><h3>分项表现</h3><div class="score-bars"><div><div class="score-bar-label"><span>技能匹配</span><strong>94</strong></div><div class="score-bar-track"><i style="width:94%"></i></div></div><div><div class="score-bar-label"><span>项目深度</span><strong>91</strong></div><div class="score-bar-track"><i style="width:91%"></i></div></div><div><div class="score-bar-label"><span>行业背景</span><strong>84</strong></div><div class="score-bar-track"><i style="width:84%"></i></div></div><div><div class="score-bar-label"><span>职业稳定性</span><strong>76</strong></div><div class="score-bar-track"><i style="width:76%"></i></div></div></div></section>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:22px"><button class="button light small" type="button" data-prototype-action data-message="候选人已加入候选库">加入候选库</button><button class="button primary small" type="button" data-prototype-action data-message="已打开 AI 面试安排">发起面试</button></div>
+            </div>
+          </aside>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="site.js?v=2"></script>
+</body>
+</html>

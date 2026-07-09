@@ -26,8 +26,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.backend.config import settings
-from src.backend.core.logging_config import configure_logging, get_logger
+from src.backend.config import settings  # noqa: E402
+from src.backend.core.logging_config import configure_logging, get_logger  # noqa: E402
 
 configure_logging()
 logger = get_logger(__name__)

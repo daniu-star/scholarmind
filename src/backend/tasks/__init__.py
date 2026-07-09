@@ -1,1 +1,1 @@
-"""ScholarMind 后台任务层：Celery配置 + 异步图表生成"""
+"""⚠ DEPRECATED: tasks/ 已合并到 scheduler/。新代码请使用 src.backend.scheduler。"""

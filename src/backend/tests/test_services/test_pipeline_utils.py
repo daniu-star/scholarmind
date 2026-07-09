@@ -16,9 +16,6 @@ from ...services.pipeline_utils import (
     resolve_journal_style,
     resolve_output_format,
     calculate_pipeline_progress,
-    RESEARCH_TYPE_MAP,
-    DISCIPLINE_TO_JOURNAL,
-    OUTPUT_FORMAT_MAP,
 )
 
 

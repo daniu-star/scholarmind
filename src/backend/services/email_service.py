@@ -2,6 +2,8 @@
 
 发件服务器根据 SMTP_USER 的邮箱域名自动检测；也支持手动指定 SMTP_HOST/PORT。
 连接方式自适应：465 端口用 SMTP_SSL，其他端口用 STARTTLS。
+
+SMTP 发送使用专用线程池（_smtp_executor），避免阻塞默认 asyncio 线程池。
 """
 
 from __future__ import annotations
@@ -9,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import structlog
 import smtplib
+from concurrent.futures import ThreadPoolExecutor
 from email.header import Header
 from email.mime.text import MIMEText
 from email.utils import formataddr
@@ -16,6 +19,9 @@ from email.utils import formataddr
 from ..config import settings
 
 logger = structlog.get_logger(__name__)
+
+# 专用 SMTP 线程池（独立于 asyncio 默认线程池，避免邮件发送阻塞其他 to_thread 调用）
+_smtp_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="smtp-")
 
 
 def _mask_email(email: str) -> str:
@@ -113,20 +119,23 @@ async def send_verification_email(target_email: str, code: str) -> None:
     msg["To"] = target_email
     msg["Reply-To"] = settings.SMTP_USER
 
+    _SMTP_TIMEOUT = 10  # 秒，足够完成 SMTP 握手 + 登录 + 发送
+
     def _send_sync():
         # 端口 465 使用 SSL 直连，其他端口使用 STARTTLS
         if port == 465:
-            with smtplib.SMTP_SSL(host, port, timeout=15) as server:
+            with smtplib.SMTP_SSL(host, port, timeout=_SMTP_TIMEOUT) as server:
                 server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
                 server.send_message(msg)
         else:
-            with smtplib.SMTP(host, port, timeout=15) as server:
+            with smtplib.SMTP(host, port, timeout=_SMTP_TIMEOUT) as server:
                 server.starttls()
                 server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
                 server.send_message(msg)
 
     try:
-        await asyncio.to_thread(_send_sync)
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(_smtp_executor, _send_sync)
         logger.info(f"verification_email_sent to={_mask_email(target_email)} via={host}:{port}")
     except smtplib.SMTPAuthenticationError as e:
         raise EmailSendError(
@@ -138,3 +147,7 @@ async def send_verification_email(target_email: str, code: str) -> None:
         ) from e
     except smtplib.SMTPException as e:
         raise EmailSendError(f"邮件发送失败（{provider}）：{e}") from e
+    except OSError as e:
+        raise EmailSendError(
+            f"无法连接 {provider} 服务器（{host}:{port}）：网络不可达（{e}）。\n请检查网络连接或防火墙设置。"
+        ) from e

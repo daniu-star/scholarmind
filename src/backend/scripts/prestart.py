@@ -5,16 +5,15 @@ Railway pre-start 脚本 — 在应用启动前执行 schema 迁移。
 from __future__ import annotations
 
 import sys
+import asyncio
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.backend.config import settings
-from src.backend.db.session import create_async_engine_from_url
-from sqlalchemy import text as sa_text
-import asyncio
+from src.backend.db.session import create_async_engine_from_url  # noqa: E402
+from sqlalchemy import text as sa_text  # noqa: E402
 
 
 MIGRATIONS = [

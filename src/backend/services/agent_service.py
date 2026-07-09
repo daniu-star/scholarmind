@@ -259,10 +259,10 @@ class AgentService(IAgentService):
             self._save_conversation(session_id)
 
         # Parse options from reply
-        options = self._parse_options(reply)
+        options = self._skills.parse_options(reply)
 
         # Detect skills that could be used based on reply content
-        skills_used = self._detect_skills(reply, message)
+        skills_used = self._skills.detect_skills(reply, message)
 
         # Execute chart generation skill if detected
         chart_info = None
@@ -367,23 +367,53 @@ class AgentService(IAgentService):
             model=llm_model, status="success", latency_ms=latency_ms,
         )
 
-        # ═══ 立即发送 done 事件，让前端停止"思考中"动画 ═══
-        # 所有后处理（DB 写入、技能检测、图表/CNKI 执行）移到后台异步执行，
-        # 不再阻塞 done 事件的发送。感知延迟从 3-7 秒降至 0。
+        # ═══ 同步保存对话历史（DB 写入 < 10ms），然后立即发送 done ═══
+        history.append({"role": "user", "content": message})
+        history.append({"role": "assistant", "content": full_reply})
+        if self._use_db:
+            await self.conversation_repo.add_message(
+                session_id, agent_id, "user", message, user_id)
+            await self.conversation_repo.add_message(
+                session_id, agent_id, "assistant", full_reply, user_id)
+        else:
+            max_history_messages = 40
+            if len(history) > max_history_messages:
+                self.conversations[session_id] = history[-max_history_messages:]
+            self._save_conversation(session_id)
+
+        # 快速检测技能（纯 CPU，不阻塞）
+        skills_used = self._skills.detect_skills(full_reply, message)
+
         yield {
             "type": "done",
-            "skills_used": [],       # 后台异步填充
-            "options": [],           # 后台异步填充
+            "skills_used": skills_used,
+            "options": self._skills.parse_options(full_reply),
             "chart_info": None,
             "cnki_results": None,
-            "skill_hint": None,
+            "skill_hint": self._detect_skill_hint(full_reply, message, skills_used),
         }
 
-        # ── 后台后处理（fire-and-forget，不阻塞用户看到响应）──
-        asyncio.create_task(self._post_process_async(
-            message=message, full_reply=full_reply, agent_id=agent_id,
-            session_id=session_id, user_id=user_id, history=history,
-        ))
+        # ── 仅延迟慢操作（图表/CNKI 需要额外 LLM 调用）到后台 ──
+        if "chart_generation" in skills_used or "cnki_search" in skills_used:
+            asyncio.create_task(self._deferred_skills(
+                message=message, full_reply=full_reply, session_id=session_id,
+                skills_used=skills_used,
+            ))
+
+    async def _deferred_skills(
+        self, *, message: str, full_reply: str, session_id: str,
+        skills_used: list[str],
+    ) -> None:
+        """后台执行慢技能（图表生成/CNKI 检索需额外 LLM 调用），不影响用户交互"""
+        try:
+            if "chart_generation" in skills_used:
+                await self._execute_chart_skill(message, full_reply, session_id)
+            if "cnki_search" in skills_used:
+                await self._execute_cnki_skill(message, session_id)
+        except Exception as e:
+            logger.warning(f"deferred_skills_failed session={session_id} error={e}")
+
+    # ── 旧 _post_process_async 已移除，替换为上述同步+延迟方案 ──
 
     # ── Post-processing (fire-and-forget, does not block user response) ──
 
@@ -414,8 +444,8 @@ class AgentService(IAgentService):
                 self._save_conversation(session_id)
 
             # 2. 解析选项和检测技能（纯 CPU，不阻塞）
-            self._parse_options(full_reply)
-            skills_used = self._detect_skills(full_reply, message)
+            self._skills.parse_options(full_reply)
+            skills_used = self._skills.detect_skills(full_reply, message)
             self._detect_skill_hint(full_reply, message, skills_used)
 
             # 3. 执行图表/CNKI 技能（可能较慢，但不影响用户交互）
@@ -807,9 +837,11 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
     def _detect_skill_hint(
         self, reply: str, user_message: str, skills_used: list[str]
     ) -> Optional[str]:
-        """When a need is detected that doesn't match existing skills,
-        suggest the user create a custom skill."""
-        # Keywords that indicate a need but don't map to existing skills
+        """对未匹配技能的需求提供提示建议。
+
+        ⚠ 此方法与 SkillRouter.detect_skill_hint 签名不同（多接受 skills_used 参数），
+        暂时保留。后续应统一到 SkillRouter。
+        """
         unmatched_keywords = {
             "翻译": "学术翻译",
             "格式": "论文格式化",
@@ -828,83 +860,13 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
         combined = reply + user_message
         for keyword, skill_name in unmatched_keywords.items():
             if keyword in combined:
-                # Check if this need is already covered by detected skills
                 if not any(s in skills_used for s in ["cnki_search", "chart_generation", "polish", "literature_review", "architecture"]):
                     return f"检测到您可能需要「{skill_name}」相关功能，当前暂无对应技能。您可以在技能管理中创建自定义技能来满足此需求。"
 
         return None
 
-    # ── Option parsing (unchanged) ────────────────────────
-
-    def _parse_options(self, reply: str) -> list[str]:
-        """Extract option buttons from agent reply"""
-        options: list[str] = []
-
-        bracket_match = self._extract_bracket_options(reply)
-        if bracket_match:
-            return bracket_match
-
-        inline_matches = self._extract_inline_options(reply)
-        if inline_matches:
-            return inline_matches
-
-        numbered_matches = self._extract_numbered_options(reply)
-        if numbered_matches:
-            return numbered_matches
-
-        return options
-
-    def _extract_bracket_options(self, reply: str) -> list[str]:
-        """Extract options from [A|B|C] pattern"""
-        matches = re.findall(r'\[([^\]]+)\]', reply)
-        if not matches:
-            return []
-
-        last_match = matches[-1]
-        if '|' in last_match:
-            options = [opt.strip() for opt in last_match.split('|') if opt.strip()]
-            if 2 <= len(options) <= 6:
-                return options
-
-        return []
-
-    def _extract_inline_options(self, reply: str) -> list[str]:
-        """Extract options from 【option】 pattern"""
-        matches = re.findall(r'【([^】]+)】', reply)
-        if len(matches) >= 2:
-            return matches
-        return []
-
-    def _extract_numbered_options(self, reply: str) -> list[str]:
-        """Extract options from numbered list pattern"""
-        matches = re.findall(r'(?:\d[.、]|①|②|③|④|⑤|⑥)\s*(.+?)(?:\n|$)', reply)
-        if len(matches) >= 2:
-            return [m.strip() for m in matches]
-        return []
-
-    # ── Skill detection (unchanged) ───────────────────────
-
-    def _detect_skills(self, reply: str, user_message: str) -> list[str]:
-        """Detect which skills/tools the agent suggests using"""
-        skills: list[str] = []
-        combined = reply + user_message
-
-        if any(kw in combined for kw in ["CNKI", "知网", "检索", "文献搜索", "查找文献"]):
-            skills.append("cnki_search")
-
-        if any(kw in combined for kw in ["图表", "可视化", "画图", "数据图", "统计图"]):
-            skills.append("chart_generation")
-
-        if any(kw in combined for kw in ["润色", "降重", "AIGC", "查重", "改写"]):
-            skills.append("polish")
-
-        if any(kw in combined for kw in ["综述", "文献综述", "系统综述"]):
-            skills.append("literature_review")
-
-        if any(kw in combined for kw in ["架构", "论文结构", "大纲", "目录"]):
-            skills.append("architecture")
-
-        return skills
+    # ── _parse_options / _detect_skills 已委托给 SkillRouter ──
+    # 调用 self._skills.parse_options() / self._skills.detect_skills()
 
     # ── Conversation management (delegating to SessionManager) ──
 

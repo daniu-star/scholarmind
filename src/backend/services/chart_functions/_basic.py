@@ -11,8 +11,6 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.colors import LinearSegmentedColormap
 from scipy.stats import gaussian_kde
-import seaborn as sns
-import pandas as pd
 
 from ..chart_style import ACADEMIC_COLORS, _apply_origin_style
 from ..chart_data import _safe_array, _make_figure, _finalize

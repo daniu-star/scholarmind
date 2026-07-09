@@ -27,15 +27,19 @@ from ..config import settings
 from ..db.pipeline_state_repo import get_pipeline_state_repo
 from ..core.exceptions import AppException
 from ..models.error_codes import ErrorCode
+from .pipeline_utils import (
+    RESEARCH_TYPE_MAP,
+    DISCIPLINE_TO_JOURNAL,
+    check_pipeline_ownership,
+    calculate_pipeline_progress,
+)
 
 logger = structlog.get_logger(__name__)
 
 # P0 修复: Pipeline 并发控制（最多 3 个同时执行，防止 LLM API 429）
-# Task 24.3: 抽取硬编码常量到 config.py
 _PIPELINE_SEMAPHORE = asyncio.Semaphore(settings.PIPELINE_MAX_CONCURRENCY)
-# P0 修复: Pipeline 全局超时（10 分钟）和每轮超时（2 分钟）
 _PIPELINE_TIMEOUT_SECONDS = settings.PIPELINE_TIMEOUT_SECONDS
-_PIPELINE_ROUND_TIMEOUT_SECONDS = 120
+_PIPELINE_ROUND_TIMEOUT_SECONDS = settings.PIPELINE_ROUND_TIMEOUT_SECONDS
 _PIPELINE_HEARTBEAT_INTERVAL_SECONDS = settings.PIPELINE_HEARTBEAT_INTERVAL_SECONDS
 _PIPELINE_PROGRESS_SYNC_INTERVAL_SECONDS = settings.PIPELINE_PROGRESS_SYNC_INTERVAL_SECONDS
 
@@ -43,37 +47,6 @@ _PIPELINE_PROGRESS_SYNC_INTERVAL_SECONDS = settings.PIPELINE_PROGRESS_SYNC_INTER
 _SKILLS_BASE = os.environ.get('SKILLS_DIR', str(Path.home() / ".trae-cn" / "skills"))
 SKILL_DIR = Path(_SKILLS_BASE) / "cyclical-paper-generation"
 PIPELINE_DIR = SKILL_DIR / "pipeline"
-
-# ── 学科 → 期刊格式映射 ──────────────────────────────────
-DISCIPLINE_TO_JOURNAL = {
-    "communication": "xwycbyj",   # 新闻与传播研究
-    "journalism": "xwycbyj",
-    "sociology": "shxyj",         # 社会学研究
-    "psychology": "xwycbyj",      # 心理学暂用新闻传播研究格式
-    "education": "xwycbyj",       # 教育学暂用新闻传播研究格式
-    "literature": "gjxwj",        # 文学用国际新闻界格式
-    "history": "gjxwj",
-    "management": "xwdx",         # 管理学用新闻大学格式
-    "economics": "xwdx",
-}
-
-# ── 研究类型映射（前端值 → Pipeline 值）──────────────────
-RESEARCH_TYPE_MAP = {
-    "quantitative": "quantitative",
-    "qualitative": "qualitative",
-    "mixed": "mixed",
-    "computational": "computational",
-    "theoretical": "theoretical",
-    "interview_report": "interview_report",
-    # 中文别名
-    "量化研究": "quantitative",
-    "质性研究": "qualitative",
-    "混合方法": "mixed",
-    "混合": "mixed",
-    "计算社会科学": "computational",
-    "理论论文": "theoretical",
-    "访谈报告": "interview_report",
-}
 
 # ── 13 Agent 执行顺序（用于进度计算）──────────────────────
 AGENT_EXECUTION_ORDER = [
@@ -100,7 +73,11 @@ _PipelineConfig = None
 
 
 def _try_import_pipeline() -> bool:
-    """尝试导入 cyclical-paper-generation 的 Pipeline 模块"""
+    """尝试导入 cyclical-paper-generation 的 Pipeline 模块
+
+    使用 importlib 直接加载技能目录中的模块，避免与 cyclical-paper-review
+    的 pipeline.loop_controller 发生模块名冲突。
+    """
     global _PIPELINE_AVAILABLE, _pipeline_create, _pipeline_run, _PipelineConfig
 
     if _PIPELINE_AVAILABLE:
@@ -111,18 +88,44 @@ def _try_import_pipeline() -> bool:
         return False
 
     try:
-        skill_path = str(SKILL_DIR)
-        if skill_path not in sys.path:
-            sys.path.insert(0, skill_path)
-
         import langgraph  # noqa: F401
+        import importlib.util
 
+        # 保存并清空 pipeline.* 模块缓存
+        _saved_path = list(sys.path)
+        _cleared = {}
+        for k in list(sys.modules.keys()):
+            if k.startswith("pipeline."):
+                _cleared[k] = sys.modules.pop(k)
+
+        # 将正确目录插入 sys.path
+        skill_path = str(SKILL_DIR)
+        sys.path.insert(0, skill_path)
+
+        # 从正确目录预加载所有子模块（注册为 pipeline.xxx）
+        _pipeline_mods = ["llm_executor", "style_constraints", "word_validation",
+                          "gan_scorer", "shared_learning", "voice_extractor"]
+        for _mod_name in _pipeline_mods:
+            _f = PIPELINE_DIR / f"{_mod_name}.py"
+            if _f.exists():
+                _spec = importlib.util.spec_from_file_location(
+                    f"pipeline.{_mod_name}", str(_f))
+                if _spec and _spec.loader:
+                    _mod = importlib.util.module_from_spec(_spec)
+                    sys.modules[f"pipeline.{_mod_name}"] = _mod
+                    _spec.loader.exec_module(_mod)
+
+        # now from . import xxx will find the correct modules
         from pipeline.loop_controller import create_pipeline, run_pipeline
         from pipeline.config import PipelineConfig
 
         _pipeline_create = create_pipeline
         _pipeline_run = run_pipeline
         _PipelineConfig = PipelineConfig
+
+        # 恢复 sys.path（保留 pipeline.* 在 sys.modules 中，
+        # 确保运行时 from . import xxx 始终找到正确的模块）
+        sys.path[:] = _saved_path
         _PIPELINE_AVAILABLE = True
         logger.info(f"cyclical_paper_pipeline_loaded version=v7.4.0 path={SKILL_DIR}")
         return True
@@ -291,31 +294,12 @@ class PaperPipelineService:
         if not p:
             return None
         # 所有权校验：state["user_id"] 与请求 user_id 必须一致
-        if user_id is not None and str(p.get("user_id")) != str(user_id):
+        if not check_pipeline_ownership(p, user_id):
             return None
 
         max_rounds = p["config"].get("max_rounds", 5)
         current_round = p["current_round"]
-        agent_count = len(AGENT_EXECUTION_ORDER)
-
-        if p["status"] == "completed":
-            progress = 1.0
-        elif p["status"] == "failed":
-            progress = 0.0
-        elif p["status"] == "cancelled":
-            # Task 24.1: cancelled 单独分支，progress=0.0（不再走 else 的 0.99 兜底）
-            progress = 0.0
-        else:
-            current_agent_idx = 0
-            if p.get("current_agent"):
-                for i, (agent_id, _, _) in enumerate(AGENT_EXECUTION_ORDER):
-                    if agent_id == p["current_agent"]:
-                        current_agent_idx = i
-                        break
-            progress = min(
-                0.99,
-                (current_round * agent_count + current_agent_idx) / (max_rounds * agent_count),
-            )
+        progress = calculate_pipeline_progress(p, AGENT_EXECUTION_ORDER)
 
         return {
             "pipeline_id": pipeline_id,
@@ -345,7 +329,7 @@ class PaperPipelineService:
         p = await self._repo.get(pipeline_id)
         if not p:
             return None
-        if user_id is not None and str(p.get("user_id")) != str(user_id):
+        if not check_pipeline_ownership(p, user_id):
             return None
 
         result = p.get("result") or {}
@@ -413,7 +397,7 @@ class PaperPipelineService:
         p = await self._repo.get(pipeline_id)
         if not p:
             return False
-        if user_id is not None and str(p.get("user_id")) != str(user_id):
+        if not check_pipeline_ownership(p, user_id):
             return False
 
         # 设置取消事件（跨线程通知）

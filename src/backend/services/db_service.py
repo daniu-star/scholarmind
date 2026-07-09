@@ -334,9 +334,22 @@ class DatabaseService:
         conn.commit()
 
     def upsert_keywords_batch(self, keywords: list[str], source_db: str):
-        """Batch upsert keywords."""
+        """Batch upsert keywords in a single transaction."""
+        if not keywords:
+            return
+        conn = self._get_conn()
+        now = datetime.now().isoformat()
+        # 单次事务批量写入，避免 N+1 次 commit
+        conn.execute("BEGIN")
         for kw in keywords:
-            self.upsert_keyword(kw, source_db)
+            conn.execute("""
+                INSERT INTO hot_keywords (id, keyword, frequency, source_db, last_seen)
+                VALUES (?, ?, 1, ?, ?)
+                ON CONFLICT(keyword, source_db) DO UPDATE SET
+                    frequency = frequency + 1,
+                    last_seen = ?
+            """, (str(uuid.uuid4()), kw, source_db, now, now))
+        conn.commit()
 
     def get_hot_keywords(self, limit: int = 20) -> list[dict]:
         """Get top keywords by frequency."""

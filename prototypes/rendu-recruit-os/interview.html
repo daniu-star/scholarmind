@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="急速面：基于职位、简历和回答动态追问，沉淀可复核的面试证据。">
+  <title>急速面｜AI 深度面试</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a>
+      <nav class="site-nav" aria-label="主要导航">
+        <a class="nav-link" href="index.html">首页</a><a class="nav-link" href="screening.html">闪电筛</a><a class="nav-link active" href="interview.html">急速面</a><a class="nav-link" href="workflow.html">工作流</a><a class="nav-link" href="demo.html">演示中心</a>
+      </nav>
+      <div class="header-actions">
+        <button class="button-quiet" type="button" data-login>登录</button>
+        <button class="button teal" type="button" data-start data-target="app.html">体验 AI 面试<span data-icon="arrow"></span></button>
+        <button class="button-icon mobile-menu-button" type="button" aria-label="打开菜单"><span data-icon="menu"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero" style="background:var(--night);color:white">
+      <div class="shell page-hero-layout">
+        <div>
+          <div class="eyebrow" style="color:#a8b3c4">Adaptive interview</div>
+          <h1 class="page-title">不止问“做过什么”，<br>还要问清<span style="color:#73d5ca">怎么做到</span></h1>
+          <p class="page-lead" style="color:#aab4c3">急速面结合职位、候选人简历与上一轮回答动态生成问题，持续验证贡献、决策、数据与真实能力边界。</p>
+          <div class="hero-actions">
+            <button class="button teal" type="button" data-start data-target="app.html">体验 AI 面试<span data-icon="arrow"></span></button>
+            <a class="button light" href="report.html">查看报告样例<span data-icon="file"></span></a>
+          </div>
+        </div>
+        <div class="page-visual dark" aria-label="AI 面试对话预览">
+          <div class="visual-toolbar"><strong>深度面试 · AI 产品经理</strong><span>问题 07 / 12</span></div>
+          <div class="question-stack">
+            <div class="question-bubble">你提到主导了企业知识库产品。最初用什么指标判断它值得做？</div>
+            <div class="question-bubble answer">我们先统计内部检索失败和重复咨询，发现客服约 28% 的时间用于回答重复问题。</div>
+            <div class="question-bubble signal">检测到可验证信息：28% 重复咨询时间 · 继续追问指标口径</div>
+            <div class="question-bubble">这个 28% 是如何采样的？上线后你用什么数据证明它真的下降了？</div>
+            <div class="question-bubble answer">按 4 周工单和客服对话抽样，首期只覆盖高频 50 个主题，8 周后重复咨询下降到约 17%。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="signal-strip" style="background:#0b101a">
+      <div class="shell signal-grid">
+        <div class="signal-item"><small>INTERVIEW PRINCIPLE</small><strong>每一次追问，都对应一个待验证的能力点</strong></div>
+        <div class="signal-item metric"><small>问题来源</small><strong>JD + 简历</strong></div>
+        <div class="signal-item metric"><small>追问依据</small><strong>上一轮回答</strong></div>
+        <div class="signal-item metric"><small>最终输出</small><strong>结论 + 证据</strong></div>
+      </div>
+    </section>
+
+    <section class="section white">
+      <div class="shell">
+        <div class="section-head">
+          <div><div class="section-number">01 / 面试不是题库轮播</div><h2 class="section-title">同一岗位，不同候选人应该面对不同问题</h2></div>
+          <p class="section-description">系统从候选人实际经历出发，围绕具体行动、数据口径、决策取舍和风险边界持续追问。答得清楚就进入下一能力点，存在矛盾则继续验证。</p>
+        </div>
+        <div class="capability-grid">
+          <article class="capability"><div class="experience-icon"><span data-icon="briefcase"></span></div><h3>职位锚定</h3><p>所有问题都围绕岗位需要验证的能力，不让对话偏离招聘目标。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="candidate"></span></div><h3>简历个性化</h3><p>从候选人自己的项目与责任边界出题，降低标准答案的有效性。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="message"></span></div><h3>动态追问</h3><p>基于上一轮回答继续追问具体行动、指标口径与方案取舍。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="radar"></span></div><h3>多维评分</h3><p>综合表现、自驱力与岗位匹配分开呈现，未评分不显示为 0。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="shield"></span></div><h3>风险线索</h3><p>切屏、粘贴与回答矛盾作为复核线索，不直接判定候选人作弊。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="file"></span></div><h3>证据链报告</h3><p>每条优势、缺口和风险均可定位到对应问题与候选人原回答。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="shell editorial-split">
+        <div class="editorial-label">Interview modes / 02</div>
+        <div class="editorial-content">
+          <h2>把面试深度交给场景，而不是让所有人都经历同样的时长。</h2>
+          <p>初步、中级与深度三档考察模式分别适配招聘漏斗的不同阶段。面试发起前，HR 会看到预计时长、考察重点、有效期与邀请方式。</p>
+          <div class="detail-list">
+            <div class="detail-item"><span>01</span><strong>初步考察</strong><p>快速确认经历真实性与岗位基本条件，适合批量初筛。</p></div>
+            <div class="detail-item"><span>02</span><strong>中级考察</strong><p>围绕关键项目、专业能力和问题解决方式进行多轮验证。</p></div>
+            <div class="detail-item"><span>03</span><strong>深度考察</strong><p>进一步追问复杂决策、边界条件、失败经验与可迁移能力。</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section dark">
+      <div class="shell proof-layout">
+        <div class="proof-copy">
+          <div class="eyebrow" style="color:#aeb8c7">Report, not verdict</div>
+          <blockquote>报告不是“通过 / 不通过”的黑盒，而是一张可继续讨论的证据地图。</blockquote>
+          <p style="color:#aab4c3">业务经理可以先看结论，再查看能力评分和问答证据。风险提示保持克制，明确哪些是事实、哪些是 AI 解释、哪些仍需人工复核。</p>
+          <div class="hero-actions"><a class="button light" href="report.html">查看报告样例<span data-icon="arrow"></span></a></div>
+        </div>
+        <div class="proof-board">
+          <div class="proof-board-head"><span>Candidate report</span><span>Confidence / high</span></div>
+          <div class="proof-score">
+            <div class="score-ring"><strong>86</strong></div>
+            <div class="score-summary"><h4>建议进入业务终面</h4><p>项目深度与自驱力表现突出，商业化规模仍需进一步复核。</p><span class="evidence-pill">12 条证据</span><span class="evidence-pill">2 项风险</span></div>
+          </div>
+          <div class="proof-lines"><div class="proof-line"><span>项目深度</span><strong>能够说明指标口径与方案取舍</strong><em>Q07</em></div><div class="proof-line"><span>自驱力</span><strong>主动建立评测集并推动跨团队复盘</strong><em>Q09</em></div><div class="proof-line"><span>待复核</span><strong>付费客户样本仍然有限</strong><em>Q11</em></div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer"><div class="shell"><div class="footer-bottom" style="margin-top:0"><a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a><span>急速面 · AI 深度面试</span><span>AI 提供辅助判断，最终决策由招聘团队完成</span></div></div></footer>
+  <script src="site.js?v=2"></script>
+</body>
+</html>

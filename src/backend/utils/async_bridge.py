@@ -46,7 +46,7 @@ def run_async(coro: Coroutine[Any, Any, T], timeout: float | None = None) -> T:
         （如 Celery 任务调用 async 服务方法），不应在 async 请求处理路径中使用。
     """
     try:
-        loop = asyncio.get_running_loop()
+        _ = asyncio.get_running_loop()
     except RuntimeError:
         # 无运行中的 event loop → 直接在当前线程运行
         if timeout is not None:

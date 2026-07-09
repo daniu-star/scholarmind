@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="任度 AI 招聘中枢产品演示中心。">
+  <title>产品演示中心｜任度 AI 招聘中枢</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a>
+      <nav class="site-nav"><a class="nav-link" href="index.html">首页</a><a class="nav-link" href="screening.html">闪电筛</a><a class="nav-link" href="interview.html">急速面</a><a class="nav-link" href="workflow.html">工作流</a><a class="nav-link active" href="demo.html">演示中心</a></nav>
+      <div class="header-actions"><button class="button-quiet" type="button" data-login>登录</button><button class="button primary" type="button" data-start>开始体验<span data-icon="arrow"></span></button><button class="button-icon mobile-menu-button" type="button" aria-label="打开菜单"><span data-icon="menu"></span></button></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero" style="padding-bottom:54px">
+      <div class="shell">
+        <div class="eyebrow">Product demonstration</div>
+        <h1 class="page-title">先看它如何工作，<br>再决定从哪里开始</h1>
+        <p class="page-lead">演示内容采用示例数据，不接触真实候选人信息。你可以查看完整链路，也可以直接进入闪电筛、急速面或报告样例。</p>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:22px">
+      <div class="shell demo-layout">
+        <aside class="demo-menu" aria-label="演示章节">
+          <button class="active" type="button" data-demo-tab="overview"><span class="demo-index">01</span><span><strong>完整产品总览</strong><small>筛选到报告 · 45 秒</small></span></button>
+          <button type="button" data-demo-tab="screening"><span class="demo-index">02</span><span><strong>闪电筛</strong><small>匹配与解释 · 30 秒</small></span></button>
+          <button type="button" data-demo-tab="interview"><span class="demo-index">03</span><span><strong>急速面</strong><small>动态追问 · 30 秒</small></span></button>
+          <button type="button" data-demo-tab="report"><span class="demo-index">04</span><span><strong>证据链报告</strong><small>复核与决策 · 30 秒</small></span></button>
+        </aside>
+
+        <div class="demo-player">
+          <div class="demo-screen" data-demo-screen>
+            <div class="demo-copy">
+              <span data-demo-kicker>产品总览</span>
+              <h2 data-demo-title>从招聘项目到证据链报告</h2>
+              <p data-demo-body>在一条连续流程中完成简历筛选、候选人面试和业务决策。</p>
+              <div class="hero-actions"><button class="button light" type="button" data-start>打开交互教程<span data-icon="play"></span></button></div>
+            </div>
+            <div class="demo-device">
+              <div class="visual-toolbar"><strong>AI 招聘工作台</strong><span>项目进行中</span></div>
+              <div class="app-pipeline" style="margin-top:16px">
+                <div class="app-pipeline-step complete"><small>01</small><strong>职位</strong></div>
+                <div class="app-pipeline-step complete"><small>02</small><strong>导入</strong></div>
+                <div class="app-pipeline-step current"><small>03</small><strong>匹配</strong></div>
+                <div class="app-pipeline-step"><small>04</small><strong>候选</strong></div>
+                <div class="app-pipeline-step"><small>05</small><strong>面试</strong></div>
+                <div class="app-pipeline-step"><small>06</small><strong>报告</strong></div>
+                <div class="app-pipeline-step"><small>07</small><strong>决策</strong></div>
+              </div>
+              <div class="metric-grid" style="grid-template-columns:1fr 1fr;margin-top:12px">
+                <div class="metric-card"><div class="metric-card-head">已解析<span data-icon="scan"></span></div><strong>128</strong><small>6 份需要确认</small></div>
+                <div class="metric-card"><div class="metric-card-head">推荐候选人<span data-icon="users"></span></div><strong>18</strong><small>5 人建议优先面试</small></div>
+              </div>
+              <div class="next-action" style="margin-top:12px;padding:15px"><div class="next-action-icon"><span data-icon="spark"></span></div><div><small>下一步</small><strong>确认匹配结果</strong></div><button class="button teal small" type="button" data-prototype-action data-message="已进入候选人确认流程">继续</button></div>
+            </div>
+          </div>
+          <div class="demo-timeline"><span class="active"></span><span></span><span></span><span></span><span></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section white">
+      <div class="shell">
+        <div class="section-head">
+          <div><div class="section-number">下一步</div><h2 class="section-title">选择与你当前目标最接近的入口</h2></div>
+          <p class="section-description">查看产品不要求登录；创建任务、上传文件或发起面试时，系统才会引导你登录并返回原始目标。</p>
+        </div>
+        <div class="experience-grid">
+          <a class="experience-card featured" href="#" data-start data-target="app.html"><div class="experience-icon"><span data-icon="spark"></span></div><h3>完整教程</h3><p>用 5 步理解完整流程，然后进入工作台。</p><div class="card-meta"><span>首次使用</span><span>约 2 分钟</span></div><span class="card-arrow" data-icon="arrow"></span></a>
+          <a class="experience-card" href="#" data-start data-target="screening-workbench.html"><div class="experience-icon"><span data-icon="scan"></span></div><h3>智能筛选原型</h3><p>进入三栏筛选工作台，查看候选人解释。</p><div class="card-meta"><span>交互原型</span><span>示例数据</span></div><span class="card-arrow" data-icon="arrow"></span></a>
+          <a class="experience-card" href="report.html"><div class="experience-icon"><span data-icon="file"></span></div><h3>面试报告样例</h3><p>查看评分、优势、风险与问答证据。</p><div class="card-meta"><span>无需登录</span><span>可复核</span></div><span class="card-arrow" data-icon="arrow"></span></a>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer"><div class="shell"><div class="footer-bottom" style="margin-top:0"><a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a><span>产品演示中心</span><span>所有候选人信息均为演示数据</span></div></div></footer>
+  <script src="site.js?v=2"></script>
+</body>
+</html>

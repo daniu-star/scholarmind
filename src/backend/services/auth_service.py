@@ -316,7 +316,7 @@ async def verify_code_and_login(
         .where(
             VerificationCode.target == target,
             VerificationCode.code == code,
-            VerificationCode.used == False,
+            VerificationCode.used.is_(False),
             VerificationCode.expires_at > now,
         )
         .order_by(VerificationCode.created_at.desc())

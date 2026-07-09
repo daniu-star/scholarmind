@@ -5,7 +5,7 @@
       "args": [
         "-y",
         "@modao-mcp/modao-proto-mcp",
-        "--token=a766805314bc8234cdee771ac14421f6",
+        "--token=YOUR_MODAO_TOKEN_HERE",
         "--url=https://modao.cc"
       ]
     }

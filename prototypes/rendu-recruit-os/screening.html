@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="闪电筛：把海量简历转化为可解释的候选人优先级。">
+  <title>闪电筛｜AI 智能筛选</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a>
+      <nav class="site-nav" aria-label="主要导航">
+        <a class="nav-link" href="index.html">首页</a><a class="nav-link active" href="screening.html">闪电筛</a><a class="nav-link" href="interview.html">急速面</a><a class="nav-link" href="workflow.html">工作流</a><a class="nav-link" href="demo.html">演示中心</a>
+      </nav>
+      <div class="header-actions">
+        <button class="button-quiet" type="button" data-login data-target="screening-workbench.html">登录</button>
+        <button class="button primary" type="button" data-start data-target="screening-workbench.html">体验智能筛选<span data-icon="arrow"></span></button>
+        <button class="button-icon mobile-menu-button" type="button" aria-label="打开菜单"><span data-icon="menu"></span></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="page-hero">
+      <div class="shell page-hero-layout">
+        <div>
+          <div class="eyebrow">Lightning screening</div>
+          <h1 class="page-title">不是多看简历，<br>而是先找到<span style="color:var(--blue)">值得判断的人</span></h1>
+          <p class="page-lead">闪电筛把格式各异的简历转化为可比较的候选人信息，再结合硬性条件与 JD 语义匹配，输出推荐顺序、能力命中、缺口和风险。</p>
+          <div class="hero-actions">
+            <button class="button primary" type="button" data-start data-target="screening-workbench.html">体验智能筛选<span data-icon="arrow"></span></button>
+            <a class="button light" href="demo.html">查看演示<span data-icon="play"></span></a>
+          </div>
+        </div>
+        <div class="page-visual" aria-label="闪电筛结果预览">
+          <div class="visual-toolbar"><strong>AI 产品经理 · 候选人匹配</strong><span>32 份简历</span></div>
+          <div class="match-row selected">
+            <div class="avatar-mini">林</div>
+            <div><strong>林屿 · AI 产品经理</strong><small>6 年经验 · 3 段 AI 产品经历 · 北京</small></div>
+            <div class="match-score"><strong>92</strong><small>强推</small></div>
+          </div>
+          <div class="match-row">
+            <div class="avatar-mini">陈</div>
+            <div><strong>陈澄 · 策略产品经理</strong><small>5 年经验 · 平台与增长产品 · 上海</small></div>
+            <div class="match-score"><strong>87</strong><small>可面</small></div>
+          </div>
+          <div class="match-row">
+            <div class="avatar-mini">周</div>
+            <div><strong>周岚 · 增长产品经理</strong><small>4 年经验 · 用户增长 · 杭州</small></div>
+            <div class="match-score"><strong>81</strong><small>观察</small></div>
+          </div>
+          <div class="reason-sheet">
+            <strong>为什么推荐林屿</strong>
+            <div class="reason-point">连续主导 3 个从 0 到 1 的 AI 产品项目，角色边界清晰。</div>
+            <div class="reason-point">具备 RAG、工作流与评测体系的实际落地经验。</div>
+            <div class="reason-point">商业化验证仍在早期，建议面试进一步确认规模化能力。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="signal-strip">
+      <div class="shell signal-grid">
+        <div class="signal-item"><small>SCREENING PRINCIPLE</small><strong>先用规则保证底线，再用 AI 判断经历深度</strong></div>
+        <div class="signal-item metric"><small>导入</small><strong>文件 + 邮箱</strong></div>
+        <div class="signal-item metric"><small>筛选</small><strong>规则 + 语义</strong></div>
+        <div class="signal-item metric"><small>输出</small><strong>排序 + 解释</strong></div>
+      </div>
+    </section>
+
+    <section class="section white">
+      <div class="shell">
+        <div class="section-head">
+          <div><div class="section-number">01 / 四个关键动作</div><h2 class="section-title">把筛选从“关键词命中”变成候选人判断</h2></div>
+          <p class="section-description">每一步都拥有明确状态和输出。解析异常会进入确认，而不是被系统悄悄忽略；匹配分数会附带理由，而不是要求 HR 盲信。</p>
+        </div>
+        <div class="capability-grid">
+          <article class="capability"><div class="experience-icon"><span data-icon="upload"></span></div><h3>多方式导入</h3><p>本地文件、批量拖拽与邮箱任务进入同一队列，统一展示上传、解析和异常状态。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="scan"></span></div><h3>结构化解析</h3><p>提取教育、经历、项目与技能，同时保留原文上下文，便于后续复核。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="filter"></span></div><h3>规则预筛</h3><p>学历、学校、经验、专业与证书按主题分组，高级条件渐进展开。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="spark"></span></div><h3>AI 深度匹配</h3><p>分析技能、项目深度、行业背景与职业稳定性，给出推荐等级。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="radar"></span></div><h3>匹配解释</h3><p>命中点、能力缺口、风险与数据完整度在候选人上下文中同步呈现。</p></article>
+          <article class="capability"><div class="experience-icon"><span data-icon="users"></span></div><h3>候选人流转</h3><p>将确认后的候选人加入人才库，或直接进入急速面的面试流程。</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="shell editorial-split">
+        <div class="editorial-label">How it reads / 02</div>
+        <div class="editorial-content">
+          <h2>先给结论，再给证据；先看重点，再展开复杂条件。</h2>
+          <p>智能筛选页面采用“条件、候选人、解释”三层结构。用户不需要在一张长表单里配置所有字段，也不需要从几十列数据中寻找推荐依据。</p>
+          <div class="detail-list">
+            <div class="detail-item"><span>01</span><strong>条件面板</strong><p>默认只展开常用字段；已配置条件形成摘要，支持按组清空。</p></div>
+            <div class="detail-item"><span>02</span><strong>候选人列表</strong><p>优先展示推荐等级、关键命中和当前状态，避免用单一分数替代判断。</p></div>
+            <div class="detail-item"><span>03</span><strong>解释面板</strong><p>将 JD 要求与简历证据关联，说明为什么推荐、哪里不足、下一轮该确认什么。</p></div>
+            <div class="detail-item"><span>04</span><strong>下一步</strong><p>加入候选库或发起 AI 面试，不让分析结果停留在当前页面。</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <div class="shell">
+        <div class="cta-card">
+          <div><h2>用示例候选人，体验一次可解释的筛选。</h2><p>首次进入会先展示 5 步教程，之后登录并返回智能筛选工作台。</p></div>
+          <div class="cta-actions"><button class="button light" type="button" data-start data-target="screening-workbench.html">开始体验<span data-icon="arrow"></span></button><a class="button-quiet" style="color:white" href="workflow.html">查看完整流程</a></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="shell"><div class="footer-bottom" style="margin-top:0"><a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a><span>闪电筛 · AI 智能筛选</span><span>演示数据 · 不提交真实账号</span></div></div>
+  </footer>
+  <script src="site.js?v=2"></script>
+</body>
+</html>

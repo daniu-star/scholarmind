@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="任度 AI 面试证据链报告原型。">
+  <title>AI 面试报告｜任度 AI 招聘中枢</title>
+  <link rel="stylesheet" href="styles.css?v=3">
+</head>
+<body class="app-body">
+  <div class="app-layout">
+    <aside class="app-sidebar">
+      <a class="brand" href="index.html"><span class="brand-mark"></span><span class="brand-type"><strong>RENDU</strong><small>Recruit OS</small></span></a>
+      <nav class="app-nav-section"><div class="app-nav-label">招聘流程</div><a class="app-nav-link" href="app.html"><span data-icon="layout"></span><span>工作台</span></a><a class="app-nav-link" href="#" data-prototype-action data-message="招聘项目页将在下一轮扩展"><span data-icon="briefcase"></span><span>招聘项目</span></a><a class="app-nav-link" href="#" data-prototype-action data-message="简历导入页将在下一轮扩展"><span data-icon="upload"></span><span>简历导入</span></a><a class="app-nav-link" href="screening-workbench.html"><span data-icon="scan"></span><span>智能筛选</span></a><a class="app-nav-link" href="#" data-prototype-action data-message="AI 面试列表将在下一轮扩展"><span data-icon="message"></span><span>AI 面试</span></a></nav>
+      <nav class="app-nav-section"><div class="app-nav-label">人才资产</div><a class="app-nav-link" href="#" data-prototype-action data-message="候选人库将在下一轮扩展"><span data-icon="users"></span><span>候选人库</span></a><a class="app-nav-link active" href="report.html"><span data-icon="file"></span><span>报告中心</span></a><a class="app-nav-link" href="#" data-prototype-action data-message="数据看板将在下一轮扩展"><span data-icon="chart"></span><span>数据看板</span></a></nav>
+      <div class="app-sidebar-footer"><small>当前组织</small><strong>任度产品体验团队</strong></div>
+    </aside>
+
+    <main class="app-main">
+      <header class="app-topbar">
+        <button class="project-switcher" type="button" data-prototype-action data-message="已打开招聘项目切换器"><span class="avatar-mini">AI</span><span><small>当前招聘项目</small><strong>AI 产品经理 · 北京</strong></span><span data-icon="chevron"></span></button>
+        <div class="topbar-actions"><button class="button-icon" type="button" aria-label="帮助" data-replay-tutorial><span data-icon="help"></span></button><button class="button-icon" type="button" aria-label="通知" data-prototype-action data-message="暂无新的系统通知"><span data-icon="bell"></span></button><div class="user-chip"><span class="user-avatar">HR</span><span>林澈</span></div></div>
+      </header>
+
+      <div class="app-content">
+        <div class="app-page-head">
+          <div><h1>AI 面试报告</h1><p>报告结论来自候选人的真实回答与岗位要求对照，风险信息用于复核，不替代人工判断。</p></div>
+          <div class="app-head-actions"><button class="button light" type="button" data-prototype-action data-message="报告分享链接已复制"><span data-icon="arrow"></span>分享</button><button class="button primary" type="button" data-prototype-action data-message="报告 PDF 已进入导出队列"><span data-icon="file"></span>导出报告</button></div>
+        </div>
+
+        <section class="report-hero">
+          <article class="report-summary">
+            <div class="report-person"><span class="avatar-mini">林</span><div><strong>林屿 · AI 产品经理</strong><small>深度面试 · 2026 年 7 月 5 日 · 38 分钟</small></div></div>
+            <div class="report-verdict"><span>RECOMMENDATION / BUSINESS INTERVIEW</span><h2>建议进入业务终面</h2><p>候选人在 AI 产品方法、复杂项目拆解与跨团队推进方面表现突出。商业化验证样本仍偏小，建议下一轮重点确认从试点到规模化的经营能力。</p></div>
+          </article>
+          <article class="report-score-card">
+            <div class="score-ring"><strong>86</strong></div>
+            <div class="report-score-meta"><strong>综合表现良好</strong><p>评分可信度：高<br>岗位匹配度：88<br>自驱力：91</p><div class="report-badges"><span class="status success">12 条能力证据</span><span class="status warning">2 项复核建议</span></div></div>
+          </article>
+        </section>
+
+        <section class="report-grid">
+          <article class="app-card">
+            <div class="app-card-head"><h2>能力雷达</h2><span class="status info">7 个维度</span></div>
+            <div class="radar-wrap">
+              <svg viewBox="0 0 260 260" aria-label="候选人能力雷达图">
+                <g fill="none" stroke="#dfe3e8" stroke-width="1">
+                  <polygon points="130,20 216,62 237,155 177,230 83,230 23,155 44,62"/>
+                  <polygon points="130,48 194,80 209,150 165,205 95,205 51,150 66,80"/>
+                  <polygon points="130,76 172,97 181,145 153,180 107,180 79,145 88,97"/>
+                  <path d="M130 20v210M23 155l214 0M44 62l133 168M216 62 83 230M237 155 44 62M23 155l193-93M130 20 83 230"/>
+                </g>
+                <polygon points="130,36 198,72 216,151 162,209 94,212 47,151 63,73" fill="rgba(22,93,255,.18)" stroke="#165dff" stroke-width="2"/>
+                <g fill="#165dff"><circle cx="130" cy="36" r="4"/><circle cx="198" cy="72" r="4"/><circle cx="216" cy="151" r="4"/><circle cx="162" cy="209" r="4"/><circle cx="94" cy="212" r="4"/><circle cx="47" cy="151" r="4"/><circle cx="63" cy="73" r="4"/></g>
+                <g fill="#59606b" font-size="9" text-anchor="middle"><text x="130" y="12">专业能力</text><text x="228" y="57">项目深度</text><text x="249" y="160">问题解决</text><text x="185" y="247">逻辑表达</text><text x="73" y="247">协作沟通</text><text x="12" y="160">自驱力</text><text x="34" y="57">岗位匹配</text></g>
+              </svg>
+            </div>
+          </article>
+
+          <article class="app-card">
+            <div class="app-card-head"><h2>问答证据链</h2><button type="button" data-prototype-action data-message="已切换为只看风险问题">只看风险</button></div>
+            <div class="evidence-list">
+              <div class="evidence-item"><div class="evidence-item-head"><strong>Q04 · 如何判断企业知识库值得投入？</strong><span class="evidence-tag">战略判断</span></div><p>候选人说明了重复咨询占客服时间约 28% 的采样方式，并解释为何首期只覆盖 50 个高频主题。结论可关联到“目标拆解”和“范围控制”两项能力。</p></div>
+              <div class="evidence-item"><div class="evidence-item-head"><strong>Q07 · 如何证明上线结果不是自然波动？</strong><span class="evidence-tag">数据能力</span></div><p>候选人使用 4 周前后工单对照，并补充了客服团队规模变化。回答包含指标口径与干扰因素，证据充分。</p></div>
+              <div class="evidence-item"><div class="evidence-item-head"><strong>Q11 · 试点如何转化为规模化收入？</strong><span class="evidence-tag" style="color:var(--orange)">需要复核</span></div><p>回答主要集中在产品复购意愿，缺少签约周期、客单价和渠道效率数据。建议业务终面继续核实。</p></div>
+            </div>
+          </article>
+        </section>
+
+        <section class="report-columns">
+          <article class="insight-card positive"><h3>核心优势</h3><p>能够将模糊问题转化为可验证目标，回答中持续出现清晰的指标、范围与取舍；对 AI 产品评测和业务闭环有实际方法。</p></article>
+          <article class="insight-card risk"><h3>复核建议</h3><p>商业化案例仍以试点为主。建议确认从试点转向付费部署时，候选人承担的具体责任、结果和失败经验。</p></article>
+        </section>
+      </div>
+    </main>
+  </div>
+  <script src="site.js?v=2"></script>
+</body>
+</html>
