@@ -156,7 +156,7 @@ async def register_user(
     pwd = get_password_hash(password)
     nick = nickname or username[-8:] if len(username) > 8 else username
 
-    # 先检查是否已存在
+    # 先检查是否已存在（避免唯一约束冲突）
     existing = await db.execute(
         select(User).where(
             (User.username == username) | ((User.email == email) if email else False)
@@ -166,12 +166,13 @@ async def register_user(
     if existing_user:
         return existing_user
 
+    # 使用原始 INSERT（不依赖 ON CONFLICT，先查后插已在上面完成）
     result = await db.execute(
         _t(
             "INSERT INTO users (username, phone, email, password_hash, nickname, "
             "role, is_active, plan, created_at, updated_at) "
             "VALUES (:u, :p, :e, :pw, :n, 'user', TRUE, 'free', NOW(), NOW()) "
-            "ON CONFLICT DO NOTHING RETURNING id"
+            "RETURNING id"
         ),
         {"u": username, "p": phone, "e": email, "pw": pwd, "n": nick},
     )
@@ -183,8 +184,7 @@ async def register_user(
         _t(
             "INSERT INTO user_quotas (user_id, tokens_used, tokens_limit, plan, "
             "free_chats_used, free_chat_limit, model_tier, created_at, updated_at) "
-            "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 'flash', NOW(), NOW()) "
-            "ON CONFLICT (user_id) DO NOTHING"
+            "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 'flash', NOW(), NOW())"
         ),
         {"uid": user_id, "limit": settings.FREE_TIER_TOKEN_LIMIT, "chat_limit": settings.FREE_CHAT_LIMIT},
     )
