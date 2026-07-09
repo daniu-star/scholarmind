@@ -50,7 +50,7 @@ if (fs.existsSync(srcAssets)) {
 // 5. 替换/注入 <meta name="api-base"> 标签（始终替换，不残留旧 URL）
 let html = fs.readFileSync(dstHtml, 'utf-8');
 const metaTag = '<meta name="api-base" content="' + apiBase + '">';
-const existingMetaRegex = /<meta\s+name=["']api-base["']\s+content=["'][^"']*["']\s*\/?>/i;
+const existingMetaRegex = /<meta\s+name=["']api-base["']\s+content=["'][^"']*["']\s*\/?>/gi;
 
 if (existingMetaRegex.test(html)) {
   html = html.replace(existingMetaRegex, metaTag);
