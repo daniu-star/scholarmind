@@ -70,6 +70,7 @@ _PIPELINE_AVAILABLE = False
 _pipeline_create = None
 _pipeline_run = None
 _PipelineConfig = None
+_PIPELINE_INIT_ERROR: str | None = None  # 记录初始化失败的具体原因
 
 
 def _try_import_pipeline() -> bool:
@@ -78,13 +79,14 @@ def _try_import_pipeline() -> bool:
     使用 importlib 直接加载技能目录中的模块，避免与 cyclical-paper-review
     的 pipeline.loop_controller 发生模块名冲突。
     """
-    global _PIPELINE_AVAILABLE, _pipeline_create, _pipeline_run, _PipelineConfig
+    global _PIPELINE_AVAILABLE, _pipeline_create, _pipeline_run, _PipelineConfig, _PIPELINE_INIT_ERROR
 
     if _PIPELINE_AVAILABLE:
         return True
 
     if not PIPELINE_DIR.exists():
-        logger.warning(f"Pipeline skill directory not found: {PIPELINE_DIR}")
+        _PIPELINE_INIT_ERROR = f"Pipeline skill directory not found: {PIPELINE_DIR} (SKILLS_DIR={_SKILLS_BASE})"
+        logger.warning(_PIPELINE_INIT_ERROR)
         return False
 
     try:
@@ -131,12 +133,14 @@ def _try_import_pipeline() -> bool:
         return True
 
     except ImportError as e:
+        _PIPELINE_INIT_ERROR = f"ImportError: {e} (hint: pip install langgraph)"
         logger.warning(
             f"cyclical_paper_pipeline_unavailable reason=import_failed error={e} "
             f"hint=Install langgraph: pip install langgraph"
         )
         return False
     except Exception as e:
+        _PIPELINE_INIT_ERROR = f"{type(e).__name__}: {e}"
         logger.warning(
             f"cyclical_paper_pipeline_unavailable reason=unexpected_error error={e}"
         )
@@ -211,8 +215,9 @@ class PaperPipelineService:
             PipelineUnavailableError: 真实 Pipeline 依赖未安装
         """
         if not self._real_available:
+            reason = _PIPELINE_INIT_ERROR or "unknown reason"
             raise PipelineUnavailableError(
-                "论文生成 Pipeline 依赖未安装，无法启动。请先安装：pip install langgraph"
+                f"论文生成 Pipeline 依赖未安装，无法启动。原因：{reason}"
             )
 
         pipeline_id = str(uuid.uuid4())
