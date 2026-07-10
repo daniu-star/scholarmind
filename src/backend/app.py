@@ -140,6 +140,7 @@ def create_app() -> FastAPI:
             "version": settings.VERSION,
             "environment": settings.ENVIRONMENT,
             "llm_reachable": getattr(request.app.state, "llm_reachable", False),
+            "llm_failure_reason": getattr(request.app.state, "llm_failure_reason", None),
             "deepseek_key_configured": bool(settings.DEEPSEEK_API_KEY),
         }
 
@@ -171,6 +172,7 @@ def create_app() -> FastAPI:
             "version": settings.VERSION,
             "environment": settings.ENVIRONMENT,
             "llm_reachable": getattr(request.app.state, "llm_reachable", False),
+            "llm_failure_reason": getattr(request.app.state, "llm_failure_reason", None),
             "database": {"connected": db_ok, "pool": pool_stats},
             "rate_limit_enabled": settings.RATE_LIMIT_ENABLED,
             "task_backend": settings.TASK_BACKEND,

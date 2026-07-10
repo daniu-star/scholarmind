@@ -44,6 +44,37 @@ TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".py", ".r", ".bib"}
 BINARY_EXTENSIONS = {".pdf", ".docx"}
 
 
+def _classify_llm_error(exc: Exception) -> str:
+    """将 LLM 调用异常分类为可操作的中文错误描述。
+
+    用于 Mock 降级前缀，让用户知道具体失败原因（余额不足/认证失败/网络不可达等），
+    而非泛化的 error_type（如 APIStatusError）。
+    """
+    # OpenAI SDK 的 APIStatusError 有 status_code 属性
+    status_code = getattr(exc, "status_code", None)
+    err_msg = str(exc).lower()
+
+    # HTTP 402 余额不足（DeepSeek 特有）
+    if status_code == 402 or "insufficient balance" in err_msg or "余额不足" in err_msg:
+        return "DeepSeek API 余额不足（HTTP 402），请前往 platform.deepseek.com 充值"
+
+    # HTTP 401 认证失败
+    if status_code == 401 or "authentication" in err_msg or "invalid api key" in err_msg:
+        return "DeepSeek API 认证失败（HTTP 401），请检查 API Key 配置"
+
+    # HTTP 429 限流
+    if status_code == 429 or "rate limit" in err_msg:
+        return "DeepSeek API 请求频率超限（HTTP 429），请稍后重试"
+
+    # 连接/超时错误（无 status_code）
+    exc_type_name = type(exc).__name__
+    if exc_type_name in ("APIConnectionError", "APITimeoutError") or "timeout" in err_msg or "connection" in err_msg:
+        return f"DeepSeek API 网络不可达（{exc_type_name}），请检查网络连通性"
+
+    # 兜底
+    return f"DeepSeek API 调用失败（{exc_type_name}）"
+
+
 class AgentService(IAgentService):
     def __init__(
         self,
@@ -237,21 +268,22 @@ class AgentService(IAgentService):
         except Exception as e:
             latency_ms = int((time.monotonic() - llm_start) * 1000)
             error_type = type(e).__name__
-            logger.error(f"DeepSeek API call failed: {e}")
+            error_reason = _classify_llm_error(e)
+            logger.error(f"DeepSeek API call failed: {e} reason={error_reason}")
             await self._log_agent_execution(
                 user_id=user_id, agent_id=agent_id, session_id=session_id,
                 model=llm_model, status="failed", latency_ms=latency_ms,
-                error_code="LLM_API_FAILED", error_message=str(e),
+                error_code="LLM_API_FAILED", error_message=f"{error_reason}: {e}",
             )
             # P0 修复: LLM 调用失败时降级到 Mock 模式，而非抛出 AgentChatFailedError(500)
-            # 项目要求：显示「⚠️ LLM调用失败（{error_type}），已降级为离线引导模式」提示
+            # Task 9: 精细化披露失败原因（余额不足/认证失败/网络不可达等）
             mock_content = self._generate_mock_reply(
                 message=message, agent_id=agent_id, session_id=session_id, context=context,
             )
-            reply = f"⚠️ LLM调用失败（{error_type}），已降级为离线引导模式\n\n{mock_content}"
+            reply = f"⚠️ {error_reason}，已降级为离线引导模式\n\n{mock_content}"
             logger.info(
                 f"LLM degraded to mock mode session={session_id} agent={agent_id} "
-                f"error_type={error_type} reply_len={len(reply)}"
+                f"error_type={error_type} reason={error_reason} reply_len={len(reply)}"
             )
 
         # Update conversation history
@@ -363,24 +395,25 @@ class AgentService(IAgentService):
         except Exception as e:
             latency_ms = int((time.monotonic() - llm_start) * 1000)
             error_type = type(e).__name__
-            logger.error(f"DeepSeek stream API failed: {e}")
+            error_reason = _classify_llm_error(e)
+            logger.error(f"DeepSeek stream API failed: {e} reason={error_reason}")
             await self._log_agent_execution(
                 user_id=user_id, agent_id=agent_id, session_id=session_id,
                 model=llm_model, status="failed", latency_ms=latency_ms,
-                error_code="LLM_STREAM_FAILED", error_message=str(e),
+                error_code="LLM_STREAM_FAILED", error_message=f"{error_reason}: {e}",
             )
             # P0 修复: 流式 LLM 调用失败时降级到 Mock 模式，而非 yield 裸错误后 return
-            # 项目要求：显示「⚠️ LLM调用失败（{error_type}），已降级为离线引导模式」提示
+            # Task 9: 精细化披露失败原因（余额不足/认证失败/网络不可达等）
             mock_content = self._generate_mock_reply(
                 message=message, agent_id=agent_id, session_id=session_id, context=context,
             )
-            full_reply = f"⚠️ LLM调用失败（{error_type}），已降级为离线引导模式\n\n{mock_content}"
+            full_reply = f"⚠️ {error_reason}，已降级为离线引导模式\n\n{mock_content}"
             # 将降级回复作为 token 事件流式输出（单次 yield，保证前端按 token 渲染）
             yield {"type": "token", "content": full_reply}
             degraded = True
             logger.info(
                 f"LLM stream degraded to mock mode session={session_id} agent={agent_id} "
-                f"error_type={error_type} reply_len={len(full_reply)}"
+                f"error_type={error_type} reason={error_reason} reply_len={len(full_reply)}"
             )
 
         # P1: 记录流式 LLM 调用成功日志（降级模式已在 except 内记录 failed，跳过 success 日志）

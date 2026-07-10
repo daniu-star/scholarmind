@@ -94,6 +94,7 @@ async def startup(app: FastAPI) -> None:
     app.state.db_session_factory = session_factory
     # LLM 连通性标志：由后台探测线程设置，默认 False（健康检查读取此字段）
     app.state.llm_reachable = False
+    app.state.llm_failure_reason = None
 
     # 开发环境：使用 Alembic 迁移（替代 Base.metadata.create_all）
     try:
@@ -169,13 +170,26 @@ async def startup(app: FastAPI) -> None:
                 )
                 # 能拿到响应即视为可达
                 app.state.llm_reachable = bool(resp and (resp.content or resp))
+                app.state.llm_failure_reason = None
                 logger.info(f"deepseek_probe_ok model={settings.DEEPSEEK_MODEL} reachable={app.state.llm_reachable}")
                 return app.state.llm_reachable
             except asyncio.TimeoutError:
-                logger.warning("deepseek_probe_timeout (>30s), llm_reachable stays False")
+                app.state.llm_failure_reason = "探测超时（>30s），DeepSeek API 未响应"
+                logger.warning(f"deepseek_probe_timeout (>30s), llm_reachable stays False reason={app.state.llm_failure_reason}")
                 return False
             except Exception as e:
-                logger.warning(f"deepseek_probe_failed type={type(e).__name__} err={e} llm_reachable stays False")
+                status_code = getattr(e, "status_code", None)
+                err_str = str(e)
+                if status_code == 402 or "insufficient balance" in err_str.lower():
+                    reason = f"余额不足（HTTP 402），请前往 platform.deepseek.com 充值"
+                elif status_code == 401:
+                    reason = f"认证失败（HTTP 401），请检查 API Key"
+                elif status_code == 429:
+                    reason = f"请求频率超限（HTTP 429）"
+                else:
+                    reason = f"{type(e).__name__} (HTTP {status_code}): {err_str}"
+                app.state.llm_failure_reason = reason
+                logger.warning(f"deepseek_probe_failed type={type(e).__name__} status={status_code} err={e} reason={reason} llm_reachable stays False")
                 return False
 
         # 首次探测
