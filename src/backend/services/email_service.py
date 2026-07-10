@@ -243,6 +243,7 @@ async def _send_via_vercel_proxy(target_email: str, code: str) -> tuple[bool, st
 
     Vercel 运行在 AWS Lambda 上，不封锁 SMTP 465/587 端口。
     后端通过 HTTPS 443 调用此函数，函数内部用 nodemailer+SMTP 发送邮件。
+    SMTP 凭据从后端 .env 读取，通过 HTTPS 请求体加密传输给 Vercel function。
 
     Returns:
         (success, error_message) 元组
@@ -252,11 +253,29 @@ async def _send_via_vercel_proxy(target_email: str, code: str) -> tuple[bool, st
     if not settings.VERCEL_EMAIL_PROXY_URL or not settings.VERCEL_EMAIL_PROXY_KEY:
         return False, "VERCEL_EMAIL_PROXY_URL or VERCEL_EMAIL_PROXY_KEY not configured"
 
+    if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+        return False, "SMTP_USER or SMTP_PASSWORD not configured for Vercel proxy"
+
+    # 解析 SMTP 主机端口 — Vercel 不封锁端口，优先 465（SSL 直连，nodemailer 更可靠）
+    if settings.SMTP_HOST and settings.SMTP_PORT > 0:
+        smtp_host = settings.SMTP_HOST
+        smtp_port = settings.SMTP_PORT
+    else:
+        smtp_host, smtp_port, _ = _detect_smtp(settings.SMTP_USER)
+        # Vercel 不封锁 465，将 587 改为 465 以获得更可靠的 SSL 直连
+        if smtp_port == 587:
+            smtp_port = 465
+
     import httpx
 
     payload = {
         "to_email": target_email,
         "code": code,
+        "smtp_host": smtp_host,
+        "smtp_port": str(smtp_port),
+        "smtp_user": settings.SMTP_USER,
+        "smtp_password": settings.SMTP_PASSWORD,
+        "smtp_from_name": settings.SMTP_FROM_NAME,
     }
 
     try:
@@ -272,7 +291,7 @@ async def _send_via_vercel_proxy(target_email: str, code: str) -> tuple[bool, st
             if resp.status_code == 200:
                 data = resp.json()
                 if data.get("success"):
-                    logger.info(f"vercel_proxy_email_sent to={_mask_email(target_email)}")
+                    logger.info(f"vercel_proxy_email_sent to={_mask_email(target_email)} host={smtp_host}:{smtp_port}")
                     return True, None
                 err = data.get("error", "unknown")
                 _last_resend_error = f"Vercel proxy: {err}"

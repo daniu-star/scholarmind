@@ -4,33 +4,19 @@
  * 通过 nodemailer + SMTP 发送验证码邮件，绕过 Railway 的 SMTP 端口封锁。
  * Vercel/AWS Lambda 不封锁 SMTP 465/587 端口。
  *
- * 认证：X-API-Key 请求头需匹配环境变量 EMAIL_PROXY_KEY
- * 调用：POST /api/send-email  body: { to_email, code }
+ * 认证：X-API-Key 请求头需匹配 PROXY_API_KEY 常量
+ * 调用：POST /api/send-email
+ *   headers: { X-API-Key: <proxy_key> }
+ *   body: { to_email, code, smtp_host, smtp_port, smtp_user, smtp_password, smtp_from_name }
+ *
+ * 设计说明：
+ *   SMTP 凭据由后端通过 HTTPS 请求体传入（加密传输），不在 Vercel 环境变量中存储。
+ *   后端从自身 .env 读取 SMTP_USER/SMTP_PASSWORD，确保真实凭据不入源码仓库。
  */
 const nodemailer = require('nodemailer');
 
-// 缓存 transporter（serverless 冷启动优化，避免每次请求都创建连接）
-let transporter = null;
-
-function getTransporter() {
-  if (!transporter) {
-    const host = process.env.SMTP_HOST || 'smtp.163.com';
-    const port = parseInt(process.env.SMTP_PORT || '465', 10);
-    transporter = nodemailer.createTransport({
-      host: host,
-      port: port,
-      secure: port === 465, // 465 用 SSL 直连，587 用 STARTTLS
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-      },
-      connectionTimeout: 8000,
-      greetingTimeout: 5000,
-      socketTimeout: 8000,
-    });
-  }
-  return transporter;
-}
+// 代理认证密钥（随机字符串，仅用于防止外部滥用，非真实账户密码）
+const PROXY_API_KEY = 'vJAC4wDxVy1cbvkgiK-Woa18zDQmxxUixZxl_sZC7ao';
 
 module.exports = async (req, res) => {
   // CORS 预检
@@ -48,26 +34,53 @@ module.exports = async (req, res) => {
 
   // 密钥认证（防止外部滥用）
   const apiKey = req.headers['x-api-key'];
-  if (!apiKey || apiKey !== process.env.EMAIL_PROXY_KEY) {
+  if (!apiKey || apiKey !== PROXY_API_KEY) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 
-  const { to_email, code } = req.body || {};
+  const {
+    to_email,
+    code,
+    smtp_host,
+    smtp_port,
+    smtp_user,
+    smtp_password,
+    smtp_from_name,
+  } = req.body || {};
 
+  // 参数校验
   if (!to_email || !code) {
     return res.status(400).json({ success: false, error: 'Missing to_email or code' });
   }
-
-  // 基本邮箱格式校验
+  if (!smtp_user || !smtp_password) {
+    return res.status(400).json({ success: false, error: 'Missing smtp credentials' });
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to_email)) {
     return res.status(400).json({ success: false, error: 'Invalid email format' });
   }
+  if (!/^\d{4,8}$/.test(String(code))) {
+    return res.status(400).json({ success: false, error: 'Invalid code format' });
+  }
+
+  const host = smtp_host || 'smtp.163.com';
+  const port = parseInt(smtp_port || '465', 10);
+  const fromName = smtp_from_name || 'ScholarMind';
+  const expireMinutes = '5';
 
   try {
-    const t = getTransporter();
-    const fromName = process.env.SMTP_FROM_NAME || 'ScholarMind';
-    const fromEmail = process.env.SMTP_USER;
-    const expireMinutes = process.env.VERIFICATION_CODE_EXPIRE_MINUTES || '5';
+    // 每次请求创建新 transporter（凭据来自请求体，不可缓存）
+    const transporter = nodemailer.createTransport({
+      host: host,
+      port: port,
+      secure: port === 465, // 465 用 SSL 直连，587 用 STARTTLS
+      auth: {
+        user: smtp_user,
+        pass: smtp_password,
+      },
+      connectionTimeout: 8000,
+      greetingTimeout: 5000,
+      socketTimeout: 8000,
+    });
 
     const html = `<div style="max-width:480px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;color:#1a1a1a;background:#f0f7f1;border-radius:16px;padding:36px 28px">
   <div style="text-align:center;margin-bottom:24px">
@@ -84,12 +97,12 @@ module.exports = async (req, res) => {
   </div>
 </div>`;
 
-    const info = await t.sendMail({
-      from: `"${fromName}" <${fromEmail}>`,
+    const info = await transporter.sendMail({
+      from: `"${fromName}" <${smtp_user}>`,
       to: to_email,
       subject: `[ScholarMind] 验证码：${code}`,
       html: html,
-      replyTo: fromEmail,
+      replyTo: smtp_user,
     });
 
     console.log('email_sent_success', { to: to_email, messageId: info.messageId });
