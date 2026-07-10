@@ -74,26 +74,34 @@ def get_last_resend_error() -> str | None:
     return _last_resend_error
 
 
-async def _send_via_resend(to_email: str, code: str) -> bool:
+async def _send_via_resend(to_email: str, code: str) -> tuple[bool, str | None]:
     """通过 Resend HTTP API 发送邮件（绕过 Railway SMTP 封锁，走 HTTPS 443）。
 
     Returns:
-        True 表示发送成功，False 表示不可用（未配置 API Key 或发送失败）
+        (success, error_message) 元组：
+        - (True, None) 表示发送成功
+        - (False, "DOMAIN_NOT_VERIFIED") 表示域名未验证，应回退 SMTP
+        - (False, "其他错误信息") 表示其他失败
     """
     global _last_resend_error
     if not settings.RESEND_API_KEY:
         _last_resend_error = "RESEND_API_KEY not configured"
-        return False
+        return False, "RESEND_NOT_CONFIGURED"
 
     import httpx
-    # Resend 免费模式限制：只能发往账户注册邮箱
-    # 域名验证完成后可移除此限制
-    actual_recipient = to_email  # 目标收件人
-    send_to = "muc18229499131@gmail.com"  # Resend 账户邮箱（免费模式限制）
+    # 🔴 P0 修复：移除硬编码的免费模式限制，发送到用户实际邮箱
+    # 原代码：send_to = "muc18229499131@gmail.com" 导致所有邮件都发到账户邮箱
+    # 修复后：发送到用户填写的实际邮箱地址
+    send_to = to_email  # 发送到用户实际邮箱
+
+    # 使用已验证的发件域名（优先使用配置的域名，否则使用 resend.dev）
+    from_domain = settings.RESEND_FROM_DOMAIN if hasattr(settings, 'RESEND_FROM_DOMAIN') and settings.RESEND_FROM_DOMAIN else "resend.dev"
+    from_email = f"{settings.SMTP_FROM_NAME} <noreply@{from_domain}>"
+
     payload = {
-        "from": f"{settings.SMTP_FROM_NAME} <onboarding@resend.dev>",
+        "from": from_email,
         "to": [send_to],
-        "subject": f"[ScholarMind] 验证码：{code}（收件人：{to_email}）",
+        "subject": f"[ScholarMind] 验证码：{code}",
         "html": f"""<div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif;color:#1a1a1a;background:#f0f7f1;border-radius:16px;padding:36px 28px">
 <div style="text-align:center;margin-bottom:24px">
 <div style="display:inline-block;background:linear-gradient(135deg,#2E7D32,#1B5E20);color:#fff;font-size:28px;font-weight:700;padding:8px 20px;border-radius:10px">ScholarMind</div>
@@ -119,14 +127,27 @@ async def _send_via_resend(to_email: str, code: str) -> bool:
             if resp.status_code in (200, 201):
                 _last_resend_error = None
                 logger.info(f"resend_email_sent to={_mask_email(to_email)}")
-                return True
-            _last_resend_error = f"Resend HTTP {resp.status_code}: {resp.text[:200]}"
-            logger.warning(f"resend_api_failed status={resp.status_code} body={resp.text[:200]}")
-            return False
+                return True, None
+
+            # 检测域名未验证错误（需要回退 SMTP）
+            resp_text = resp.text
+            if "domain" in resp_text.lower() and ("not verified" in resp_text.lower() or "unverified" in resp_text.lower()):
+                _last_resend_error = f"Resend 域名未验证: {resp_text[:200]}"
+                logger.warning(f"resend_domain_not_verified to={_mask_email(to_email)}")
+                return False, "DOMAIN_NOT_VERIFIED"
+
+            if "free mode" in resp_text.lower() or "restricted" in resp_text.lower():
+                _last_resend_error = f"Resend 免费模式限制: {resp_text[:200]}"
+                logger.warning(f"resend_free_mode_restricted to={_mask_email(to_email)}")
+                return False, "FREE_MODE_RESTRICTED"
+
+            _last_resend_error = f"Resend HTTP {resp.status_code}: {resp_text[:200]}"
+            logger.warning(f"resend_api_failed status={resp.status_code} body={resp_text[:200]}")
+            return False, f"HTTP_{resp.status_code}"
     except Exception as e:
         _last_resend_error = f"Resend network: {e}"
         logger.warning(f"resend_network_error error={e}")
-        return False
+        return False, "NETWORK_ERROR"
 
 
 def _detect_smtp(email: str) -> tuple[str, int, str]:
@@ -142,13 +163,21 @@ def _detect_smtp(email: str) -> tuple[str, int, str]:
 
 
 async def send_verification_email(target_email: str, code: str) -> None:
-    """发送验证码邮件 — 优先 Resend API，回退 SMTP"""
+    """发送验证码邮件 — 优先 Resend API，失败时回退 SMTP"""
 
     # 优先尝试 Resend HTTP API（绕过 Railway SMTP 封锁）
     if settings.RESEND_API_KEY:
-        if await _send_via_resend(target_email, code):
+        success, error_type = await _send_via_resend(target_email, code)
+        if success:
             return
-        # Resend 失败，继续尝试 SMTP
+        # Resend 失败，检查是否需要回退 SMTP
+        if error_type in ("DOMAIN_NOT_VERIFIED", "FREE_MODE_RESTRICTED"):
+            logger.info(f"resend_fallback_to_smtp reason={error_type} to={_mask_email(target_email)}")
+            # 继续尝试 SMTP
+        else:
+            # 其他错误（网络、HTTP 错误等），也尝试 SMTP 回退
+            logger.warning(f"resend_failed_attempting_smtp error={error_type}")
+            # 继续尝试 SMTP
 
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         raise EmailSendError(
