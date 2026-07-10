@@ -23,6 +23,9 @@ from ..core.exceptions import NotFoundError
 # P0 Task 3.3：强制鉴权（替代 get_optional_user_id 可选鉴权）
 from ..core.dependencies import get_current_user, get_db
 from ..services.entitlement_service import EntitlementError, EntitlementService
+from ..core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/paper-pipeline", tags=["paper-pipeline"])
 
@@ -66,9 +69,20 @@ async def start_pipeline(
             pass_threshold=request.pass_threshold,
             user_id=str(user_id),
         )
-    except Exception:
+    except Exception as e:
         await EntitlementService.refund_pipeline(db, user_id, reservation)
-        raise
+        logger.exception(f"pipeline_start_failed user_id={user_id} error={e}")
+        # Distinguish LLM unavailability from other errors
+        error_msg = str(e).lower()
+        if any(kw in error_msg for kw in ["timeout", "connection", "unreachable", "refused", "api_key", "authenticate"]):
+            raise HTTPException(
+                status_code=503,
+                detail={"code": "LLM_UNAVAILABLE", "message": "AI服务暂不可用，请稍后重试。Pipeline 依赖大语言模型，当前模型服务无法访问。"},
+            ) from e
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "PIPELINE_START_FAILED", "message": f"Pipeline 启动失败: {str(e)}"},
+        ) from e
 
     return PipelineStartResponse(
         pipeline_id=result["pipeline_id"],

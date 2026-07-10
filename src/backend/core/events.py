@@ -150,29 +150,41 @@ async def startup(app: FastAPI) -> None:
 
     # ── DeepSeek LLM 连通性后台探测（fire-and-forget，不阻塞 startup）──
     # 健康检查的 llm_reachable 字段依赖此探测结果。探测用 1-token 请求，
-    # 10s 超时；成功则置 app.state.llm_reachable = True。
+    # 30s 超时；首次失败后 60s 重试一次。成功则置 app.state.llm_reachable = True。
     import asyncio
     from ..utils.llm_client import llm_client
 
     async def _probe_deepseek() -> None:
-        try:
-            resp = await asyncio.wait_for(
-                llm_client.chat(
-                    system="ok",
-                    user="ping",
-                    temperature=0.0,
-                    max_tokens=1,
-                    model=settings.DEEPSEEK_MODEL,
-                ),
-                timeout=10.0,
-            )
-            # 能拿到响应即视为可达
-            app.state.llm_reachable = bool(resp and (resp.content or resp))
-            logger.info(f"deepseek_probe_ok model={settings.DEEPSEEK_MODEL} reachable={app.state.llm_reachable}")
-        except asyncio.TimeoutError:
-            logger.warning("deepseek_probe_timeout (>10s), llm_reachable stays False")
-        except Exception as e:
-            logger.warning(f"deepseek_probe_failed type={type(e).__name__} err={e} llm_reachable stays False")
+        async def _try_probe() -> bool:
+            try:
+                resp = await asyncio.wait_for(
+                    llm_client.chat(
+                        system="ok",
+                        user="ping",
+                        temperature=0.0,
+                        max_tokens=1,
+                        model=settings.DEEPSEEK_MODEL,
+                    ),
+                    timeout=30.0,
+                )
+                # 能拿到响应即视为可达
+                app.state.llm_reachable = bool(resp and (resp.content or resp))
+                logger.info(f"deepseek_probe_ok model={settings.DEEPSEEK_MODEL} reachable={app.state.llm_reachable}")
+                return app.state.llm_reachable
+            except asyncio.TimeoutError:
+                logger.warning("deepseek_probe_timeout (>30s), llm_reachable stays False")
+                return False
+            except Exception as e:
+                logger.warning(f"deepseek_probe_failed type={type(e).__name__} err={e} llm_reachable stays False")
+                return False
+
+        # 首次探测
+        if await _try_probe():
+            return
+        # 首次失败，60s 后重试一次（Railway 冷启动后 DNS/网络可能需要时间恢复）
+        logger.info("deepseek_probe_first_failed_retry_in_60s")
+        await asyncio.sleep(60)
+        await _try_probe()
 
     asyncio.create_task(_probe_deepseek())
     logger.info("DeepSeek connectivity probe dispatched to background task")

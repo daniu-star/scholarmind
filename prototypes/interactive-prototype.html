@@ -13682,29 +13682,36 @@ function sendMessage(pageId) {
     const typingEl = document.getElementById(typingId);
     if (typingEl) typingEl.remove();
 
-    // Check if this is a network error (backend not running) → use client-side mock
+    // Check if this is a network error (backend not running) or a server error (HTTP 5xx) → degrade to client-side mock
     var isNetworkError = (err instanceof TypeError) || (err.message && err.message.includes('Failed to fetch'));
-    
-    if (isNetworkError) {
-      clientMockModeActive = true;
-      // Update health indicator to offline mode
-      var statusEl = document.getElementById('backendStatus');
-      if (statusEl) {
-        statusEl.className = 'backend-status offline-mode';
-        statusEl.querySelector('.status-text').textContent = '离线模式';
-        var tooltipEl = document.getElementById('backendStatusTooltip');
-        if (tooltipEl) tooltipEl.textContent = '后端未运行，正在使用离线模式。启动后端：cd src/backend && uvicorn app:app --reload';
+    var isServerError = !!(err.message && /HTTP\s+5\d\d/.test(err.message));
+    var shouldDegrade = isNetworkError || isServerError;
+
+    if (shouldDegrade) {
+      // Only flip the global offline flag for true network errors (backend down).
+      // 5xx errors may be transient, so keep retrying the backend on subsequent messages.
+      if (isNetworkError) {
+        clientMockModeActive = true;
+        // Update health indicator to offline mode
+        var statusEl = document.getElementById('backendStatus');
+        if (statusEl) {
+          statusEl.className = 'backend-status offline-mode';
+          statusEl.querySelector('.status-text').textContent = '离线模式';
+          var tooltipEl = document.getElementById('backendStatusTooltip');
+          if (tooltipEl) tooltipEl.textContent = '后端未运行，正在使用离线模式。启动后端：cd src/backend && uvicorn app:app --reload';
+        }
       }
-      
+
       var mockReply = generateClientMockReply(agentId, message).replace(/\s*\[[^\]]+\]\s*$/, '').trim();
       var aiBubble = document.createElement('div');
       aiBubble.className = 'chat-bubble chat-bubble-ai';
-      // Add offline mode badge
-      var badge = '<span style="display:inline-block;font-size:0.68rem;padding:1px 6px;border-radius:var(--radius-sm);background:rgba(251,191,36,0.15);color:var(--amber-warning);margin-bottom:6px;">离线模式</span><br>';
+      // Add degradation badge (离线模式 for network errors, 降级模式 for 5xx server errors)
+      var badgeLabel = isNetworkError ? '离线模式' : '降级模式';
+      var badge = '<span style="display:inline-block;font-size:0.68rem;padding:1px 6px;border-radius:var(--radius-sm);background:rgba(251,191,36,0.15);color:var(--amber-warning);margin-bottom:6px;">' + badgeLabel + '</span><br>';
       if (typeof marked !== 'undefined') {
         aiBubble.innerHTML = badge + safeRenderMarkdown(mockReply);
       } else {
-        aiBubble.textContent = '[离线模式] ' + mockReply;
+        aiBubble.textContent = '[' + badgeLabel + '] ' + mockReply;
       }
       chatMessages.appendChild(aiBubble);
       addChatRecord(pageId, 'ai', mockReply);
@@ -13955,7 +13962,14 @@ function startPaperPipeline(agentId, guidanceDataStr) {
       has_interview: hasInterview,
     })
   })
-  .then(res => res.json())
+  .then(res => {
+    if (!res.ok) {
+      // 5xx: show a friendly degraded message instead of raw "HTTP 500"
+      if (res.status >= 500) throw new Error('PIPELINE_SERVER_ERROR:' + res.status);
+      throw new Error('HTTP ' + res.status);
+    }
+    return res.json();
+  })
   .then(data => {
     if (data.success && data.pipeline_id) {
       pollPipelineDrawer(data.pipeline_id, 'pipeline');
@@ -13964,10 +13978,16 @@ function startPaperPipeline(agentId, guidanceDataStr) {
     }
   })
   .catch(err => {
-    // 后端不可用 → 显示真实错误（不再模拟空转）
-    var hint = (err && err.status === 404)
-      ? '端点不存在（后端版本不匹配，请重启后端）'
-      : 'Pipeline 启动失败：' + (err.message || err) + '，请检查后端是否运行';
+    // 后端不可用 → 显示友好错误（5xx 不再裸露 "HTTP 500"）
+    var hint;
+    if (err && err.message && err.message.indexOf('PIPELINE_SERVER_ERROR:') === 0) {
+      var code = err.message.split(':')[1];
+      hint = '论文生成服务暂时不可用（HTTP ' + code + '），已降级处理。请稍后重试，或检查后端日志。';
+    } else if (err && err.status === 404) {
+      hint = '端点不存在（后端版本不匹配，请重启后端）';
+    } else {
+      hint = 'Pipeline 启动失败：' + (err.message || err) + '，请检查后端是否运行';
+    }
     renderPipelineDrawer('error', { error: hint });
     showToast(hint, 'error');
   });
@@ -15341,29 +15361,36 @@ function sendWSMessage() {
   .catch(err => {
     if (typingEl.parentNode) typingEl.remove();
     
-    // Check if this is a network error (backend not running) → use client-side mock
+    // Check if this is a network error (backend not running) or a server error (HTTP 5xx) → degrade to client-side mock
     var isNetworkError = (err instanceof TypeError) || (err.message && err.message.includes('Failed to fetch'));
-    
-    if (isNetworkError) {
-      clientMockModeActive = true;
-      // Update health indicator to offline mode
-      var statusEl = document.getElementById('backendStatus');
-      if (statusEl) {
-        statusEl.className = 'backend-status offline-mode';
-        statusEl.querySelector('.status-text').textContent = '离线模式';
-        var tooltipEl = document.getElementById('backendStatusTooltip');
-        if (tooltipEl) tooltipEl.textContent = '后端未运行，正在使用离线模式。启动后端：cd src/backend && uvicorn app:app --reload';
+    var isServerError = !!(err.message && /HTTP\s+5\d\d/.test(err.message));
+    var shouldDegrade = isNetworkError || isServerError;
+
+    if (shouldDegrade) {
+      // Only flip the global offline flag for true network errors (backend down).
+      // 5xx errors may be transient, so keep retrying the backend on subsequent messages.
+      if (isNetworkError) {
+        clientMockModeActive = true;
+        // Update health indicator to offline mode
+        var statusEl = document.getElementById('backendStatus');
+        if (statusEl) {
+          statusEl.className = 'backend-status offline-mode';
+          statusEl.querySelector('.status-text').textContent = '离线模式';
+          var tooltipEl = document.getElementById('backendStatusTooltip');
+          if (tooltipEl) tooltipEl.textContent = '后端未运行，正在使用离线模式。启动后端：cd src/backend && uvicorn app:app --reload';
+        }
       }
-      
+
       var mockReply = generateClientMockReply(wsAgentId, message).replace(/\s*\[[^\]]+\]\s*$/, '').trim();
       var aiBubble = document.createElement('div');
       aiBubble.className = 'chat-bubble chat-bubble-ai';
-      // Add offline mode badge
-      var badge = '<span style="display:inline-block;font-size:0.68rem;padding:1px 6px;border-radius:var(--radius-sm);background:rgba(251,191,36,0.15);color:var(--amber-warning);margin-bottom:6px;">离线模式</span><br>';
+      // Add degradation badge (离线模式 for network errors, 降级模式 for 5xx server errors)
+      var badgeLabel = isNetworkError ? '离线模式' : '降级模式';
+      var badge = '<span style="display:inline-block;font-size:0.68rem;padding:1px 6px;border-radius:var(--radius-sm);background:rgba(251,191,36,0.15);color:var(--amber-warning);margin-bottom:6px;">' + badgeLabel + '</span><br>';
       if (typeof marked !== 'undefined') {
         aiBubble.innerHTML = badge + safeRenderMarkdown(mockReply);
       } else {
-        aiBubble.textContent = '[离线模式] ' + mockReply;
+        aiBubble.textContent = '[' + badgeLabel + '] ' + mockReply;
       }
       chatMessages.appendChild(aiBubble);
       addChatRecord('workspace_' + wsAgentId, 'ai', mockReply);
@@ -18306,6 +18333,27 @@ function sendPaperMessage() {
     // 移除思考指示器
     var typingErr = document.getElementById(typingId);
     if (typingErr) typingErr.remove();
+
+    // 网络错误（后端未运行）或 HTTP 5xx 服务端错误 → 降级为本地 Mock 引导，避免裸露 "HTTP 500"
+    var isNetworkError = (err instanceof TypeError) || (err.message && err.message.indexOf('Failed to fetch') !== -1);
+    var isServerError = !!(err.message && /HTTP\s+5\d\d/.test(err.message));
+    if (isNetworkError || isServerError) {
+      if (isNetworkError) clientMockModeActive = true;
+      var pwMockReply = generateClientMockReply('custom', fullMessage).replace(/\s*\[[^\]]+\]\s*$/, '').trim();
+      var pwBadgeLabel = isNetworkError ? '离线模式' : '降级模式';
+      var pwMockBubble = document.createElement('div');
+      pwMockBubble.className = 'chat-bubble chat-bubble-ai';
+      var pwBadge = '<span style="display:inline-block;font-size:0.68rem;padding:1px 6px;border-radius:var(--radius-sm);background:rgba(251,191,36,0.15);color:var(--amber-warning);margin-bottom:6px;">' + pwBadgeLabel + '</span><br>';
+      if (typeof marked !== 'undefined') {
+        pwMockBubble.innerHTML = pwBadge + safeRenderMarkdown(pwMockReply);
+      } else {
+        pwMockBubble.textContent = '[' + pwBadgeLabel + '] ' + pwMockReply;
+      }
+      msgs.appendChild(pwMockBubble);
+      msgs.scrollTop = msgs.scrollHeight;
+      return;
+    }
+
     // 显示错误气泡
     var errBubble = document.createElement('div');
     errBubble.className = 'chat-bubble chat-bubble-ai chat-bubble-error';

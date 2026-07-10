@@ -67,7 +67,7 @@ async def mark_order_paid(
         # 已失败/过期/拒绝的订单：返回 success 让支付宝停止重试
         return "success"
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     claimed = await db.execute(
         sa_update(Order)
         .where(Order.id == order.id, Order.status.in_(["pending", "reviewing"]))
@@ -182,7 +182,7 @@ async def create_order(
         payment_method=req.payment_method,
         status="pending",
         payment_mode="api",
-        expires_at=datetime.now(timezone.utc) + timedelta(minutes=15),
+        expires_at=datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15),
     )
     db.add(order)
     await db.commit()

@@ -54,7 +54,7 @@ class ChartRepository(BaseRepository[ChartRecord]):
             title=title,
             filepath=filepath,
             session_id=session_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         return await self.create(record)
 

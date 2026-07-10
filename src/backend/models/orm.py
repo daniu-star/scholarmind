@@ -24,8 +24,12 @@ from ..db.session import Base
 
 
 def _utcnow() -> datetime:
-    """统一的 UTC 当前时间函数(替代已弃用的 datetime.utcnow)"""
-    return datetime.now(timezone.utc)
+    """统一的 UTC 当前时间函数(替代已弃用的 datetime.utcnow)
+
+    返回 offset-naive datetime，与 PostgreSQL TIMESTAMP WITHOUT TIME ZONE 列类型一致。
+    避免 asyncpg "can't subtract offset-naive and offset-aware datetimes" 错误。
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Conversation(Base):

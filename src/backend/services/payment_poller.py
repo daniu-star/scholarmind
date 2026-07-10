@@ -44,7 +44,7 @@ async def _mark_order_paid(db: AsyncSession, order_no: str, trade_no: str) -> bo
     from ..models.orm import User, UserQuota
     from ..config import settings
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     # SELECT ... FOR UPDATE 暂不支持 SQLite，使用条件 UPDATE 保证幂等
     result = await db.execute(
         update(Order)
@@ -139,7 +139,7 @@ class PaymentPoller:
 
     async def _poll_pending_orders(self) -> None:
         """查询所有 pending 订单并逐个轮询"""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         async with self._session_factory() as db:
             # 查找所有待支付且未过期的订单
@@ -167,7 +167,7 @@ class PaymentPoller:
         """轮询单个订单"""
         # 检查是否过期
         if order.expires_at:
-            expire_time = order.expires_at.replace(tzinfo=timezone.utc) if order.expires_at.tzinfo is None else order.expires_at
+            expire_time = order.expires_at.replace(tzinfo=None) if order.expires_at.tzinfo else order.expires_at
             if now > expire_time:
                 await _expire_order(db, order.order_no)
                 self._poll_counts.pop(order.order_no, None)
@@ -178,13 +178,13 @@ class PaymentPoller:
         count = self._poll_counts.get(order.order_no, 0)
         if count >= _MAX_POLL_ATTEMPTS:
             # 已用完全部退避序列，每 120s 轮询一次直到过期
-            if order.updated_at and (now - order.updated_at.replace(tzinfo=timezone.utc)).total_seconds() < 120:
+            if order.updated_at and (now - order.updated_at).total_seconds() < 120:
                 return
         else:
             # 检查是否到了下一次轮询时间
             backoff = _POLL_BACKOFF_SECONDS[min(count, _MAX_POLL_ATTEMPTS - 1)]
             if order.updated_at:
-                updated = order.updated_at.replace(tzinfo=timezone.utc) if order.updated_at.tzinfo is None else order.updated_at
+                updated = order.updated_at.replace(tzinfo=None) if order.updated_at.tzinfo else order.updated_at
                 if (now - updated).total_seconds() < backoff:
                     return
 

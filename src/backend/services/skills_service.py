@@ -187,8 +187,8 @@ class SkillsService:
                     triggers=skill["triggers"],
                     rules=skill["rules"],
                     is_preset=False,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
                 self.repository.db.add(new_skill)
                 await self.repository.db.flush()
@@ -219,7 +219,7 @@ class SkillsService:
                     for key in ("display_name", "description", "category", "agents", "triggers", "rules"):
                         if key in skill_data and skill_data[key] is not None:
                             setattr(target, key, skill_data[key])
-                    target.updated_at = datetime.now(timezone.utc)
+                    target.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
                     await self.repository.db.flush()
                     return _skill_orm_to_dict(target)
             except Exception as e:
@@ -364,8 +364,8 @@ class SkillsService:
                     triggers=parsed["triggers"],
                     rules=parsed["rules"],
                     is_preset=False,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
                 self.repository.db.add(new_skill)
                 await self.repository.db.flush()

@@ -75,8 +75,8 @@ class ConversationRepository(BaseRepository[Conversation]):
                     content=content,
                     user_id=user_id,
                     title=title[:128] if title else None,
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
                 return await self.create(msg)
         msg = Conversation(
@@ -85,8 +85,8 @@ class ConversationRepository(BaseRepository[Conversation]):
             role=role,
             content=content,
             user_id=user_id,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
         )
         return await self.create(msg)
 

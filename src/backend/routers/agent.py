@@ -134,10 +134,22 @@ async def stream_chat_with_agent(
     try:
         model = await resolve_model(db, user_id, request.mode)
     except ModelPolicyError as e:
-        # 免费用户请求 pro 模型 → 403
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "MODEL_RESOLVE_FAILED", "message": f"模型解析失败，请稍后重试: {str(e)}"},
+        ) from e
 
-    reservation = await _reserve_chat(db, user_id, request.agent_id, request.context)
+    try:
+        reservation = await _reserve_chat(db, user_id, request.agent_id, request.context)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "ENTITLEMENT_SERVICE_ERROR", "message": f"配额服务暂时不可用，请稍后重试: {str(e)}"},
+        ) from e
 
     # 获取会话工厂用于 SSE 生成器中的独立 DB 会话
     # event_generator() 在 StreamingResponse 消费时才执行，此时 get_db 已关闭请求级会话

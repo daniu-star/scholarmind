@@ -236,13 +236,23 @@ class AgentService(IAgentService):
             )
         except Exception as e:
             latency_ms = int((time.monotonic() - llm_start) * 1000)
+            error_type = type(e).__name__
             logger.error(f"DeepSeek API call failed: {e}")
             await self._log_agent_execution(
                 user_id=user_id, agent_id=agent_id, session_id=session_id,
                 model=llm_model, status="failed", latency_ms=latency_ms,
                 error_code="LLM_API_FAILED", error_message=str(e),
             )
-            raise AgentChatFailedError(f"AI服务调用失败: {str(e)}")
+            # P0 修复: LLM 调用失败时降级到 Mock 模式，而非抛出 AgentChatFailedError(500)
+            # 项目要求：显示「⚠️ LLM调用失败（{error_type}），已降级为离线引导模式」提示
+            mock_content = self._generate_mock_reply(
+                message=message, agent_id=agent_id, session_id=session_id, context=context,
+            )
+            reply = f"⚠️ LLM调用失败（{error_type}），已降级为离线引导模式\n\n{mock_content}"
+            logger.info(
+                f"LLM degraded to mock mode session={session_id} agent={agent_id} "
+                f"error_type={error_type} reply_len={len(reply)}"
+            )
 
         # Update conversation history
         history.append({"role": "user", "content": message})
@@ -331,6 +341,7 @@ class AgentService(IAgentService):
         # P0 修复: llm_client 顶层已导入为 llm_client；此处保留局部别名以最小化改动
         _llm = llm_client
         full_reply = ""
+        degraded = False
         llm_start = time.monotonic()
         try:
             # 使用 per-agent 配置的 temperature/max_tokens
@@ -351,21 +362,34 @@ class AgentService(IAgentService):
             logger.info(f"stream_truncated session={session_id} agent={agent_id} reply_len={len(full_reply)}")
         except Exception as e:
             latency_ms = int((time.monotonic() - llm_start) * 1000)
+            error_type = type(e).__name__
             logger.error(f"DeepSeek stream API failed: {e}")
             await self._log_agent_execution(
                 user_id=user_id, agent_id=agent_id, session_id=session_id,
                 model=llm_model, status="failed", latency_ms=latency_ms,
                 error_code="LLM_STREAM_FAILED", error_message=str(e),
             )
-            yield {"type": "error", "message": f"AI服务调用失败: {str(e)}"}
-            return
+            # P0 修复: 流式 LLM 调用失败时降级到 Mock 模式，而非 yield 裸错误后 return
+            # 项目要求：显示「⚠️ LLM调用失败（{error_type}），已降级为离线引导模式」提示
+            mock_content = self._generate_mock_reply(
+                message=message, agent_id=agent_id, session_id=session_id, context=context,
+            )
+            full_reply = f"⚠️ LLM调用失败（{error_type}），已降级为离线引导模式\n\n{mock_content}"
+            # 将降级回复作为 token 事件流式输出（单次 yield，保证前端按 token 渲染）
+            yield {"type": "token", "content": full_reply}
+            degraded = True
+            logger.info(
+                f"LLM stream degraded to mock mode session={session_id} agent={agent_id} "
+                f"error_type={error_type} reply_len={len(full_reply)}"
+            )
 
-        # P1: 记录流式 LLM 调用成功日志
-        latency_ms = int((time.monotonic() - llm_start) * 1000)
-        await self._log_agent_execution(
-            user_id=user_id, agent_id=agent_id, session_id=session_id,
-            model=llm_model, status="success", latency_ms=latency_ms,
-        )
+        # P1: 记录流式 LLM 调用成功日志（降级模式已在 except 内记录 failed，跳过 success 日志）
+        if not degraded:
+            latency_ms = int((time.monotonic() - llm_start) * 1000)
+            await self._log_agent_execution(
+                user_id=user_id, agent_id=agent_id, session_id=session_id,
+                model=llm_model, status="success", latency_ms=latency_ms,
+            )
 
         # ═══ 同步保存对话历史（DB 写入 < 10ms），然后立即发送 done ═══
         history.append({"role": "user", "content": message})
@@ -864,6 +888,101 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
                     return f"检测到您可能需要「{skill_name}」相关功能，当前暂无对应技能。您可以在技能管理中创建自定义技能来满足此需求。"
 
         return None
+
+    # ── Mock degradation reply (LLM unavailable fallback) ──
+
+    def _generate_mock_reply(
+        self,
+        *,
+        message: str,
+        agent_id: str,
+        session_id: Optional[str] = None,
+        context: Optional[dict] = None,
+    ) -> str:
+        """LLM 不可用时生成离线引导回复（Mock 降级模式）。
+
+        项目要求：LLM 调用失败时必须降级到 Mock 模式，避免向用户抛出裸错误。
+        本方法根据 agent_id 提供针对性的引导话术，确保用户在 AI 服务异常时
+        仍能获得可用的交互体验。
+
+        Args:
+            message: 用户原始消息（用于在回复中确认已收到）
+            agent_id: Agent 标识（决定引导话术内容）
+            session_id: 会话 ID（预留，当前未使用）
+            context: 模板变量字典（预留，当前未使用）
+
+        Returns:
+            离线引导回复正文（不含降级提示前缀，前缀由调用方拼接）
+        """
+        guidance: dict[str, str] = {
+            "researcher": (
+                "我目前无法连接到 AI 服务，但可以为您提供研究选题的离线引导：\n"
+                "1. 请描述您的研究领域和感兴趣的方向\n"
+                "2. 说明您目前处于选题的哪个阶段（初探/聚焦/细化）\n"
+                "3. 提供您已关注的关键文献或研究空白\n\n"
+                "您可以将这些信息留在此处，待服务恢复后我会继续协助您建构研究问题。"
+            ),
+            "reviewer": (
+                "我目前无法连接到 AI 服务，但可以为您提供研究方案审查的离线引导：\n"
+                "1. 请简要描述您的研究问题与假设\n"
+                "2. 说明您采用的研究方法与数据来源\n"
+                "3. 列出您目前的主要顾虑或待审查环节\n\n"
+                "待服务恢复后，我将从理论依据、方法严谨性、可行性、创新性四个维度为您审查。"
+            ),
+            "architect": (
+                "我目前无法连接到 AI 服务，但可以为您提供论文架构优化的离线引导：\n"
+                "1. 请粘贴您当前的论文大纲或章节标题\n"
+                "2. 说明各章节的核心论点\n"
+                "3. 指出您感觉逻辑不连贯的位置\n\n"
+                "待服务恢复后，我将评估章节完整性、论证链路与逻辑连贯性。"
+            ),
+            "synthesizer": (
+                "我目前无法连接到 AI 服务，但可以为您提供文献综述的离线引导：\n"
+                "1. 请列出您已收集的关键文献（标题/作者/年份）\n"
+                "2. 说明您的综述主题与逻辑框架\n"
+                "3. 指出希望突出的对比维度或研究脉络\n\n"
+                "待服务恢复后，我将协助您完成综述撰写与文献筛选。"
+            ),
+            "polisher": (
+                "我目前无法连接到 AI 服务，但可以为您提供学术润色的离线引导：\n"
+                "1. 请粘贴需要润色的段落\n"
+                "2. 说明目标期刊/学位层次与语言（中/英）\n"
+                "3. 指出您关心的重点（学术规范/AIGC降重/表达流畅）\n\n"
+                "待服务恢复后，我将为您提供规范的学术语言润色建议。"
+            ),
+            "external_reviewer": (
+                "我目前无法连接到 AI 服务，但可以为您提供外审意见的离线引导：\n"
+                "1. 请粘贴论文摘要或关键章节\n"
+                "2. 说明评审场景（期刊外审/学位论文/基金评审）\n"
+                "3. 指出希望重点关注的维度\n\n"
+                "待服务恢复后，我将为您生成专业、建设性的外审意见。"
+            ),
+            "computational": (
+                "我目前无法连接到 AI 服务，但可以为您提供计算传播研究的离线引导：\n"
+                "1. 请描述您的研究问题与可用数据规模\n"
+                "2. 说明您考虑采用的分析方法（网络分析/文本挖掘/机器学习等）\n"
+                "3. 指出您在方法选型或实现上的困惑\n\n"
+                "待服务恢复后，我将协助您完成方法设计与可复现流程。"
+            ),
+            "custom": (
+                "我目前无法连接到 AI 服务，但可以为您提供离线引导：\n"
+                "1. 请详细描述您的需求与背景\n"
+                "2. 提供您已尝试的方案或思路\n"
+                "3. 说明期望的输出形式\n\n"
+                "待服务恢复后，我将根据您的具体场景继续协助。"
+            ),
+        }
+
+        base = guidance.get(agent_id, guidance["custom"])
+
+        # 若用户消息非空，附上确认已收到的提示（截断超长消息）
+        user_hint = ""
+        if message and message.strip():
+            snippet = message.strip()[:80]
+            ellipsis = "…" if len(message.strip()) > 80 else ""
+            user_hint = f"\n\n—— 已收到您的消息：「{snippet}{ellipsis}」，将在服务恢复后处理。"
+
+        return f"{base}{user_hint}"
 
     # ── _parse_options / _detect_skills 已委托给 SkillRouter ──
     # 调用 self._skills.parse_options() / self._skills.detect_skills()

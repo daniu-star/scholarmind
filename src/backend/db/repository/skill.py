@@ -60,7 +60,7 @@ class SkillRepository(BaseRepository[Skill]):
         if skill is None:
             return None
         skill.enabled = enabled
-        skill.updated_at = datetime.now(timezone.utc)
+        skill.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         return await self.update(skill)
 
     async def seed_preset_skills(self, presets: list[dict]) -> int:
@@ -83,8 +83,8 @@ class SkillRepository(BaseRepository[Skill]):
                     triggers=preset.get("triggers", []),
                     rules=preset.get("rules", ""),
                     is_preset=preset.get("is_preset", True),
-                    created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc),
+                    created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                    updated_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
                 self.db.add(skill)
                 inserted += 1

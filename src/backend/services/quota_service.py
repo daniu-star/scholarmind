@@ -37,7 +37,7 @@ class QuotaService:
     async def upgrade_plan(db: AsyncSession, user_id: int, plan: str, duration_days: int):
         """升级套餐（不提交事务，由调用方管理事务边界）。"""
         limit = settings.PRO_TIER_TOKEN_LIMIT if plan.startswith("pro") else settings.FREE_TIER_TOKEN_LIMIT
-        expires = datetime.now(timezone.utc) + timedelta(days=duration_days)
+        expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=duration_days)
         result = await db.execute(select(UserQuota).where(UserQuota.user_id == user_id))
         quota = result.scalar_one_or_none()
         if quota:

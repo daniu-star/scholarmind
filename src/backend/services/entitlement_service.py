@@ -143,14 +143,20 @@ class EntitlementService:
             snapshot["consumed"] = "unlimited"
             return snapshot
 
-        result = await db.execute(
-            update(UserQuota)
-            .where(
-                UserQuota.user_id == user_id,
-                UserQuota.free_chats_used < UserQuota.free_chat_limit,
+        try:
+            result = await db.execute(
+                update(UserQuota)
+                .where(
+                    UserQuota.user_id == user_id,
+                    UserQuota.free_chats_used < UserQuota.free_chat_limit,
+                )
+                .values(free_chats_used=UserQuota.free_chats_used + 1)
             )
-            .values(free_chats_used=UserQuota.free_chats_used + 1)
-        )
+        except Exception as e:
+            raise EntitlementError(
+                "ENTITLEMENT_SERVICE_ERROR",
+                f"配额服务暂时不可用，请稍后重试。",
+            ) from e
         if result.rowcount != 1:
             raise EntitlementError(
                 "CHAT_QUOTA_EXHAUSTED",
@@ -165,11 +171,14 @@ class EntitlementService:
     async def refund_chat(db: AsyncSession, user_id: int, consumed: str) -> None:
         if consumed != "free_chat":
             return
-        await db.execute(
-            update(UserQuota)
-            .where(UserQuota.user_id == user_id, UserQuota.free_chats_used > 0)
-            .values(free_chats_used=UserQuota.free_chats_used - 1)
-        )
+        try:
+            await db.execute(
+                update(UserQuota)
+                .where(UserQuota.user_id == user_id, UserQuota.free_chats_used > 0)
+                .values(free_chats_used=UserQuota.free_chats_used - 1)
+            )
+        except Exception:
+            pass  # 退还不应阻断主流程
 
     @staticmethod
     async def require_external_reviewer(db: AsyncSession, user_id: int) -> None:
@@ -198,25 +207,37 @@ class EntitlementService:
             )
 
         if capability == "generation":
+            try:
+                result = await db.execute(
+                    update(UserQuota)
+                    .where(
+                        UserQuota.user_id == user_id,
+                        UserQuota.generation_credits > 0,
+                    )
+                    .values(generation_credits=UserQuota.generation_credits - 1)
+                )
+            except Exception as e:
+                raise EntitlementError(
+                    "ENTITLEMENT_SERVICE_ERROR",
+                    "配额服务暂时不可用，请稍后重试。",
+                ) from e
+            if result.rowcount == 1:
+                return {"consumed": "generation_credit", "capability": capability}
+
+        try:
             result = await db.execute(
                 update(UserQuota)
                 .where(
                     UserQuota.user_id == user_id,
-                    UserQuota.generation_credits > 0,
+                    UserQuota.shared_pipeline_credits > 0,
                 )
-                .values(generation_credits=UserQuota.generation_credits - 1)
+                .values(shared_pipeline_credits=UserQuota.shared_pipeline_credits - 1)
             )
-            if result.rowcount == 1:
-                return {"consumed": "generation_credit", "capability": capability}
-
-        result = await db.execute(
-            update(UserQuota)
-            .where(
-                UserQuota.user_id == user_id,
-                UserQuota.shared_pipeline_credits > 0,
-            )
-            .values(shared_pipeline_credits=UserQuota.shared_pipeline_credits - 1)
-        )
+        except Exception as e:
+            raise EntitlementError(
+                "ENTITLEMENT_SERVICE_ERROR",
+                "配额服务暂时不可用，请稍后重试。",
+            ) from e
         if result.rowcount == 1:
             return {"consumed": "shared_pipeline_credit", "capability": capability}
 
