@@ -410,22 +410,25 @@ class Settings(BaseSettings):
             ]
             if placeholder_violations:
                 errors.append("支付配置仍为占位符，请配置真实值: " + ", ".join(placeholder_violations))
-        # P0 修复: 回调 URL 占位符校验（your-domain.com 等）
-        if _is_placeholder_key(self.WECHAT_PAY_NOTIFY_URL):
-            errors.append("WECHAT_PAY_NOTIFY_URL 仍为占位符（如 your-domain.com），请配置真实公网域名")
-        if _is_placeholder_key(self.ALIPAY_NOTIFY_URL):
-            errors.append("ALIPAY_NOTIFY_URL 仍为占位符（如 your-domain.com），请配置真实公网域名")
+            # P0 修复: 回调 URL 占位符校验（your-domain.com 等）——仅在支付启用时校验
+            # 避免支付未启用时回调 URL 仍为默认 your-domain.com 占位符而阻断核心功能部署
+            if _is_placeholder_key(self.WECHAT_PAY_NOTIFY_URL):
+                errors.append("WECHAT_PAY_NOTIFY_URL 仍为占位符（如 your-domain.com），请配置真实公网域名")
+            if _is_placeholder_key(self.ALIPAY_NOTIFY_URL):
+                errors.append("ALIPAY_NOTIFY_URL 仍为占位符（如 your-domain.com），请配置真实公网域名")
         # P0 修复: SMTP_PASSWORD 占位符校验（仅当 SMTP_USER 非空时）
         if self.SMTP_USER and _is_placeholder_key(self.SMTP_PASSWORD):
             errors.append("SMTP_PASSWORD 仍为占位符，请配置真实邮箱授权码")
         # P1 修复: 生产环境禁止使用 SQLite
         if "sqlite" in self.DATABASE_URL.lower():
             errors.append("生产环境禁止使用 SQLite，请配置 PostgreSQL DATABASE_URL")
-        # P1 修复: 支付回调 URL 显式检测 your-domain.com 占位符（_is_placeholder_key 只识别 YOUR_/XXXX，识别不到 your-domain.com）
-        for url_field in ("ALIPAY_NOTIFY_URL", "WECHAT_PAY_NOTIFY_URL", "ALIPAY_RETURN_URL"):
-            url_value = getattr(self, url_field, "")
-            if url_value and "your-domain.com" in url_value:
-                errors.append(f"{url_field} 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）")
+        # P1 修复: 支付回调 URL 显式检测 your-domain.com 占位符 —— 仅在支付启用时校验
+        # （_is_placeholder_key 实际已覆盖 your-domain.com 检测，此为冗余兜底；移入 PAYMENT_ENABLED 避免阻断核心功能部署）
+        if self.PAYMENT_ENABLED:
+            for url_field in ("ALIPAY_NOTIFY_URL", "WECHAT_PAY_NOTIFY_URL", "ALIPAY_RETURN_URL"):
+                url_value = getattr(self, url_field, "")
+                if url_value and "your-domain.com" in url_value:
+                    errors.append(f"{url_field} 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）")
         # P1 修复: 生产环境 CORS_ORIGINS 必须包含真实公网域名，不得仅 localhost
         cors_origins_lower = [o.lower() for o in self.CORS_ORIGINS]
         has_public_origin = any(
