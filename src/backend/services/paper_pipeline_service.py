@@ -44,9 +44,19 @@ _PIPELINE_HEARTBEAT_INTERVAL_SECONDS = settings.PIPELINE_HEARTBEAT_INTERVAL_SECO
 _PIPELINE_PROGRESS_SYNC_INTERVAL_SECONDS = settings.PIPELINE_PROGRESS_SYNC_INTERVAL_SECONDS
 
 # ── 技能目录路径（P4-T7：从环境变量读取，避免硬编码） ─────
+# 主目录：可能被 Railway volume 挂载覆盖
 _SKILLS_BASE = os.environ.get('SKILLS_DIR', str(Path.home() / ".trae-cn" / "skills"))
 SKILL_DIR = Path(_SKILLS_BASE) / "cyclical-paper-generation"
 PIPELINE_DIR = SKILL_DIR / "pipeline"
+
+# 备用目录：Docker 构建时复制到 /app/skills_builtin/，不会被 volume 覆盖
+_SKILLS_BUILTIN = os.environ.get('SKILLS_BUILTIN_DIR', '')
+if _SKILLS_BUILTIN:
+    _BUILTIN_SKILL_DIR = Path(_SKILLS_BUILTIN) / "cyclical-paper-generation"
+    _BUILTIN_PIPELINE_DIR = _BUILTIN_SKILL_DIR / "pipeline"
+else:
+    _BUILTIN_SKILL_DIR = None
+    _BUILTIN_PIPELINE_DIR = None
 
 # ── 13 Agent 执行顺序（用于进度计算）──────────────────────
 AGENT_EXECUTION_ORDER = [
@@ -84,8 +94,16 @@ def _try_import_pipeline() -> bool:
     if _PIPELINE_AVAILABLE:
         return True
 
-    if not PIPELINE_DIR.exists():
-        _PIPELINE_INIT_ERROR = f"Pipeline skill directory not found: {PIPELINE_DIR} (SKILLS_DIR={_SKILLS_BASE})"
+    # 选择有效的技能目录：优先主目录，不存在时回退到内置目录
+    _active_skill_dir = SKILL_DIR
+    _active_pipeline_dir = PIPELINE_DIR
+    if not _active_pipeline_dir.exists() and _BUILTIN_PIPELINE_DIR is not None and _BUILTIN_PIPELINE_DIR.exists():
+        logger.warning(f"Primary pipeline dir not found, falling back to builtin: {_BUILTIN_PIPELINE_DIR}")
+        _active_skill_dir = _BUILTIN_SKILL_DIR
+        _active_pipeline_dir = _BUILTIN_PIPELINE_DIR
+
+    if not _active_pipeline_dir.exists():
+        _PIPELINE_INIT_ERROR = f"Pipeline skill directory not found: {PIPELINE_DIR} (SKILLS_DIR={_SKILLS_BASE}), builtin fallback also not found: {_BUILTIN_PIPELINE_DIR}"
         logger.warning(_PIPELINE_INIT_ERROR)
         return False
 
@@ -101,14 +119,14 @@ def _try_import_pipeline() -> bool:
                 _cleared[k] = sys.modules.pop(k)
 
         # 将正确目录插入 sys.path
-        skill_path = str(SKILL_DIR)
+        skill_path = str(_active_skill_dir)
         sys.path.insert(0, skill_path)
 
         # 从正确目录预加载所有子模块（注册为 pipeline.xxx）
         _pipeline_mods = ["llm_executor", "style_constraints", "word_validation",
                           "gan_scorer", "shared_learning", "voice_extractor"]
         for _mod_name in _pipeline_mods:
-            _f = PIPELINE_DIR / f"{_mod_name}.py"
+            _f = _active_pipeline_dir / f"{_mod_name}.py"
             if _f.exists():
                 _spec = importlib.util.spec_from_file_location(
                     f"pipeline.{_mod_name}", str(_f))
@@ -129,7 +147,7 @@ def _try_import_pipeline() -> bool:
         # 确保运行时 from . import xxx 始终找到正确的模块）
         sys.path[:] = _saved_path
         _PIPELINE_AVAILABLE = True
-        logger.info(f"cyclical_paper_pipeline_loaded version=v7.4.0 path={SKILL_DIR}")
+        logger.info(f"cyclical_paper_pipeline_loaded version=v7.4.0 path={_active_skill_dir}")
         return True
 
     except ImportError as e:

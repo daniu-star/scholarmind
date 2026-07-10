@@ -19,18 +19,27 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # 仅复制后端代码（不复制 prototypes/、data/）
+# - prototypes/ 由 Vercel 端构建，后端容器不需要
+# - data/ 是运行时挂载的持久化卷，构建期不需要
 COPY src/backend/ ./src/backend/
 
-# 复制 Pipeline 技能到 /app/skills_builtin/（非 volume 挂载点）
-# Railway 挂载 volume 到 /app/data 时会覆盖构建期 /app/data 的内容，
-# 因此技能必须放到 /app/skills_builtin/，启动时同步到 /app/data/skills/
+# 复制 Pipeline 技能到 /app/skills_builtin/（非 volume 挂载点，不会被覆盖）
+# 同时复制到 /app/data/skills/（兼容旧逻辑，volume 挂载时可能被覆盖）
 COPY skills/cyclical-paper-generation/ /app/skills_builtin/cyclical-paper-generation/
 COPY skills/cyclical-paper-review/ /app/skills_builtin/cyclical-paper-review/
+COPY skills/cyclical-paper-generation/ /app/data/skills/cyclical-paper-generation/
+COPY skills/cyclical-paper-review/ /app/data/skills/cyclical-paper-review/
 
-# 设置技能目录环境变量
+# 设置技能目录环境变量（pipeline_llm_bridge / paper_pipeline_service 统一使用）
 ENV SKILLS_DIR=/app/data/skills
+# 备用技能目录（volume 挂载覆盖 /app/data 时使用）
+ENV SKILLS_BUILTIN_DIR=/app/skills_builtin
+
+# 预创建数据卷子目录（避免首次启动报错）
+RUN mkdir -p /app/data/uploads /app/data/chroma /app/data/skills \
+             /app/data/conversations /app/data/charts /app/logs
 
 EXPOSE 8000
 
-# 启动时先同步内置技能到 volume 挂载点，再启动应用
-CMD ["sh", "-c", "mkdir -p /app/data/skills /app/data/uploads /app/data/chroma /app/data/conversations /app/data/charts /app/logs && cp -rn /app/skills_builtin/* /app/data/skills/ 2>/dev/null; python -m src.backend.scripts.prestart && uvicorn src.backend.app:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]
+# Railway/PaaS 通过 $PORT 环境变量指定监听端口；本地 docker run 默认 8000
+CMD ["sh", "-c", "python -m src.backend.scripts.prestart && uvicorn src.backend.app:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]
