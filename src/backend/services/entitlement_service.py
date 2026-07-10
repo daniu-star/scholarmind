@@ -75,7 +75,7 @@ class EntitlementService:
                     "INSERT INTO user_quotas (user_id, tokens_used, tokens_limit, plan, "
                     "free_chats_used, free_chat_limit, generation_credits, "
                     "shared_pipeline_credits, model_tier, created_at, updated_at) "
-                    "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 0, 0, 'flash', NOW(), NOW())"
+                    "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 0, 0, 'flash', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
                     " ON CONFLICT (user_id) DO NOTHING"
                 ),
                 {"uid": user_id, "limit": settings.FREE_TIER_TOKEN_LIMIT,

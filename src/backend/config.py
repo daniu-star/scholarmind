@@ -268,6 +268,8 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "ScholarMind"
     RESEND_API_KEY: str = Field(default="", description="Resend API Key（绕过 Railway SMTP 限制）")
     RESEND_FROM_DOMAIN: str = Field(default="", description="Resend 已验证的发件域名（如 quannengyanjiu.cn），留空则使用 resend.dev")
+    VERCEL_EMAIL_PROXY_URL: str = Field(default="", description="Vercel 邮件代理函数 URL（如 https://www.quannengyanjiu.cn/api/send-email）")
+    VERCEL_EMAIL_PROXY_KEY: str = Field(default="", description="Vercel 邮件代理认证密钥")
     VERIFICATION_CODE_EXPIRE_MINUTES: int = 5
     VERIFICATION_CODE_LENGTH: int = 6
     VERIFICATION_CODE_RATE_LIMIT_SECONDS: int = 60

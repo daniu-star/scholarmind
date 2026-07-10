@@ -238,32 +238,86 @@ async def _send_via_smtp(target_email: str, code: str) -> None:
         ) from e
 
 
-async def send_verification_email(target_email: str, code: str) -> None:
-    """发送验证码邮件 — 优先 SMTP（无收件人限制），失败回退 Resend
+async def _send_via_vercel_proxy(target_email: str, code: str) -> tuple[bool, str | None]:
+    """通过 Vercel Serverless Function 发送邮件（绕过 Railway SMTP 封锁）。
 
-    策略变更：原优先 Resend（免费模式只能发到账户邮箱），现优先 SMTP（无限制）。
-    Railway 等云平台可能封锁 465 端口，已统一改用 587（STARTTLS）。
+    Vercel 运行在 AWS Lambda 上，不封锁 SMTP 465/587 端口。
+    后端通过 HTTPS 443 调用此函数，函数内部用 nodemailer+SMTP 发送邮件。
+
+    Returns:
+        (success, error_message) 元组
     """
-    # 优先 SMTP（无收件人限制）
+    global _last_resend_error
+
+    if not settings.VERCEL_EMAIL_PROXY_URL or not settings.VERCEL_EMAIL_PROXY_KEY:
+        return False, "VERCEL_EMAIL_PROXY_URL or VERCEL_EMAIL_PROXY_KEY not configured"
+
+    import httpx
+
+    payload = {
+        "to_email": target_email,
+        "code": code,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                settings.VERCEL_EMAIL_PROXY_URL,
+                json=payload,
+                headers={
+                    "X-API-Key": settings.VERCEL_EMAIL_PROXY_KEY,
+                    "Content-Type": "application/json",
+                },
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("success"):
+                    logger.info(f"vercel_proxy_email_sent to={_mask_email(target_email)}")
+                    return True, None
+                err = data.get("error", "unknown")
+                _last_resend_error = f"Vercel proxy: {err}"
+                return False, err
+            _last_resend_error = f"Vercel proxy HTTP {resp.status_code}: {resp.text[:200]}"
+            logger.warning(f"vercel_proxy_failed status={resp.status_code} body={resp.text[:200]}")
+            return False, f"HTTP_{resp.status_code}"
+    except Exception as e:
+        _last_resend_error = f"Vercel proxy network: {e}"
+        logger.warning(f"vercel_proxy_network_error error={e}")
+        return False, "NETWORK_ERROR"
+
+
+async def send_verification_email(target_email: str, code: str) -> None:
+    """发送验证码邮件 — 优先 SMTP 直连，失败走 Vercel 代理，最后 Resend
+
+    策略：
+    1. SMTP 直连（本地开发可用，Railway 不可用因端口封锁）
+    2. Vercel Serverless Function 代理（绕过 Railway SMTP 封锁，走 HTTPS 443）
+    3. Resend HTTP API（需要域名验证，作为最后兜底）
+    """
+    # 1. 优先 SMTP 直连
     if settings.SMTP_USER and settings.SMTP_PASSWORD:
         try:
             await _send_via_smtp(target_email, code)
             return
         except EmailSendError as e:
-            logger.warning(f"smtp_failed_attempting_resend error={e}")
-            # 继续尝试 Resend
+            logger.warning(f"smtp_failed_attempting_vercel_proxy error={e}")
 
-    # SMTP 不可用或失败，尝试 Resend
+    # 2. SMTP 失败（如 Railway 封锁端口），走 Vercel 代理
+    if settings.VERCEL_EMAIL_PROXY_URL and settings.VERCEL_EMAIL_PROXY_KEY:
+        success, error = await _send_via_vercel_proxy(target_email, code)
+        if success:
+            return
+        logger.warning(f"vercel_proxy_failed_attempting_resend error={error}")
+
+    # 3. Vercel 代理也失败，尝试 Resend
     if settings.RESEND_API_KEY:
         success, _error_type = await _send_via_resend(target_email, code)
         if success:
             return
-        # Resend 也失败，抛出最终错误
         raise EmailSendError(
-            f"所有邮件发送方式均失败。SMTP 错误 + Resend 错误：{get_last_resend_error() or 'unknown'}"
+            f"所有邮件发送方式均失败。SMTP + Vercel代理 + Resend 错误：{get_last_resend_error() or 'unknown'}"
         )
 
-    # SMTP 和 Resend 都不可用
     raise EmailSendError(
-        "邮件服务未配置。请设置 SMTP_USER/SMTP_PASSWORD 或 RESEND_API_KEY"
+        "邮件服务未配置。请设置 SMTP_USER/SMTP_PASSWORD 或 VERCEL_EMAIL_PROXY_URL 或 RESEND_API_KEY"
     )

@@ -171,7 +171,7 @@ async def register_user(
         _t(
             "INSERT INTO users (username, phone, email, password_hash, nickname, "
             "role, is_active, email_verified, failed_login_attempts, plan, created_at, updated_at) "
-            "VALUES (:u, :p, :e, :pw, :n, 'user', TRUE, FALSE, 0, 'free', NOW(), NOW()) "
+            "VALUES (:u, :p, :e, :pw, :n, 'user', TRUE, FALSE, 0, 'free', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) "
             "RETURNING id"
         ),
         {"u": username, "p": phone, "e": email, "pw": pwd, "n": nick},
@@ -185,7 +185,7 @@ async def register_user(
             "INSERT INTO user_quotas (user_id, tokens_used, tokens_limit, plan, "
             "free_chats_used, free_chat_limit, generation_credits, "
             "shared_pipeline_credits, model_tier, created_at, updated_at) "
-            "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 0, 0, 'flash', NOW(), NOW())"
+            "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 0, 0, 'flash', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
         ),
         {"uid": user_id, "limit": settings.FREE_TIER_TOKEN_LIMIT, "chat_limit": settings.FREE_CHAT_LIMIT},
     )
@@ -323,7 +323,7 @@ async def verify_code_and_login(
         await db.execute(
             _t(
                 "INSERT INTO login_attempts (identifier, success, failure_reason, created_at) "
-                "VALUES (:id, FALSE, :reason, NOW())"
+                "VALUES (:id, FALSE, :reason, CURRENT_TIMESTAMP)"
             ),
             {"id": target, "reason": "invalid_code"},
         )
@@ -352,7 +352,7 @@ async def verify_code_and_login(
             _t(
                 "INSERT INTO users (username, phone, email, password_hash, nickname, "
                 "role, is_active, email_verified, failed_login_attempts, plan, created_at, updated_at) "
-                "VALUES (:u, :p, :e, :pw, :n, 'user', TRUE, FALSE, 0, 'free', NOW(), NOW()) "
+                "VALUES (:u, :p, :e, :pw, :n, 'user', TRUE, FALSE, 0, 'free', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) "
                 "RETURNING id"
             ),
             {"u": target, "p": phone_val, "e": email_val, "pw": pwd, "n": nick_val},
@@ -366,7 +366,7 @@ async def verify_code_and_login(
                 "INSERT INTO user_quotas (user_id, tokens_used, tokens_limit, plan, "
                 "free_chats_used, free_chat_limit, generation_credits, "
                 "shared_pipeline_credits, model_tier, created_at, updated_at) "
-                "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 0, 0, 'flash', NOW(), NOW())"
+                "VALUES (:uid, 0, :limit, 'free', 0, :chat_limit, 0, 0, 'flash', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
             ),
             {"uid": uid, "limit": settings.FREE_TIER_TOKEN_LIMIT, "chat_limit": settings.FREE_CHAT_LIMIT},
         )

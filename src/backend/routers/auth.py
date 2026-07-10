@@ -53,7 +53,7 @@ async def create_code(db, target: str, purpose: str = "login") -> str:
     await db.execute(
         _t(
             "INSERT INTO verification_codes (target, code, purpose, used, expires_at, created_at) "
-            "VALUES (:t, :c, :p, FALSE, :exp, NOW())"
+            "VALUES (:t, :c, :p, FALSE, :exp, CURRENT_TIMESTAMP)"
         ),
         {"t": target, "c": code, "p": purpose, "exp": expires_at},
     )
@@ -148,7 +148,7 @@ async def _record_login_attempt(db, identifier: str, success: bool, reason: str 
     await db.execute(
         _t(
             "INSERT INTO login_attempts (identifier, success, failure_reason, created_at) "
-            "VALUES (:id, :ok, :reason, NOW())"
+            "VALUES (:id, :ok, :reason, CURRENT_TIMESTAMP)"
         ),
         {"id": identifier or "", "ok": success, "reason": reason},
     )
