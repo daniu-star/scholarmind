@@ -8737,14 +8737,28 @@ function showAuthDialog(initialMode) {
       });
       sendCodeBtn.classList.add('counting');
       errorEl.textContent = '';
-      // 如果 API 直接返回了验证码（SMTP 未配置/发送失败），自动填入并提示
-      if (result && result.code) {
+      // 检查邮件是否真正发送成功
+      if (result && result.email_sent === false) {
+        // 邮件发送失败 — 显示明文验证码 + 警告
+        if (result.code) {
+          codeInput.value = result.code;
+          var failReason = result.email_error || result.resend_error || 'SMTP/Resend 均不可用';
+          emailHint.textContent = '⚠️ 邮件发送失败（' + failReason.substring(0, 80) + '），验证码：' + result.code;
+          emailHint.style.color = '#f97316';
+          showToast('邮件发送失败，验证码已直接显示', 'warning');
+        } else {
+          emailHint.textContent = '⚠️ 邮件发送失败，请稍后重试或联系管理员';
+          emailHint.style.color = '#ef4444';
+          showToast('邮件发送失败', 'error');
+        }
+      } else if (result && result.code) {
+        // 兼容旧格式：有 code 但无 email_sent 字段
         codeInput.value = result.code;
-        var smtpMsg = result.smtp_error ? '（' + result.smtp_error + '）' : '';
         emailHint.textContent = '验证码：' + result.code + '（直接显示，无需查收邮件）';
         emailHint.style.color = 'var(--accent-green)';
         showToast('验证码：' + result.code, 'info');
       } else {
+        // 邮件发送成功
         emailHint.textContent = '验证码已发送至 ' + target + '，请查收（含垃圾邮件箱）';
         emailHint.style.color = 'var(--accent-green)';
         showToast('验证码已发送，请查收邮箱', 'success');

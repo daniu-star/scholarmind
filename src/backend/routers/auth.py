@@ -13,7 +13,6 @@ from sqlalchemy.exc import IntegrityError
 from ..config import settings
 from ..core.dependencies import get_db
 from ..models.orm import User, VerificationCode
-import asyncio
 from ..services.auth_service import (
     authenticate_user,
     create_access_token,
@@ -25,6 +24,7 @@ from ..services.auth_service import (
     send_code_background,
     verify_code_and_login,
 )
+from ..services.email_service import get_last_resend_error
 from ..services.entitlement_service import EntitlementService
 
 # create_code 内联定义于此（避免 Railway Python 3.12 对 auth_service 的深层导入失败）
@@ -221,12 +221,13 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
             email_error = str(e)
         return {
             "success": True,
-            "message": "验证码已发送到您的邮箱" if email_sent else f"邮件发送失败（Railway 禁 SMTP），验证码：{code}",
+            "message": "验证码已发送到您的邮箱" if email_sent else f"邮件发送失败，验证码：{code}",
             "code": code if not email_sent else None,
             "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
             "email_sent": email_sent,
+            "email_error": email_error,
             "resend_configured": bool(settings.RESEND_API_KEY),
-            "resend_error": None if email_sent else (__import__('src.backend.services.email_service', fromlist=['get_last_resend_error']).get_last_resend_error()),
+            "resend_error": None if email_sent else get_last_resend_error(),
         }
 
     # 手机号：先归一化，检查是否关联了邮箱
@@ -253,10 +254,12 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
             email_error = str(e)
         return {
             "success": True,
-            "message": "验证码已发送到您绑定的邮箱" if email_sent else f"邮件发送失败（Railway 禁 SMTP），验证码：{code}",
+            "message": "验证码已发送到您绑定的邮箱" if email_sent else f"邮件发送失败，验证码：{code}",
             "code": code if not email_sent else None,
             "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
             "email_sent": email_sent,
+            "email_error": email_error,
+            "resend_error": None if email_sent else get_last_resend_error(),
         }
 
     # 无绑定邮箱：统一返回成功提示，防止用户枚举

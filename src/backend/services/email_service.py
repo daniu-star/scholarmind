@@ -31,13 +31,14 @@ def _mask_email(email: str) -> str:
     return f"{local[:2]}***@{domain}"
 
 # ── 主流邮箱 SMTP 服务器自动检测表 ──────────────────────────
+# 注：Railway 等云平台通常封锁 465 端口出站，统一改用 587（STARTTLS）
 SMTP_SERVERS: dict[str, tuple[str, int]] = {
     "qq.com":       ("smtp.qq.com",       587),
     "vip.qq.com":   ("smtp.qq.com",       587),
     "foxmail.com":  ("smtp.qq.com",       587),
-    "163.com":      ("smtp.163.com",      465),
-    "126.com":      ("smtp.126.com",      465),
-    "yeah.net":     ("smtp.yeah.net",     465),
+    "163.com":      ("smtp.163.com",      587),
+    "126.com":      ("smtp.126.com",      587),
+    "yeah.net":     ("smtp.yeah.net",     587),
     "gmail.com":    ("smtp.gmail.com",    587),
     "outlook.com":  ("smtp-mail.outlook.com", 587),
     "hotmail.com":  ("smtp-mail.outlook.com", 587),
@@ -95,7 +96,7 @@ async def _send_via_resend(to_email: str, code: str) -> tuple[bool, str | None]:
     send_to = to_email  # 发送到用户实际邮箱
 
     # 使用已验证的发件域名（优先使用配置的域名，否则使用 resend.dev）
-    from_domain = settings.RESEND_FROM_DOMAIN if hasattr(settings, 'RESEND_FROM_DOMAIN') and settings.RESEND_FROM_DOMAIN else "resend.dev"
+    from_domain = settings.RESEND_FROM_DOMAIN or "resend.dev"
     from_email = f"{settings.SMTP_FROM_NAME} <noreply@{from_domain}>"
 
     payload = {
@@ -162,27 +163,15 @@ def _detect_smtp(email: str) -> tuple[str, int, str]:
     return host, port, provider
 
 
-async def send_verification_email(target_email: str, code: str) -> None:
-    """发送验证码邮件 — 优先 Resend API，失败时回退 SMTP"""
+async def _send_via_smtp(target_email: str, code: str) -> None:
+    """通过 SMTP 发送验证码邮件（无收件人限制）。
 
-    # 优先尝试 Resend HTTP API（绕过 Railway SMTP 封锁）
-    if settings.RESEND_API_KEY:
-        success, error_type = await _send_via_resend(target_email, code)
-        if success:
-            return
-        # Resend 失败，检查是否需要回退 SMTP
-        if error_type in ("DOMAIN_NOT_VERIFIED", "FREE_MODE_RESTRICTED"):
-            logger.info(f"resend_fallback_to_smtp reason={error_type} to={_mask_email(target_email)}")
-            # 继续尝试 SMTP
-        else:
-            # 其他错误（网络、HTTP 错误等），也尝试 SMTP 回退
-            logger.warning(f"resend_failed_attempting_smtp error={error_type}")
-            # 继续尝试 SMTP
-
+    Raises:
+        EmailSendError: SMTP 发送失败时抛出
+    """
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         raise EmailSendError(
-            "邮件服务未配置。请在 .env 中设置 SMTP_USER（您的邮箱地址）和 SMTP_PASSWORD（邮箱授权码）。\n"
-            "示例：SMTP_USER=your@163.com  SMTP_PASSWORD=您的授权码"
+            "邮件服务未配置。请在 .env 中设置 SMTP_USER 和 SMTP_PASSWORD"
         )
 
     # 自动检测或使用手动配置
@@ -211,12 +200,11 @@ async def send_verification_email(target_email: str, code: str) -> None:
 
     msg = MIMEText(html, "html", "utf-8")
     msg["Subject"] = Header(f"[ScholarMind] 验证码：{code}", "utf-8")
-    # 使用 formataddr 避免 Header 编码导致 QQ 等收件服务器拒收
     msg["From"] = formataddr((settings.SMTP_FROM_NAME, settings.SMTP_USER))
     msg["To"] = target_email
     msg["Reply-To"] = settings.SMTP_USER
 
-    _SMTP_TIMEOUT = 10  # 秒，足够完成 SMTP 握手 + 登录 + 发送
+    _SMTP_TIMEOUT = 8  # 秒（从 10 降到 8，避免请求总耗时过长）
 
     def _send_sync():
         # 端口 465 使用 SSL 直连，其他端口使用 STARTTLS
@@ -236,15 +224,46 @@ async def send_verification_email(target_email: str, code: str) -> None:
         logger.info(f"verification_email_sent to={_mask_email(target_email)} via={host}:{port}")
     except smtplib.SMTPAuthenticationError as e:
         raise EmailSendError(
-            f"{provider} 登录失败：用户名或授权码错误。\n请检查 SMTP_USER 和 SMTP_PASSWORD（注意：需要使用邮箱授权码，而非登录密码）。\n原错误：{e}"
+            f"{provider} 登录失败：用户名或授权码错误。请检查 SMTP_USER 和 SMTP_PASSWORD。原错误：{e}"
         ) from e
     except smtplib.SMTPConnectError as e:
         raise EmailSendError(
-            f"无法连接 {provider} 服务器（{host}:{port}）：{e}。\n如持续失败，可在 .env 中手动指定 SMTP_HOST 和 SMTP_PORT。"
+            f"无法连接 {provider} 服务器（{host}:{port}）：{e}。如持续失败，可在 .env 中手动指定 SMTP_HOST 和 SMTP_PORT。"
         ) from e
     except smtplib.SMTPException as e:
         raise EmailSendError(f"邮件发送失败（{provider}）：{e}") from e
     except OSError as e:
         raise EmailSendError(
-            f"无法连接 {provider} 服务器（{host}:{port}）：网络不可达（{e}）。\n请检查网络连接或防火墙设置。"
+            f"无法连接 {provider} 服务器（{host}:{port}）：网络不可达（{e}）。请检查网络连接或防火墙设置。"
         ) from e
+
+
+async def send_verification_email(target_email: str, code: str) -> None:
+    """发送验证码邮件 — 优先 SMTP（无收件人限制），失败回退 Resend
+
+    策略变更：原优先 Resend（免费模式只能发到账户邮箱），现优先 SMTP（无限制）。
+    Railway 等云平台可能封锁 465 端口，已统一改用 587（STARTTLS）。
+    """
+    # 优先 SMTP（无收件人限制）
+    if settings.SMTP_USER and settings.SMTP_PASSWORD:
+        try:
+            await _send_via_smtp(target_email, code)
+            return
+        except EmailSendError as e:
+            logger.warning(f"smtp_failed_attempting_resend error={e}")
+            # 继续尝试 Resend
+
+    # SMTP 不可用或失败，尝试 Resend
+    if settings.RESEND_API_KEY:
+        success, _error_type = await _send_via_resend(target_email, code)
+        if success:
+            return
+        # Resend 也失败，抛出最终错误
+        raise EmailSendError(
+            f"所有邮件发送方式均失败。SMTP 错误 + Resend 错误：{get_last_resend_error() or 'unknown'}"
+        )
+
+    # SMTP 和 Resend 都不可用
+    raise EmailSendError(
+        "邮件服务未配置。请设置 SMTP_USER/SMTP_PASSWORD 或 RESEND_API_KEY"
+    )

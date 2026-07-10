@@ -145,7 +145,6 @@ def register_error_handlers(app: FastAPI) -> None:
         logger.exception(
             f"Unhandled exception: {exc} request_id={request_id}"
         )
-        from ..config import settings
         is_dev = True
         details = {
             "type": type(exc).__name__,
