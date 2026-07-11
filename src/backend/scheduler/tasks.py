@@ -176,7 +176,7 @@ def expire_stale_orders():
         engine = create_async_engine_from_url()
         session_factory = create_async_sessionmaker_from_engine(engine)
         async with session_factory() as db:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
             result = await db.execute(
                 update(Order)
                 .where(

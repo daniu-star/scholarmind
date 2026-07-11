@@ -156,7 +156,7 @@ async def create_order(
         raise HTTPException(status_code=400, detail=f"未知产品: {req.product_id}")
 
     # 防滥用
-    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+    one_hour_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
     recent_count = await db.scalar(
         select(func.count(Order.id)).where(
             Order.user_id == user.id, Order.created_at >= one_hour_ago
