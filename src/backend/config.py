@@ -378,47 +378,54 @@ class Settings(BaseSettings):
         if _is_placeholder_key(self.DEEPSEEK_API_KEY):
             errors.append("DEEPSEEK_API_KEY 未设置或仍为占位符，生产环境必须显式设置真实密钥")
         if self.PAYMENT_ENABLED:
-            payment_fields = (
-                "ALIPAY_APP_ID",
-                "ALIPAY_PRIVATE_KEY",
-                "ALIPAY_PUBLIC_KEY",
-                "ALIPAY_SELLER_ID",
-                "WECHAT_PAY_APP_ID",
-                "WECHAT_PAY_MCH_ID",
-                "WECHAT_PAY_PRIVATE_KEY",
-                "WECHAT_PAY_CERT_SERIAL_NO",
-                "WECHAT_PAY_APIV3_KEY",
-            )
-            missing = [name for name in payment_fields if not getattr(self, name)]
-            if not (self.WECHAT_PAY_PLATFORM_PUBLIC_KEY or self.WECHAT_PAY_PLATFORM_CERT):
-                missing.append("WECHAT_PAY_PLATFORM_PUBLIC_KEY/WECHAT_PAY_PLATFORM_CERT")
-            if missing:
-                errors.append("支付已启用但缺少配置: " + ", ".join(missing))
+            # 支持部分配置：允许只启用支付宝或只启用微信支付（无需同时配置两者）
+            alipay_configured = bool(self.ALIPAY_APP_ID)
+            wechat_configured = bool(self.WECHAT_PAY_APP_ID)
+            if not alipay_configured and not wechat_configured:
+                errors.append("支付已启用但未配置任何支付方式，请至少配置支付宝或微信支付凭证")
+            # 支付宝凭证校验（仅当配置了支付宝时）
+            if alipay_configured:
+                alipay_fields = (
+                    "ALIPAY_APP_ID",
+                    "ALIPAY_PRIVATE_KEY",
+                    "ALIPAY_PUBLIC_KEY",
+                    "ALIPAY_SELLER_ID",
+                )
+                alipay_missing = [name for name in alipay_fields if not getattr(self, name)]
+                if alipay_missing:
+                    errors.append("支付宝凭证不完整: " + ", ".join(alipay_missing))
+                if not self.ALIPAY_NOTIFY_URL.startswith("https://"):
+                    errors.append("ALIPAY_NOTIFY_URL 必须使用公网 HTTPS")
+                if _is_placeholder_key(self.ALIPAY_NOTIFY_URL):
+                    errors.append("ALIPAY_NOTIFY_URL 仍为占位符（如 your-domain.com），请配置真实公网域名")
+                if _is_placeholder_key(self.ALIPAY_APP_ID):
+                    errors.append("ALIPAY_APP_ID 仍为占位符，请配置真实值")
+                if _is_placeholder_key(self.ALIPAY_PRIVATE_KEY):
+                    errors.append("ALIPAY_PRIVATE_KEY 仍为占位符，请配置真实值")
+            # 微信支付凭证校验（仅当配置了微信支付时）
+            if wechat_configured:
+                wechat_fields = (
+                    "WECHAT_PAY_APP_ID",
+                    "WECHAT_PAY_MCH_ID",
+                    "WECHAT_PAY_PRIVATE_KEY",
+                    "WECHAT_PAY_CERT_SERIAL_NO",
+                    "WECHAT_PAY_APIV3_KEY",
+                )
+                wechat_missing = [name for name in wechat_fields if not getattr(self, name)]
+                if not (self.WECHAT_PAY_PLATFORM_PUBLIC_KEY or self.WECHAT_PAY_PLATFORM_CERT):
+                    wechat_missing.append("WECHAT_PAY_PLATFORM_PUBLIC_KEY/WECHAT_PAY_PLATFORM_CERT")
+                if wechat_missing:
+                    errors.append("微信支付凭证不完整: " + ", ".join(wechat_missing))
+                if not self.WECHAT_PAY_NOTIFY_URL.startswith("https://"):
+                    errors.append("WECHAT_PAY_NOTIFY_URL 必须使用公网 HTTPS")
+                if _is_placeholder_key(self.WECHAT_PAY_NOTIFY_URL):
+                    errors.append("WECHAT_PAY_NOTIFY_URL 仍为占位符（如 your-domain.com），请配置真实公网域名")
+                if _is_placeholder_key(self.WECHAT_PAY_APP_ID):
+                    errors.append("WECHAT_PAY_APP_ID 仍为占位符，请配置真实值")
+                if _is_placeholder_key(self.WECHAT_PAY_PRIVATE_KEY):
+                    errors.append("WECHAT_PAY_PRIVATE_KEY 仍为占位符，请配置真实值")
             if not self.PAYMENT_VERIFY_REQUIRED:
                 errors.append("生产环境 PAYMENT_VERIFY_REQUIRED 必须为 true")
-            if not self.ALIPAY_NOTIFY_URL.startswith("https://"):
-                errors.append("ALIPAY_NOTIFY_URL 必须使用公网 HTTPS")
-            if not self.WECHAT_PAY_NOTIFY_URL.startswith("https://"):
-                errors.append("WECHAT_PAY_NOTIFY_URL 必须使用公网 HTTPS")
-            # P0 修复: 支付相关敏感字段占位符校验
-            payment_placeholder_fields = (
-                "ALIPAY_APP_ID",
-                "ALIPAY_PRIVATE_KEY",
-                "WECHAT_PAY_APP_ID",
-                "WECHAT_PAY_PRIVATE_KEY",
-            )
-            placeholder_violations = [
-                name for name in payment_placeholder_fields
-                if getattr(self, name) and _is_placeholder_key(getattr(self, name))
-            ]
-            if placeholder_violations:
-                errors.append("支付配置仍为占位符，请配置真实值: " + ", ".join(placeholder_violations))
-            # P0 修复: 回调 URL 占位符校验（your-domain.com 等）——仅在支付启用时校验
-            # 避免支付未启用时回调 URL 仍为默认 your-domain.com 占位符而阻断核心功能部署
-            if _is_placeholder_key(self.WECHAT_PAY_NOTIFY_URL):
-                errors.append("WECHAT_PAY_NOTIFY_URL 仍为占位符（如 your-domain.com），请配置真实公网域名")
-            if _is_placeholder_key(self.ALIPAY_NOTIFY_URL):
-                errors.append("ALIPAY_NOTIFY_URL 仍为占位符（如 your-domain.com），请配置真实公网域名")
         # P0 修复: SMTP_PASSWORD 占位符校验（仅当 SMTP_USER 非空时）
         if self.SMTP_USER and _is_placeholder_key(self.SMTP_PASSWORD):
             errors.append("SMTP_PASSWORD 仍为占位符，请配置真实邮箱授权码")
@@ -428,10 +435,17 @@ class Settings(BaseSettings):
         # P1 修复: 支付回调 URL 显式检测 your-domain.com 占位符 —— 仅在支付启用时校验
         # （_is_placeholder_key 实际已覆盖 your-domain.com 检测，此为冗余兜底；移入 PAYMENT_ENABLED 避免阻断核心功能部署）
         if self.PAYMENT_ENABLED:
-            for url_field in ("ALIPAY_NOTIFY_URL", "WECHAT_PAY_NOTIFY_URL", "ALIPAY_RETURN_URL"):
-                url_value = getattr(self, url_field, "")
+            _alipay_cfg = bool(self.ALIPAY_APP_ID)
+            _wechat_cfg = bool(self.WECHAT_PAY_APP_ID)
+            if _alipay_cfg:
+                for url_field in ("ALIPAY_NOTIFY_URL", "ALIPAY_RETURN_URL"):
+                    url_value = getattr(self, url_field, "")
+                    if url_value and "your-domain.com" in url_value:
+                        errors.append(f"{url_field} 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）")
+            if _wechat_cfg:
+                url_value = getattr(self, "WECHAT_PAY_NOTIFY_URL", "")
                 if url_value and "your-domain.com" in url_value:
-                    errors.append(f"{url_field} 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）")
+                    errors.append("WECHAT_PAY_NOTIFY_URL 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）")
         # P1 修复: 生产环境 CORS_ORIGINS 必须包含真实公网域名，不得仅 localhost
         cors_origins_lower = [o.lower() for o in self.CORS_ORIGINS]
         has_public_origin = any(
