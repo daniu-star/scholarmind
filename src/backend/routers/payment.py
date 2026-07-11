@@ -119,6 +119,12 @@ class CreateOrderRequest(BaseModel):
 
 @router.get("/packages")
 async def get_packages():
+    # 仅返回已配置凭证的支付方式，避免用户选择后下单失败
+    available_methods = []
+    if settings.ALIPAY_APP_ID:
+        available_methods.append("alipay")
+    if settings.WECHAT_PAY_APP_ID:
+        available_methods.append("wechat")
     return {
         "packages": [
             {
@@ -128,7 +134,7 @@ async def get_packages():
             for product in PRODUCTS.values()
         ],
         "payment_enabled": settings.PAYMENT_ENABLED,
-        "methods": ["alipay", "wechat"],
+        "methods": available_methods,
     }
 
 
