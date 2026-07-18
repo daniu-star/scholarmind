@@ -75,32 +75,71 @@ class SkillRouter:
 
     # ── 选项解析 ──
     def parse_options(self, reply: str) -> list[str]:
-        """从 LLM 回复中提取选项"""
+        """从 LLM 回复中提取选项。
+
+        优先级：
+        1. 最后一个含分隔符的方括号块（避免被 [1] 脚注截胡）
+        2. 末尾连续行号/字母/圈号标记列表
+        """
+        # 1. 优先取最后一个含分隔符的方括号块
         options = self._extract_bracket_options(reply)
-        if not options:
-            options = self._extract_numbered_options(reply)
-        return options
+        if options:
+            return options
+        # 2. 序号格式（1. / 1) / 1、 / ① / A. / a)）
+        options = self._extract_numbered_options(reply)
+        if options:
+            return options
+        return []
 
     def _extract_bracket_options(self, reply: str) -> list[str]:
+        """提取方括号选项。
+
+        规则：
+        - 仅当方括号内含分隔符（| ｜ 、 ， ,）才视为选项块
+        - 取最后一个符合条件的方括号（避免 [1] 脚注干扰）
+        - 选项数量必须 2-8 个，每个长度 < 100 字
+        - 全角 ｜ (U+FF5C) 自动归一化为半角 | 后再拆分
+        """
         import re
-        matches = re.findall(r'\[([^\]]+)\]', reply)
-        options = []
-        for m in matches:
-            parts = [p.strip() for p in m.split('|')]
-            options.extend([p for p in parts if p and len(p) < 100])
-        return options[:8]
+        # 匹配所有方括号（不允许内嵌 [ ]，避免误匹配嵌套引用）
+        matches = re.findall(r'\[([^\[\]\n]+)\]', reply)
+        for m in reversed(matches):  # 从后往前找，取最后一个有效选项块
+            # 归一化全角 ｜ (U+FF5C) 为半角 | (U+007C)
+            normalized = m.replace('｜', '|')
+            # 仅当方括号内含分隔符才视为选项块
+            sep = None
+            for s in ['|', '、', '，', ',']:
+                if s in normalized:
+                    sep = s
+                    break
+            if sep is None:
+                continue
+            parts = [p.strip() for p in normalized.split(sep)]
+            candidates = [p for p in parts if p and len(p) < 100]
+            if 2 <= len(candidates) <= 8:
+                return candidates[:8]
+        return []
 
     def _extract_numbered_options(self, reply: str) -> list[str]:
+        """提取序号选项。
+
+        支持格式：1. / 1) / 1、 / ① / ❶ / A. / a) / a、
+        仅当连续编号 ≥ 2 行才视为选项列表，避免误识别章节标题。
+        """
         import re
         lines = reply.split('\n')
         options = []
+        # 支持格式：1. / 1) / 1、 / ①-⑩ / A. / a) / a、
+        pattern = re.compile(r'^\s*(?:\d+[).、]|①|②|③|④|⑤|⑥|⑦|⑧|⑨|⑩|[A-Z][.)、]|[a-z][.)、])\s*(.+)')
         for line in lines:
-            m = re.match(r'^\s*\d+[\).、]\s*(.+)', line)
+            m = pattern.match(line)
             if m:
                 opt = m.group(1).strip()
-                if len(opt) < 100:
+                # 排除正文中的章节标题（如 "1. 研究背景：" 以冒号结尾）
+                if 2 <= len(opt) < 100 and not opt.endswith('：') and not opt.endswith(':'):
                     options.append(opt)
-        return options[:8]
+        # 仅当连续编号 ≥ 2 行才视为选项列表
+        return options[:8] if len(options) >= 2 else []
 
     # ── 图表技能执行 ──
     async def execute_chart_skill(self, reply: str, user_message: str, session_id: str = '') -> Optional[dict]:

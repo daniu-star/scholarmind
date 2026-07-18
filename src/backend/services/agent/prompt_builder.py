@@ -61,50 +61,50 @@ def _canned_greeting(agent_id: str, context: Optional[dict] = None) -> str:
     topic_clause = f"你提到的「{topic}」是个不错的切入点。" if topic else ""
     greetings = {
         "researcher": (
-            "你好，我是林知远——ScholarMind 的研究员。"
+            "你好，我是小全——ScholarMind 的研究员。"
             f"{topic_clause}我会陪你从模糊兴趣一步步收敛到一个真正可研究的问题。"
             "先问问：最近是什么现象或困惑让你产生了研究冲动？\n"
             "[算法推荐与信息茧房|平台劳工与数字控制|舆论极化与群体认同|短视频与青少年认知|其他(请直接输入)]"
         ),
         "reviewer": (
-            "我是苏明哲，做了十余年匿名审稿人。"
+            "你好，我是小全——ScholarMind 的审查员。"
             f"{topic_clause}把你的研究思路交给我，我会从四个维度给你坦诚的反馈。"
             "先用一句话告诉我：你想回答的核心研究问题是什么？\n"
             "[我有明确的研究问题|有大致方向但表述模糊|只有现象没有问题|其他(请直接输入)]"
         ),
         "architect": (
-            "你好，我是陈书远。框架决定论文的基因。"
+            "你好，我是小全——ScholarMind 的架构师。"
             f"{topic_clause}我会帮你把论文的骨架搭稳。"
             "先了解现状：你的论文目前处在哪个阶段？\n"
             "[刚开始构思|已有大纲需优化|已完成初稿需审查|已投稿被拒需重构|其他(请直接输入)]"
         ),
         "synthesizer": (
-            "我是周文澜。文献综述不是文献展览，而是理论对话的舞台。"
+            "你好，我是小全——ScholarMind 的综述员。"
             f"{topic_clause}我会帮你把零散的文献织成一张有论点的网。"
             "先告诉我：你想综述的核心主题是什么？\n"
             "[我有明确主题|有方向但需聚焦|需要你帮我从兴趣提炼主题|其他(请直接输入)]"
         ),
         "polisher": (
-            "你好，我是宋墨然。形式即内容——一句拗口的学术腔可能毁掉一个绝佳的洞见。"
+            "你好，我是小全——ScholarMind 的润色员。"
             f"{topic_clause}我负责让你的表达既严谨又有人味儿。"
             "先问：你这次想润色的是哪一部分？\n"
             "[论文摘要|引言|方法部分|讨论部分|全文|其他(请直接输入)]"
         ),
         "external_reviewer": (
-            "我是方严谨，独立评审。一流论文等于理论原创加方法严谨加表达优雅，缺一不可。"
+            "你好，我是小全——ScholarMind 的外审专家。"
             f"{topic_clause}我会按九个维度给你的完整论文做一次严苛而建设性的外审。"
             "先确认：这篇论文属于哪种研究类型？\n"
             "[量化研究|质性研究|混合方法|计算社会科学|理论论文|其他(请直接输入)]"
         ),
         "computational": (
-            "你好，我是陆代码。算法透明、可复现、数据伦理——这三条是计算社科的底线。"
+            "你好，我是小全——ScholarMind 的计算员。"
             f"{topic_clause}从爬虫到建模到可视化，我都能直接写码跑给你看。"
             "先问最关键的：你的数据从哪里来？\n"
             "[需要爬取公开网页|已有数据集待分析|需要调用API|还没想好需你建议|其他(请直接输入)]"
         ),
         "custom": (
-            "你好，我是 ScholarMind 的通用学术助手。"
-            "我没有专项 Agent 的深度，但我能灵活应对各种学术需求，并在需要时帮你转接到合适的专家。"
+            "你好，我是小全——ScholarMind 的通用助手。"
+            "我能灵活应对各种学术需求，并在需要时帮你转接到合适的专家。"
             f"{topic_clause}先告诉我：你这次想做什么？\n"
             "[选题/建构问题|审查研究思路|搭建论文架构|文献综述|语言润色|外审论文|计算分析|其他(请直接输入)]"
         ),
@@ -128,6 +128,86 @@ CONTEXT_TEMPLATES = {
     "research_type": "\n研究类型：{value}",
     "readiness": "\n用户研究准备度：{value}",
 }
+
+
+# ── 学科化写作风格特征（Task 6.1：为不同学科注入差异化风格） ──
+STYLE_FEATURES_BY_DISCIPLINE: dict[str, str] = {
+    "humanities": (
+        "── 人文社科写作特征 ──\n"
+        "- 重视理论谱系与概念谱系，引文优先 CSSCI 来源期刊与领域奠基性著作\n"
+        "- 论证以理论对话为主轴，善用\"连接-反连接\"\"中心-边缘\"等二元对范畴展开辩证分析\n"
+        "- 语言兼具学术性与人文质感，转折-递进型过渡词高频（然而、进而、与此相应、值得注意的是）\n"
+        "- 方法部分强调研究设计的理论依据，质性研究须交代理论饱和度与反思性\n"
+        "- 概念首现必指明提出者与理论谱系，术语规范遵循学科惯例\n"
+        "- 文献综述权重较高，须识别\"共识-争议-空白\"三重结构\n"
+        "- 结论部分强调理论贡献与对相邻领域的启示，避免单纯的实证复述"
+    ),
+    "engineering": (
+        "── 工科写作特征 ──\n"
+        "- 重视实验设计与性能指标，引文优先 IEEE/ACM 顶会与领域顶级期刊\n"
+        "- 论证以实验验证为主轴，须有明确的 baseline 对比与消融实验\n"
+        "- 语言精确简洁，多用被动语态描述实验过程，避免冗长的理论铺陈\n"
+        "- 方法部分须包含：问题定义、算法/系统设计、实验设置、结果分析、讨论\n"
+        "- 技术术语首现必全称+缩写，公式与图表编号规范\n"
+        "- 须明确定义评估指标（precision/recall/F1/latency 等）与统计显著性\n"
+        "- 结论部分强调工程贡献与可复现性，须给出代码/数据可用性声明"
+    ),
+    "science": (
+        "── 理科写作特征 ──\n"
+        "- 重视实验可复现性与统计严谨性，引文优先 Nature/Science/Cell 及领域顶刊\n"
+        "- 论证以假设检验为主轴，须有明确的科研问题、假设、实验设计、数据验证\n"
+        "- 语言客观精确，数据呈现须含误差棒/置信区间/效应量，避免主观判断词\n"
+        "- 方法部分须包含：材料、仪器、protocol、统计方法，详尽到他人可复现\n"
+        "- 图表须符合期刊规范（坐标轴标签/单位/图例/分辨率），优先使用专业绘图软件\n"
+        "- 须报告统计检验方法（t-test/ANOVA/χ²）、p 值、样本量、多重比较校正\n"
+        "- 结论部分强调科学发现与理论意义，须单设 Limitations 段落承认局限"
+    ),
+    "interdisciplinary": (
+        "── 跨学科写作特征 ──\n"
+        "- 重视学科整合逻辑，引文平衡多领域顶刊（CS 顶会+领域顶刊+方法学期刊）\n"
+        "- 论证须明确学科边界与整合点，交代各学科理论/方法如何融合\n"
+        "- 语言须兼顾不同学科读者的可读性，避免单一学科术语堆砌\n"
+        "- 方法部分须说明跨学科研究设计（互补/三角验证/嵌入/整合逻辑）\n"
+        "- 术语首现须解释跨学科含义，不同学科对同一概念的定义差异须澄清\n"
+        "- 须讨论跨学科整合的挑战与张力，避免简单拼凑多学科内容\n"
+        "- 结论部分强调跨学科贡献的独特价值，指出对各参与学科的双重启示"
+    ),
+}
+
+
+def get_style_features(discipline: Optional[str]) -> str:
+    """根据大学科返回学科化写作风格特征文本。
+
+    Args:
+        discipline: 学科 ID（humanities/engineering/science/interdisciplinary）或子学科 ID
+
+    Returns:
+        学科化风格特征文本；若学科未识别，返回人文社科特征作为默认。
+    """
+    if not discipline:
+        return STYLE_FEATURES_BY_DISCIPLINE["humanities"]
+
+    # 子学科 → 大学科映射
+    sub_to_major = {
+        # 人文社科
+        "communication": "humanities", "sociology": "humanities", "psychology": "humanities",
+        "education": "humanities", "journalism": "humanities", "anthropology": "humanities",
+        "law": "humanities", "economics": "humanities", "philosophy": "humanities",
+        # 工科
+        "computer_science": "engineering", "electronic_engineering": "engineering",
+        "mechanical_engineering": "engineering", "civil_engineering": "engineering",
+        "materials_science": "engineering", "automation": "engineering",
+        "chemical_engineering": "engineering", "environmental_engineering": "engineering",
+        # 理科
+        "mathematics": "science", "physics": "science", "chemistry": "science",
+        "biology": "science", "astronomy": "science", "earth_science": "science",
+        "medicine": "science",
+    }
+
+    # 若传入的是子学科，先映射到大学科
+    major = sub_to_major.get(discipline, discipline)
+
+    return STYLE_FEATURES_BY_DISCIPLINE.get(major, STYLE_FEATURES_BY_DISCIPLINE["humanities"])
 
 
 # ═══════════════════════════════════════════════════════════════

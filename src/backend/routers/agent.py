@@ -231,7 +231,7 @@ async def get_topics_by_discipline(
     service: IAgentService = Depends(get_agent_service),
     user_id: int = Depends(get_current_user),
 ):
-    """获取指定学科的热门选题列表（4 大学科各 15 个 Top 议题）
+    """获取指定学科的热门选题列表（4 大学科各 25 个 Top 议题）
 
     P0 Task 3.2：强制鉴权。
 

@@ -417,3 +417,40 @@ class LoginAttempt(Base):
     __table_args__ = (
         Index("idx_la_identifier_created", "identifier", "created_at"),
     )
+
+
+# ═══════════════════════════════════════════════════════════════
+# 设备指纹+信任设备登录策略（UserDevice）
+# 用户可标记某设备为"信任设备"7天免登录，非信任设备每次访问强制弹登录框
+# ═══════════════════════════════════════════════════════════════
+class UserDevice(Base):
+    """用户信任设备表 — 设备指纹+信任设备登录策略"""
+
+    __tablename__ = "user_devices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=False, index=True
+    )
+    device_fingerprint: Mapped[str] = mapped_column(
+        String(128), nullable=False, comment="设备指纹（SHA256 浏览器特征）"
+    )
+    device_name: Mapped[Optional[str]] = mapped_column(
+        String(128), nullable=True, comment="设备名称（UA 解析）"
+    )
+    trusted: Mapped[bool] = mapped_column(
+        Boolean, default=False, comment="是否为信任设备（7天免登录）"
+    )
+    trusted_until: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True, comment="信任设备到期时间"
+    )
+    last_login_at: Mapped[datetime] = mapped_column(
+        DateTime, default=_utcnow, comment="最后登录时间"
+    )
+    last_login_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_fingerprint", name="uq_user_device"),
+        Index("idx_user_devices_user_trusted", "user_id", "trusted"),
+    )

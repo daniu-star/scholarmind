@@ -217,6 +217,7 @@ async def create_order(
         "pay_url": pay_result,
         "method": req.payment_method,
         "product": product,
+        "amount_yuan": product["amount_cents"] / 100,
         "expires_in_seconds": 900,
     }
 

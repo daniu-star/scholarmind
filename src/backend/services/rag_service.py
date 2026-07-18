@@ -129,9 +129,14 @@ class RAGService:
         return db.search_resources(query, limit=limit)
 
     def build_context(
-        self, query: str, agent_id: Optional[str] = None, top_k: int = 5
+        self, query: str, agent_id: Optional[str] = None, top_k: int = 5,
+        filters: Optional[dict] = None,
     ) -> dict:
         """组装 RAG 上下文字符串，供 Agent 系统提示词注入。
+
+        Args:
+            filters: 可选的元数据过滤条件（如 {"discipline": "humanities"}），
+                     透传到 search() 实现学科差异化检索。
 
         Returns:
             dict 包含以下字段:
@@ -140,7 +145,7 @@ class RAGService:
                 - reason: str，降级原因（未降级时为空字符串）
         """
         try:
-            search_result = self.search(query, top_k=top_k)
+            search_result = self.search(query, top_k=top_k, filters=filters)
         except Exception as e:
             logger.error(f"RAG search failed: {e}")
             return {"context": "", "degraded": False, "reason": ""}

@@ -53,6 +53,56 @@ async def _ensure_schema_columns(engine) -> None:
                         logger.info(f"schema_auto_fix: added {table}.{col}")
                     except Exception:
                         pass  # 列已存在或其他非致命错误
+
+            # 设备指纹+信任设备表（Alembic 未迁移时的兜底建表）
+            # 兼容 SQLite 和 PostgreSQL：使用 IF NOT EXISTS + 通用数据类型
+            try:
+                await conn.execute(sa_text("""
+                    CREATE TABLE IF NOT EXISTS user_devices (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        device_fingerprint VARCHAR(128) NOT NULL,
+                        device_name VARCHAR(128),
+                        trusted BOOLEAN DEFAULT FALSE,
+                        trusted_until TIMESTAMP,
+                        last_login_at TIMESTAMP,
+                        last_login_ip VARCHAR(45),
+                        created_at TIMESTAMP
+                    )
+                """))
+                await conn.commit()
+                logger.info("schema_auto_fix: ensured user_devices table exists")
+            except Exception:
+                # PostgreSQL 用 SERIAL 替代 AUTOINCREMENT，回退重建
+                try:
+                    await conn.execute(sa_text("""
+                        CREATE TABLE IF NOT EXISTS user_devices (
+                            id SERIAL PRIMARY KEY,
+                            user_id INTEGER NOT NULL,
+                            device_fingerprint VARCHAR(128) NOT NULL,
+                            device_name VARCHAR(128),
+                            trusted BOOLEAN DEFAULT FALSE,
+                            trusted_until TIMESTAMP,
+                            last_login_at TIMESTAMP,
+                            last_login_ip VARCHAR(45),
+                            created_at TIMESTAMP
+                        )
+                    """))
+                    await conn.commit()
+                    logger.info("schema_auto_fix: ensured user_devices table exists (postgres)")
+                except Exception as e:
+                    logger.warning(f"schema_auto_fix: user_devices creation failed: {e}")
+
+            # 添加唯一约束和索引（IF NOT EXISTS 不被所有版本支持，try-except 兜底）
+            for sql_stmt in (
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_user_device ON user_devices(user_id, device_fingerprint)",
+                "CREATE INDEX IF NOT EXISTS idx_user_devices_user_trusted ON user_devices(user_id, trusted)",
+            ):
+                try:
+                    await conn.execute(sa_text(sql_stmt))
+                    await conn.commit()
+                except Exception:
+                    pass
     except Exception as e:
         logger.warning(f"schema_auto_fix non-fatal failure: {e}")
 

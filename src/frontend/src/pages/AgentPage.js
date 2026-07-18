@@ -1033,7 +1033,7 @@ export function AgentPage({ agentId } = {}) {
     synthesizer: '请输入您要综述的研究方向',
     polisher: '请描述您的润色或降重需求',
   };
-  // P3-T1：异步从后端获取指定学科的热门议题（4 学科各 15 个 Top 议题）
+  // P3-T1：异步从后端获取指定学科的热门议题（4 学科各 25 个 Top 议题）
   // 替代原硬编码 DISCIPLINE_SUGGESTIONS（仅 3 学科各 3 议题且缺 interdisciplinary）
   const FALLBACK_TOPICS = ['算法推荐与信息茧房', 'AI生成内容的传播伦理', '平台经济中的劳动控制'];
   async function fetchTopics() {

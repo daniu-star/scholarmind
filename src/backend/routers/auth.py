@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
@@ -12,7 +12,7 @@ from sqlalchemy.exc import IntegrityError
 
 from ..config import settings
 from ..core.dependencies import get_db
-from ..models.orm import User, VerificationCode
+from ..models.orm import User, UserDevice, VerificationCode
 from ..services.auth_service import (
     authenticate_user,
     create_access_token,
@@ -70,6 +70,10 @@ class PhoneCredentials(BaseModel):
     username: Optional[str] = Field(default=None, min_length=3, max_length=128)
     email: Optional[str] = Field(default=None, min_length=5, max_length=128)
     password: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    # 设备指纹+信任设备登录策略：前端登录/注册时附带
+    device_fingerprint: Optional[str] = Field(default=None, max_length=128)
+    device_name: Optional[str] = Field(default=None, max_length=128)
+    trust_device: bool = Field(default=False, description="是否将此设备标记为信任设备（7天免登录）")
 
     def normalized_phone(self) -> str:
         try:
@@ -114,6 +118,8 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: dict
     entitlements: dict
+    device_trusted: bool = False
+    device_fingerprint: Optional[str] = None
 
 
 def _mask_phone(phone: str | None) -> str | None:
@@ -154,14 +160,87 @@ async def _record_login_attempt(db, identifier: str, success: bool, reason: str 
     )
 
 
-async def _token_response(db, user: User) -> TokenResponse:
+async def _upsert_user_device(
+    db,
+    user_id: int,
+    device_fingerprint: str,
+    device_name: Optional[str],
+    trust_device: bool,
+    client_ip: Optional[str],
+) -> bool:
+    """登录/注册成功后记录或更新设备指纹。
+
+    - 若 user_id + device_fingerprint 已存在 → 更新 last_login_at/ip，trust 状态按 trust_device 刷新
+    - 若不存在 → 新建记录
+    - trust_device=True 时设置 trusted_until = now + 7天
+    返回当前设备是否被信任（用于响应字段 device_trusted）。
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    trusted_until = (now + timedelta(days=7)) if trust_device else None
+    result = await db.execute(
+        select(UserDevice).where(
+            UserDevice.user_id == user_id,
+            UserDevice.device_fingerprint == device_fingerprint,
+        )
+    )
+    device = result.scalar_one_or_none()
+    if device:
+        device.last_login_at = now
+        device.last_login_ip = client_ip
+        if device_name:
+            device.device_name = device_name
+        if trust_device:
+            device.trusted = True
+            device.trusted_until = trusted_until
+        # 注意：trust_device=False 时不主动撤销已有的信任状态（用户重新登录可能不勾选但保留之前信任）
+    else:
+        device = UserDevice(
+            user_id=user_id,
+            device_fingerprint=device_fingerprint,
+            device_name=device_name,
+            trusted=trust_device,
+            trusted_until=trusted_until,
+            last_login_at=now,
+            last_login_ip=client_ip,
+            created_at=now,
+        )
+        db.add(device)
+    await db.flush()
+    # 计算当前设备是否仍处于信任期
+    if device.trusted and device.trusted_until and device.trusted_until > now:
+        return True
+    return False
+
+
+async def _token_response(
+    db,
+    user: User,
+    device_fingerprint: Optional[str] = None,
+    device_name: Optional[str] = None,
+    trust_device: bool = False,
+    client_ip: Optional[str] = None,
+) -> TokenResponse:
+    """生成 token 响应；若提供 device_fingerprint 则记录设备并写入 JWT claims。"""
     claims = {"sub": str(user.id)}
+    device_trusted = False
+    if device_fingerprint:
+        claims["device_fp"] = device_fingerprint
+        try:
+            device_trusted = await _upsert_user_device(
+                db, user.id, device_fingerprint, device_name, trust_device, client_ip
+            )
+        except Exception as exc:
+            # 设备记录失败不应阻断登录流程
+            import structlog
+            structlog.get_logger(__name__).warning(f"upsert UserDevice failed: {exc}")
     entitlements = await EntitlementService.get_snapshot(db, user.id)
     return TokenResponse(
         access_token=create_access_token(claims),
         refresh_token=create_refresh_token(claims),
         user=_public_user(user, entitlements),
         entitlements=entitlements,
+        device_trusted=device_trusted,
+        device_fingerprint=device_fingerprint,
     )
 
 
@@ -267,7 +346,8 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
 
 
 @router.post("/register", response_model=TokenResponse)
-async def register(req: RegisterRequest, db=Depends(get_db)):
+async def register(req: RegisterRequest, request: Request, db=Depends(get_db)):
+    client_ip = request.client.host if request and request.client else None
     # 验证码注册：与登录共用 verify_code_and_login（新用户自动创建）
     if req.code and len(req.code) == 6:
         target = req.identifier
@@ -282,7 +362,13 @@ async def register(req: RegisterRequest, db=Depends(get_db)):
         if req.email and not user.email:
             user.email = req.email
         await db.commit()
-        return await _token_response(db, user)
+        return await _token_response(
+            db, user,
+            device_fingerprint=req.device_fingerprint,
+            device_name=req.device_name,
+            trust_device=req.trust_device,
+            client_ip=client_ip,
+        )
 
     # 密码注册（支持邮箱和手机号，register_user 自动识别）
     if not req.password or len(req.password) < settings.PASSWORD_MIN_LENGTH:
@@ -307,7 +393,13 @@ async def register(req: RegisterRequest, db=Depends(get_db)):
     user = await register_user(db, reg_identifier, req.password, req.nickname or "")
 
     try:
-        response = await _token_response(db, user)
+        response = await _token_response(
+            db, user,
+            device_fingerprint=req.device_fingerprint,
+            device_name=req.device_name,
+            trust_device=req.trust_device,
+            client_ip=client_ip,
+        )
         await db.commit()
         return response
     except IntegrityError as exc:
@@ -316,7 +408,8 @@ async def register(req: RegisterRequest, db=Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(req: LoginRequest, db=Depends(get_db)):
+async def login(req: LoginRequest, request: Request, db=Depends(get_db)):
+    client_ip = request.client.host if request and request.client else None
     # P0 修复: 登录失败速率限制（5 次/15 分钟窗口）
     identifier = req.identifier
     if identifier:
@@ -343,7 +436,13 @@ async def login(req: LoginRequest, db=Depends(get_db)):
             await db.commit()
             raise HTTPException(status_code=401, detail="验证码错误或已过期")
         await _record_login_attempt(db, identifier, True)
-        return await _token_response(db, user)
+        return await _token_response(
+            db, user,
+            device_fingerprint=req.device_fingerprint,
+            device_name=req.device_name,
+            trust_device=req.trust_device,
+            client_ip=client_ip,
+        )
 
     # 密码登录（支持手机号和邮箱）
     if not req.password:
@@ -380,7 +479,13 @@ async def login(req: LoginRequest, db=Depends(get_db)):
             {"uid": user.id},
         )
     await _record_login_attempt(db, identifier, True)
-    return await _token_response(db, user)
+    return await _token_response(
+        db, user,
+        device_fingerprint=req.device_fingerprint,
+        device_name=req.device_name,
+        trust_device=req.trust_device,
+        client_ip=client_ip,
+    )
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -405,3 +510,163 @@ async def get_me(user: User = Depends(get_current_user), db=Depends(get_db)):
         "user": _public_user(user, entitlements),
         "entitlements": entitlements,
     }
+
+
+# ═══════════════════════════════════════════════════════════════
+# 设备指纹+信任设备登录策略：设备管理端点
+# ═══════════════════════════════════════════════════════════════
+
+@router.get("/devices")
+async def list_user_devices(user: User = Depends(get_current_user), db=Depends(get_db)):
+    """列出当前用户的所有设备（按最后登录时间倒序）。"""
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    result = await db.execute(
+        select(UserDevice)
+        .where(UserDevice.user_id == user.id)
+        .order_by(UserDevice.last_login_at.desc())
+    )
+    devices = result.scalars().all()
+    return {
+        "devices": [
+            {
+                "id": d.id,
+                "device_name": d.device_name or "未命名设备",
+                "device_fingerprint": d.device_fingerprint,
+                "trusted": d.trusted,
+                "trusted_until": d.trusted_until.isoformat() if d.trusted_until else None,
+                "is_current_active": bool(
+                    d.trusted and d.trusted_until and d.trusted_until > now
+                ),
+                "last_login_at": d.last_login_at.isoformat() if d.last_login_at else None,
+                "last_login_ip": d.last_login_ip,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
+            }
+            for d in devices
+        ]
+    }
+
+
+@router.delete("/devices/{device_id}")
+async def revoke_device(
+    device_id: int,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """撤销指定设备的信任状态（不删除记录，仅置 trusted=False）。"""
+    result = await db.execute(
+        select(UserDevice).where(
+            UserDevice.id == device_id,
+            UserDevice.user_id == user.id,
+        )
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="设备不存在或无权操作")
+    device.trusted = False
+    device.trusted_until = None
+    await db.commit()
+    return {"success": True, "message": "已撤销该设备的信任状态"}
+
+
+@router.post("/devices/{device_id}/trust")
+async def trust_device_again(
+    device_id: int,
+    user: User = Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """重新信任某设备（延长 7 天）。"""
+    result = await db.execute(
+        select(UserDevice).where(
+            UserDevice.id == device_id,
+            UserDevice.user_id == user.id,
+        )
+    )
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="设备不存在或无权操作")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    device.trusted = True
+    device.trusted_until = now + timedelta(days=7)
+    await db.commit()
+    return {
+        "success": True,
+        "message": "已重新信任该设备（7天免登录）",
+        "trusted_until": device.trusted_until.isoformat(),
+    }
+
+
+class ValidateDeviceRequest(BaseModel):
+    device_fingerprint: str = Field(min_length=8, max_length=128)
+
+
+@router.post("/validate-device")
+async def validate_device(
+    req: ValidateDeviceRequest,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db=Depends(get_db),
+):
+    """前端页面加载时校验：token 是否有效 + 设备是否在信任列表。
+
+    返回:
+        - valid: token 是否有效
+        - need_login: 是否需要重新登录
+        - device_trusted: 当前设备是否处于信任期
+        - user: 用户基本信息（若 token 有效）
+    """
+    # 1. 无 token → 需要登录
+    if not credentials:
+        return {"valid": False, "need_login": True, "device_trusted": False, "user": None}
+
+    # 2. token 解码
+    payload = decode_token(credentials.credentials, expected_type="access")
+    if not payload:
+        return {"valid": False, "need_login": True, "device_trusted": False, "user": None}
+
+    try:
+        user_id = int(payload.get("sub", 0))
+    except (TypeError, ValueError):
+        user_id = 0
+    user = await get_user_by_id(db, user_id)
+    if not user or not user.is_active:
+        return {"valid": False, "need_login": True, "device_trusted": False, "user": None}
+
+    # 3. 校验设备指纹是否在用户设备列表中
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    result = await db.execute(
+        select(UserDevice).where(
+            UserDevice.user_id == user.id,
+            UserDevice.device_fingerprint == req.device_fingerprint,
+        )
+    )
+    device = result.scalar_one_or_none()
+
+    if not device:
+        # 设备未在列表中 → 需要登录（用户可勾选信任）
+        return {
+            "valid": True,
+            "need_login": True,
+            "device_trusted": False,
+            "user": _public_user(user),
+            "reason": "device_not_found",
+        }
+
+    # 4. 检查信任状态是否仍有效
+    is_still_trusted = bool(
+        device.trusted and device.trusted_until and device.trusted_until > now
+    )
+    if is_still_trusted:
+        return {
+            "valid": True,
+            "need_login": False,
+            "device_trusted": True,
+            "user": _public_user(user),
+        }
+    else:
+        # 设备已记录但信任过期 → 需重新登录可勾选信任
+        return {
+            "valid": True,
+            "need_login": True,
+            "device_trusted": False,
+            "user": _public_user(user),
+            "reason": "trust_expired",
+        }

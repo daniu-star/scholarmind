@@ -64,6 +64,11 @@ scripts/deploy/archive/
 *.bak
 tmp/
 
+# ========== 临时测试文件（E2E/冒烟测试产物）==========
+_smoke_*.png
+e2e_api_test.py
+test_smoke_*.py
+
 # ========== CNKI Downloader 运行时数据 ==========
 cnki-downloader/js_bundles/
 cnki-downloader/storage/

@@ -80,7 +80,7 @@ export const agentApi = {
   clearConversation: (sessionId) =>
     api.delete(`/api/v1/agent/conversation/${sessionId}`),
   listAgents: () => api.get('/api/v1/agent/agents'),
-  // P2-T3：获取指定学科的热门选题（4 学科各 15 个 Top 议题）
+  // P2-T3：获取指定学科的热门选题（4 学科各 25 个 Top 议题）
   getTopics: (disciplineId) =>
     api.get(`/api/v1/agent/topics/${disciplineId || 'humanities'}`),
   // P1-T6 补全：会话重命名与删除（对应后端 PATCH/DELETE /agent/sessions/{id})

@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import structlog
 import smtplib
+import time
 from concurrent.futures import ThreadPoolExecutor
 from email.header import Header
 from email.mime.text import MIMEText
@@ -22,6 +23,27 @@ logger = structlog.get_logger(__name__)
 
 # 专用 SMTP 线程池（独立于 asyncio 默认线程池，避免邮件发送阻塞其他 to_thread 调用）
 _smtp_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="smtp-")
+
+# ── Task 4: 通道健康缓存 ──────────────────────────────────
+# 5 分钟内成功过的通道直接复用，避免每次都全通道并发竞速。
+# 失败通道不写入缓存；配置变更需重启服务清空缓存。
+_channel_health: dict[str, tuple[float, float]] = {}
+_HEALTH_TTL = 300.0  # 5 分钟
+
+
+def _is_channel_healthy(name: str) -> bool:
+    rec = _channel_health.get(name)
+    if not rec:
+        return False
+    return (time.monotonic() - rec[0]) < rec[1]
+
+
+def _mark_channel_healthy(name: str) -> None:
+    _channel_health[name] = (time.monotonic(), _HEALTH_TTL)
+
+
+def _clear_channel_health(name: str) -> None:
+    _channel_health.pop(name, None)
 
 
 def _mask_email(email: str) -> str:
@@ -116,7 +138,7 @@ async def _send_via_resend(to_email: str, code: str) -> tuple[bool, str | None]:
 </div>""",
     }
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=6.0) as client:
             resp = await client.post(
                 "https://api.resend.com/emails",
                 json=payload,
@@ -204,7 +226,7 @@ async def _send_via_smtp(target_email: str, code: str) -> None:
     msg["To"] = target_email
     msg["Reply-To"] = settings.SMTP_USER
 
-    _SMTP_TIMEOUT = 8  # 秒（从 10 降到 8，避免请求总耗时过长）
+    _SMTP_TIMEOUT = 5  # 秒（Task 4: 从 8 降到 5，配合并发竞速缩短整体耗时）
 
     def _send_sync():
         # 端口 465 使用 SSL 直连，其他端口使用 STARTTLS
@@ -279,7 +301,7 @@ async def _send_via_vercel_proxy(target_email: str, code: str) -> tuple[bool, st
     }
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=6.0) as client:
             resp = await client.post(
                 settings.VERCEL_EMAIL_PROXY_URL,
                 json=payload,
@@ -305,38 +327,112 @@ async def _send_via_vercel_proxy(target_email: str, code: str) -> tuple[bool, st
         return False, "NETWORK_ERROR"
 
 
+async def _send_via_smtp_safe(target_email: str, code: str) -> None:
+    """SMTP 通道包装：统一 asyncio.wait 行为（失败时抛 EmailSendError 而非返回元组）。"""
+    await _send_via_smtp(target_email, code)  # 失败时抛 EmailSendError
+
+
+async def _dispatch_channel(name: str, target_email: str, code: str) -> None:
+    """单通道调度（用于健康通道直连路径）。
+
+    不同通道返回类型不一致：
+    - SMTP: 成功返回 None，失败抛 EmailSendError
+    - Vercel/Resend: 返回 (success: bool, error: str | None) 元组
+
+    本函数统一为"成功返回 None，失败抛 EmailSendError"。
+    """
+    if name == "smtp":
+        await _send_via_smtp(target_email, code)
+    elif name == "vercel":
+        success, err = await _send_via_vercel_proxy(target_email, code)
+        if not success:
+            raise EmailSendError(f"Vercel proxy failed: {err}")
+    elif name == "resend":
+        success, err = await _send_via_resend(target_email, code)
+        if not success:
+            raise EmailSendError(f"Resend failed: {err}")
+
+
 async def send_verification_email(target_email: str, code: str) -> None:
-    """发送验证码邮件 — 优先 SMTP 直连，失败走 Vercel 代理，最后 Resend
+    """发送验证码邮件 — Task 4: 并发竞速 + 健康通道优先。
 
     策略：
-    1. SMTP 直连（本地开发可用，Railway 不可用因端口封锁）
-    2. Vercel Serverless Function 代理（绕过 Railway SMTP 封锁，走 HTTPS 443）
-    3. Resend HTTP API（需要域名验证，作为最后兜底）
+    1. 若有健康通道缓存（5min TTL），直接调用该通道，跳过并发竞速
+    2. 否则并发发起所有已配置通道，首通道成功即返回（asyncio.wait FIRST_COMPLETED）
+       并 cancel 其余未完成通道；成功通道写入健康缓存加速下次发送
+    3. 全部失败则抛 EmailSendError
+
+    性能：
+    - 旧策略（串行）：最坏 8s(SMTP) + 15s(Vercel) + 15s(Resend) = 38s
+    - 新策略（并发）：最坏 6s（首通道超时），通常 1-3s（Vercel/Resend 并发竞速）
+    - 健康通道直连：< 2s（无并发开销）
     """
-    # 1. 优先 SMTP 直连
+    # 1. 健康通道直连
+    for name in ("smtp", "vercel", "resend"):
+        if _is_channel_healthy(name):
+            try:
+                await _dispatch_channel(name, target_email, code)
+                _mark_channel_healthy(name)  # 刷新 TTL
+                logger.info(f"email_sent_via_healthy_channel name={name} to={_mask_email(target_email)}")
+                return
+            except Exception as e:
+                logger.warning(f"healthy_channel_failed name={name} error={e}")
+                _clear_channel_health(name)
+                # 健康通道失败 → 走并发竞速
+                break
+
+    # 2. 并发竞速
+    tasks: list[asyncio.Task] = []
+    task_names: list[str] = []
     if settings.SMTP_USER and settings.SMTP_PASSWORD:
-        try:
-            await _send_via_smtp(target_email, code)
-            return
-        except EmailSendError as e:
-            logger.warning(f"smtp_failed_attempting_vercel_proxy error={e}")
-
-    # 2. SMTP 失败（如 Railway 封锁端口），走 Vercel 代理
+        tasks.append(asyncio.create_task(_send_via_smtp_safe(target_email, code)))
+        task_names.append("smtp")
     if settings.VERCEL_EMAIL_PROXY_URL and settings.VERCEL_EMAIL_PROXY_KEY:
-        success, error = await _send_via_vercel_proxy(target_email, code)
-        if success:
-            return
-        logger.warning(f"vercel_proxy_failed_attempting_resend error={error}")
-
-    # 3. Vercel 代理也失败，尝试 Resend
+        tasks.append(asyncio.create_task(_send_via_vercel_proxy(target_email, code)))
+        task_names.append("vercel")
     if settings.RESEND_API_KEY:
-        success, _error_type = await _send_via_resend(target_email, code)
-        if success:
-            return
+        tasks.append(asyncio.create_task(_send_via_resend(target_email, code)))
+        task_names.append("resend")
+
+    if not tasks:
         raise EmailSendError(
-            f"所有邮件发送方式均失败。SMTP + Vercel代理 + Resend 错误：{get_last_resend_error() or 'unknown'}"
+            "邮件服务未配置。请设置 SMTP_USER/SMTP_PASSWORD 或 VERCEL_EMAIL_PROXY_URL 或 RESEND_API_KEY"
         )
 
+    # FIRST_COMPLETED：任一通道成功即返回；其余任务取消
+    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+    for t in pending:
+        t.cancel()
+
+    # 检查 done 中的任务结果
+    first_success_name: str | None = None
+    errors: list[str] = []
+    for i, t in enumerate(done):
+        name = task_names[i]
+        try:
+            result = t.result()
+            if name == "smtp":
+                # _send_via_smtp_safe 成功返回 None，失败已抛异常
+                first_success_name = name
+                break
+            else:
+                # Vercel/Resend 返回 (success, error) 元组
+                success, err = result
+                if success:
+                    first_success_name = name
+                    break
+                errors.append(f"{name}: {err}")
+        except Exception as e:
+            errors.append(f"{name}: {e}")
+
+    if first_success_name:
+        _mark_channel_healthy(first_success_name)
+        logger.info(
+            f"email_sent_winning_channel={first_success_name} to={_mask_email(target_email)}"
+        )
+        return
+
+    # 全部失败
     raise EmailSendError(
-        "邮件服务未配置。请设置 SMTP_USER/SMTP_PASSWORD 或 VERCEL_EMAIL_PROXY_URL 或 RESEND_API_KEY"
+        f"所有邮件发送方式均失败：{'; '.join(errors)}。最后 Resend 错误：{get_last_resend_error() or 'unknown'}"
     )

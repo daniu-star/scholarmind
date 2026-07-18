@@ -12,7 +12,7 @@ from datetime import datetime
 
 from ..services.skills_service import SkillsService
 from ..services import chart_service
-from ..config import settings
+from ..config import settings, DATA_ROOT
 from ..utils.file_parser import extract_pdf, extract_docx
 from ..utils.cache import cache_result
 from ..utils.llm_client import llm_client
@@ -540,7 +540,7 @@ class AgentService(IAgentService):
         （原 sync 版本调用 async SkillsService.list_all() 返回 coroutine 导致
         'coroutine' object is not iterable）
         """
-        from .agent.prompt_builder import get_prompt_builder
+        from .agent.prompt_builder import get_prompt_builder, get_style_features
 
         builder = get_prompt_builder(auto_reload=settings.DEBUG)
 
@@ -568,6 +568,7 @@ class AgentService(IAgentService):
             skills_rules_text = "\n".join(skills_parts)
 
         # RAG 上下文延迟初始化（fire-and-forget，不阻塞首 token）
+        # Task 3.3: 加 1.0s 超时保护，避免 ChromaDB/SQLite 偶发卡顿阻塞首 token
         rag_text = ""
         if context and context.get("last_message"):
             try:
@@ -576,21 +577,61 @@ class AgentService(IAgentService):
                     self.rag_service = get_rag_service()
                     self._rag_warmed_up = True
                 if self.rag_service:
-                    rag_text = self.rag_service.build_context(
-                        query=context["last_message"],
-                        agent_id=agent_id,
-                        top_k=min(3, settings.RAG_TOP_K),
+                    # Task 6.2: 按学科过滤 RAG 检索，实现学科差异化
+                    rag_filters = None
+                    discipline_ctx = context.get("discipline", "")
+                    if discipline_ctx:
+                        rag_filters = {"discipline": discipline_ctx}
+                    # Task 3.3: 同步方法用 asyncio.to_thread 转异步 + wait_for 加 1s 超时
+                    rag_result = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            self.rag_service.build_context,
+                            query=context["last_message"],
+                            agent_id=agent_id,
+                            top_k=min(3, settings.RAG_TOP_K),
+                            filters=rag_filters,
+                        ),
+                        timeout=1.0,
                     )
+                    rag_text = rag_result.get("context", "") if isinstance(rag_result, dict) else ""
+            except asyncio.TimeoutError:
+                logger.warning(
+                    f"rag_timeout agent={agent_id} query_len={len(context.get('last_message', ''))}"
+                )
+                rag_text = ""
             except Exception as e:
                 logger.warning(f"RAG context injection failed: {e}")
+                rag_text = ""
+
+        # Task 6.2: 注入学科化风格特征与用户核心上下文
+        discipline_ctx = context.get("discipline", "") if context else ""
+        style_features_text = get_style_features(discipline_ctx)
+
+        # 构造 user_core_context（含学科、研究类型、用户背景）
+        user_core_context_text = ""
+        if context:
+            uc_parts = []
+            if discipline_ctx:
+                uc_parts.append(f"用户学科领域：{discipline_ctx}")
+            research_type = context.get("research_type", "")
+            if research_type:
+                uc_parts.append(f"研究类型：{research_type}")
+            readiness = context.get("readiness", "")
+            if readiness:
+                uc_parts.append(f"研究准备度：{readiness}")
+            user_topic = context.get("user_topic", "")
+            if user_topic:
+                uc_parts.append(f"用户关注议题：{user_topic}")
+            if uc_parts:
+                user_core_context_text = "\n".join(uc_parts)
 
         # ── 模板渲染 ──
         return builder.build_with_academic_features(
             agent_id=agent_id,
             context_info=context_info,
             guidance_info="",
-            user_core_context="",
-            style_features="",
+            user_core_context=user_core_context_text,
+            style_features=style_features_text,
             skills_rules=skills_rules_text,
             rag_context=rag_text,
             cot_instruction="",
@@ -1106,3 +1147,70 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
             },
         }
         return list(agent_info.values())
+
+    # ── 学科议题 ──────────────────────────────────────────
+
+    # 子学科 → 大学科映射表（与 agent.py valid_disciplines 对应）
+    _SUBDISCIPLINE_MAP: dict[str, str] = {
+        # 人文社科子学科
+        "communication": "humanities", "sociology": "humanities",
+        "psychology": "humanities", "education": "humanities",
+        "journalism": "humanities", "ethnology": "humanities",
+        "anthropology": "humanities", "literature": "humanities",
+        "history": "humanities", "management": "humanities", "economics": "humanities",
+        # 工科子学科
+        "computer_science": "engineering", "electronic_engineering": "engineering",
+        "mechanical_engineering": "engineering", "civil_engineering": "engineering",
+        "materials_science": "engineering", "automation": "engineering",
+        # 理科子学科
+        "mathematics": "science", "physics": "science", "chemistry": "science",
+        "biology": "science", "astronomy": "science", "earth_science": "science",
+        # 交叉学科子学科
+        "computational_social_science": "interdisciplinary",
+        "digital_humanities": "interdisciplinary", "bioinformatics": "interdisciplinary",
+        "cognitive_science": "interdisciplinary", "environmental_studies": "interdisciplinary",
+        "complex_systems": "interdisciplinary",
+    }
+
+    _MAJOR_DISCIPLINES = {"engineering", "science", "humanities", "interdisciplinary"}
+
+    # 议题数据缓存（避免每次请求都读文件）
+    _topics_cache: dict[str, Any] | None = None
+
+    def _map_to_major_discipline(self, discipline_id: str) -> str:
+        """将子学科 ID 映射回大学科 ID。
+
+        如果 discipline_id 本身就是大学科，直接返回；
+        否则查 _SUBDISCIPLINE_MAP 映射表。
+        """
+        if discipline_id in self._MAJOR_DISCIPLINES:
+            return discipline_id
+        return self._SUBDISCIPLINE_MAP.get(discipline_id, "humanities")
+
+    def get_topics_for_discipline(self, discipline_id: str) -> list[dict]:
+        """获取指定学科的热门选题列表。
+
+        数据来源：data/topics.json（4 大学科各 25 个 Top 议题）。
+        子学科 ID 自动映射回大学科。
+        """
+        # 懒加载 topics.json
+        if self._topics_cache is None:
+            topics_file = DATA_ROOT / "topics.json"
+            try:
+                with open(topics_file, "r", encoding="utf-8") as f:
+                    self._topics_cache = json.load(f)
+                logger.info(f"topics_loaded file={topics_file}")
+            except FileNotFoundError:
+                logger.error(f"topics_file_not_found path={topics_file}")
+                return []
+            except Exception as e:
+                logger.error(f"topics_load_failed error={e}")
+                return []
+
+        disciplines_data = self._topics_cache.get("disciplines", {})
+        major_id = self._map_to_major_discipline(discipline_id)
+        discipline_data = disciplines_data.get(major_id, {})
+        topics = discipline_data.get("topics", [])
+
+        logger.info(f"topics_returned discipline={discipline_id} major={major_id} count={len(topics)}")
+        return topics

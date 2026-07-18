@@ -137,6 +137,7 @@ class VectorService:
                 "year": doc.get("year", ""),
                 "keywords": doc.get("keywords", "[]"),
                 "title": title[:200],  # Truncate for metadata size limits
+                "discipline": doc.get("discipline", ""),  # Task 6.4: 学科标签用于 RAG 过滤
             })
 
         if not ids:

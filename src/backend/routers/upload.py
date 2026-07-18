@@ -88,9 +88,14 @@ def _validate_magic_byte(file_path: str, expected_ext: str) -> bool:
         import magic
         actual_mime = magic.from_file(file_path, mime=True) or ""
     except Exception as e:
-        # magic 库不可用或读取失败：fail closed 拒绝文件
-        # （扩展名白名单+大小校验不足以阻止伪装文件类型攻击）
-        logger.error(f"magic_check_unavailable file={file_path} error={e}")
+        # magic 库不可用或读取失败时的分级处理：
+        # - 纯文本类扩展名（txt/md/csv/json/py/r/bib/tex/ipynb）→ 跳过校验通过
+        #   （扩展名白名单 + 大小校验 + 后续 _extract_text 文本解析已足够安全）
+        # - 二进制容器扩展名（pdf/docx/xlsx）→ fail closed 拒绝（防止伪装攻击）
+        if expected_ext in {".txt", ".md", ".csv", ".json", ".py", ".r", ".bib", ".tex", ".ipynb"}:
+            logger.warning(f"magic_check_unavailable_text_ext_skip file={file_path} ext={expected_ext} error={e}")
+            return True
+        logger.error(f"magic_check_unavailable_binary_ext_reject file={file_path} ext={expected_ext} error={e}")
         return False
 
     # text/* 灵活匹配（不同 OS/库对文本类返回 charset 差异大，统一前缀匹配）
