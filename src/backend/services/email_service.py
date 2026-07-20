@@ -354,18 +354,27 @@ async def _dispatch_channel(name: str, target_email: str, code: str) -> None:
 
 
 async def send_verification_email(target_email: str, code: str) -> None:
-    """发送验证码邮件 — Task 4: 并发竞速 + 健康通道优先。
+    """发送验证码邮件 — 并发竞速 + 健康通道优先。
 
     策略：
     1. 若有健康通道缓存（5min TTL），直接调用该通道，跳过并发竞速
-    2. 否则并发发起所有已配置通道，首通道成功即返回（asyncio.wait FIRST_COMPLETED）
-       并 cancel 其余未完成通道；成功通道写入健康缓存加速下次发送
-    3. 全部失败则抛 EmailSendError
+    2. 否则并发发起所有已配置通道，循环等待任一任务完成：
+       - 成功 → cancel 其余任务，返回
+       - 失败 → 继续等待下一个任务
+       - 全部失败 → 抛 EmailSendError
+    3. 成功通道写入健康缓存加速下次发送
+
+    Bug 修复（2026-07）：
+    - 旧实现用 `enumerate(done)` + `task_names[i]` 索引，但 `done` 是 set，
+      迭代顺序与 tasks 列表顺序不一致，导致任务名误判（如把 resend 失败误判为
+      smtp 成功），即使所有通道失败也误报 email_sent:true。
+    - 旧实现用 `asyncio.wait(FIRST_COMPLETED)` 在第一个任务完成（无论成败）后
+      立即 cancel 所有 pending 任务，导致慢通道（Vercel）没机会成功。
+    - 新实现用 `dict[task, name]` 正确映射，循环等待直到有成功或全部失败。
 
     性能：
-    - 旧策略（串行）：最坏 8s(SMTP) + 15s(Vercel) + 15s(Resend) = 38s
-    - 新策略（并发）：最坏 6s（首通道超时），通常 1-3s（Vercel/Resend 并发竞速）
     - 健康通道直连：< 2s（无并发开销）
+    - 并发竞速：最坏 max(SMTP 5s, Vercel 6s, Resend 6s)，通常 1-3s
     """
     # 1. 健康通道直连
     for name in ("smtp", "vercel", "resend"):
@@ -381,49 +390,51 @@ async def send_verification_email(target_email: str, code: str) -> None:
                 # 健康通道失败 → 走并发竞速
                 break
 
-    # 2. 并发竞速
-    tasks: list[asyncio.Task] = []
-    task_names: list[str] = []
+    # 2. 并发竞速 — 用 dict[task, name] 正确映射，避免索引错位
+    task_to_name: dict[asyncio.Task, str] = {}
     if settings.SMTP_USER and settings.SMTP_PASSWORD:
-        tasks.append(asyncio.create_task(_send_via_smtp_safe(target_email, code)))
-        task_names.append("smtp")
+        t = asyncio.create_task(_send_via_smtp_safe(target_email, code))
+        task_to_name[t] = "smtp"
     if settings.VERCEL_EMAIL_PROXY_URL and settings.VERCEL_EMAIL_PROXY_KEY:
-        tasks.append(asyncio.create_task(_send_via_vercel_proxy(target_email, code)))
-        task_names.append("vercel")
+        t = asyncio.create_task(_send_via_vercel_proxy(target_email, code))
+        task_to_name[t] = "vercel"
     if settings.RESEND_API_KEY:
-        tasks.append(asyncio.create_task(_send_via_resend(target_email, code)))
-        task_names.append("resend")
+        t = asyncio.create_task(_send_via_resend(target_email, code))
+        task_to_name[t] = "resend"
 
-    if not tasks:
+    if not task_to_name:
         raise EmailSendError(
             "邮件服务未配置。请设置 SMTP_USER/SMTP_PASSWORD 或 VERCEL_EMAIL_PROXY_URL 或 RESEND_API_KEY"
         )
 
-    # FIRST_COMPLETED：任一通道成功即返回；其余任务取消
-    done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-    for t in pending:
-        t.cancel()
-
-    # 检查 done 中的任务结果
+    # 循环等待：直到有任务成功，或所有任务都完成（失败）
+    pending: set[asyncio.Task] = set(task_to_name.keys())
     first_success_name: str | None = None
     errors: list[str] = []
-    for i, t in enumerate(done):
-        name = task_names[i]
-        try:
-            result = t.result()
-            if name == "smtp":
-                # _send_via_smtp_safe 成功返回 None，失败已抛异常
-                first_success_name = name
-                break
-            else:
-                # Vercel/Resend 返回 (success, error) 元组
-                success, err = result
-                if success:
+
+    while pending and first_success_name is None:
+        done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+        for t in done:
+            name = task_to_name[t]  # 正确映射：从 dict 查询，不依赖迭代顺序
+            try:
+                result = t.result()
+                if name == "smtp":
+                    # _send_via_smtp_safe 成功返回 None，失败已抛异常（被 except 捕获）
                     first_success_name = name
                     break
-                errors.append(f"{name}: {err}")
-        except Exception as e:
-            errors.append(f"{name}: {e}")
+                else:
+                    # Vercel/Resend 返回 (success, error) 元组
+                    success, err = result
+                    if success:
+                        first_success_name = name
+                        break
+                    errors.append(f"{name}: {err}")
+            except Exception as e:
+                errors.append(f"{name}: {e}")
+
+    # 取消所有尚未完成的任务（有成功通道时，其他通道无需继续）
+    for t in pending:
+        t.cancel()
 
     if first_success_name:
         _mark_channel_healthy(first_success_name)
