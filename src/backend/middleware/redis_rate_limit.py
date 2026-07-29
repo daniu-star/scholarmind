@@ -15,6 +15,7 @@ P0 Task 6 修复要点：
 5. **每端点成本权重**：不同路径类各自限额（Task 6.6）。
 6. **WebSocket 可复用**：暴露 `check_rate()` 供 WS accept 前调用（Task 6.7）。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -37,17 +38,17 @@ logger = get_logger(__name__)
 # 成本权重：cost 越高，该端点每窗口允许的请求越少（limit = base // cost）。
 # 不同端点各自独立桶（key 含 path_class），互不影响。
 PATH_COST_WEIGHTS: dict[str, int] = {
-    "/api/v1/agent/chat": 10,            # Agent 对话：成本最高
-    "/api/v1/code-execution/run": 10,    # 代码执行：成本最高
-    "/api/v1/paper-pipeline/start": 5,   # Paper Pipeline 启动
-    "/api/v1/paper-review/start": 5,     # Paper Review 启动
-    "/api/v1/upload": 3,                 # 文件上传
-    "/api/v1/knowledge/search": 2,       # 学术搜索
+    "/api/v1/agent/chat": 10,  # Agent 对话：成本最高
+    "/api/v1/code-execution/run": 10,  # 代码执行：成本最高
+    "/api/v1/paper-pipeline/start": 5,  # Paper Pipeline 启动
+    "/api/v1/paper-review/start": 5,  # Paper Review 启动
+    "/api/v1/upload": 3,  # 文件上传
+    "/api/v1/knowledge/search": 2,  # 学术搜索
     "/api/v1/knowledge/academic/search": 3,  # Task 28: 学术搜索深度端点（成本与 upload 一致）
-    "/api/v1/auth/login": 2,             # 登录（防爆破）
-    "/api/v1/auth/register": 2,          # 注册（防批量注册）
-    "/api/v1/auth/send-code": 5,        # 验证码发送（防短信/邮件轰炸）
-    "/api/v1/ws/chat": 2,                # WebSocket 建连
+    "/api/v1/auth/login": 2,  # 登录（防爆破）
+    "/api/v1/auth/register": 2,  # 注册（防批量注册）
+    "/api/v1/auth/send-code": 5,  # 验证码发送（防短信/邮件轰炸）
+    "/api/v1/ws/chat": 2,  # WebSocket 建连
 }
 DEFAULT_COST = 1
 
@@ -56,9 +57,10 @@ DEFAULT_COST = 1
 FAIL_CLOSED_PATHS: set[str] = {
     "/api/v1/agent/chat",
     "/api/v1/code-execution/run",
-    # paper-pipeline/start 已移除：Pipeline 仅启动后台任务，Redis 不可用时应降级到本地限流
+    "/api/v1/paper-pipeline/start",
+    "/api/v1/paper-review/start",
 }
-FAIL_CLOSED_PREFIXES: tuple[str, ...] = ("/api/v1/payment/admin/",)
+FAIL_CLOSED_PREFIXES: tuple[str, ...] = ("/api/v1/payment/",)
 
 
 def _path_cost(path: str) -> int:
@@ -155,6 +157,7 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
 
         # Task 6.1：始终初始化本地 LRU+TTL fallback（移除 `if app is None else None`）
         from .rate_limit import RateLimitMiddleware
+
         self._fallback = RateLimitMiddleware(
             app=app,
             max_requests=self.max_requests,
@@ -179,6 +182,7 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
                 return True
             try:
                 import redis.asyncio as aioredis
+
                 self._redis = aioredis.from_url(
                     self.redis_url,
                     socket_connect_timeout=2,
@@ -186,20 +190,14 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
                     decode_responses=True,
                 )
                 await self._redis.ping()
-                self._lua_sha = await self._redis.script_load(
-                    self.LUA_SLIDING_WINDOW
-                )
+                self._lua_sha = await self._redis.script_load(self.LUA_SLIDING_WINDOW)
                 # URL 脱敏：同时处理 redis://（明文）和 rediss://（TLS）两种 scheme，
                 # 避免 URL 中的凭证（user:pass@host）落入日志。order 不影响（两 scheme 不互为子串）。
-                url_safe = self.redis_url.replace('redis://', 'redis://***@').replace('rediss://', 'rediss://***@')
-                logger.info(
-                    f"redis rate limiter initialized url={url_safe}"
-                )
+                url_safe = self.redis_url.replace("redis://", "redis://***@").replace("rediss://", "rediss://***@")
+                logger.info(f"redis rate limiter initialized url={url_safe}")
                 return True
             except Exception as e:
-                logger.warning(
-                    f"redis unavailable falling back to memory rate limiter error={e}"
-                )
+                logger.warning(f"redis unavailable falling back to memory rate limiter error={e}")
                 self._available = False
                 self._redis = None
                 return False
@@ -240,9 +238,7 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
 
     # ── 核心限流检查 ───────────────────────────────────────────
 
-    async def _check_redis(
-        self, identity: str, path_class: str, limit: int
-    ) -> dict:
+    async def _check_redis(self, identity: str, path_class: str, limit: int) -> dict:
         """执行 Redis 滑动窗口检查
 
         Returns:
@@ -264,8 +260,7 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
                 member,
             )
             if result is None:
-                return {"allowed": False, "remaining": 0,
-                        "retry_after": self.window_seconds}
+                return {"allowed": False, "remaining": 0, "retry_after": self.window_seconds}
             # Lua 返回 [allowed, remaining, retry_after]
             allowed_int = int(result[0])
             remaining = int(result[1]) if len(result) > 1 else 0
@@ -278,9 +273,7 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
         except Exception:
             raise
 
-    async def check_rate(
-        self, identity: str, path: str
-    ) -> dict:
+    async def check_rate(self, identity: str, path: str) -> dict:
         """通用限流检查（供 WebSocket 与 HTTP 复用）
 
         Returns:
@@ -302,12 +295,9 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
 
         # Redis 不可用
         if _is_fail_closed(path):
-            return {"allowed": False, "remaining": 0,
-                    "retry_after": self.window_seconds, "source": "fail_closed"}
+            return {"allowed": False, "remaining": 0, "retry_after": self.window_seconds, "source": "fail_closed"}
         # 普通端点降级到本地 fallback 限制
-        logger.warning(
-            f"redis unavailable fallback to local identity={identity} path={path}"
-        )
+        logger.warning(f"redis unavailable fallback to local identity={identity} path={path}")
         return await self._local_check(identity, path_class, limit)
 
     # ── Task 25: 公开 acquire 方法，封装 _lock + _consume 逻辑 ──
@@ -328,9 +318,7 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
         # 委托给 fallback 的公开 acquire（RateLimitMiddleware.acquire）
         return await self._fallback.acquire(key, cost)
 
-    async def _local_check(
-        self, identity: str, path_class: str, limit: int
-    ) -> dict:
+    async def _local_check(self, identity: str, path_class: str, limit: int) -> dict:
         """调用本地 fallback 的内存限流逻辑（线程安全：不修改 self._fallback.max_requests）
 
         P1 Task 9 修复：原实现临时切换 self._fallback.max_requests 后 finally 恢复，
@@ -341,9 +329,7 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
             now = time.time()
             # fallback 的桶 key 含 path_class 以隔离不同端点额度
             bucket_key = f"{identity}:{path_class}"
-            allowed, remaining, retry_after = self._fallback._consume(
-                bucket_key, now, limit=limit
-            )
+            allowed, remaining, retry_after = self._fallback._consume(bucket_key, now, limit=limit)
         return {
             "allowed": allowed,
             "remaining": remaining,
@@ -367,14 +353,10 @@ class RedisRateLimitMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(self._limit_for_path(path))
         response.headers["X-RateLimit-Remaining"] = str(result["remaining"])
-        response.headers["X-RateLimit-Reset"] = str(
-            int(time.time() + self.window_seconds)
-        )
+        response.headers["X-RateLimit-Reset"] = str(int(time.time() + self.window_seconds))
         return response
 
-    def _reject(
-        self, request: Request, path: str, identity: str, result: dict
-    ) -> JSONResponse:
+    def _reject(self, request: Request, path: str, identity: str, result: dict) -> JSONResponse:
         request_id = getattr(request.state, "request_id", None)
         # 高成本端点 Redis 不可用 → 503；其余超限 → 429
         is_fail_closed = result.get("source") == "fail_closed"

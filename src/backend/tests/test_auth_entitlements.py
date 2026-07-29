@@ -1,9 +1,13 @@
 """手机号账户、免费对话额度与付费 Pipeline 权益测试。"""
+
 from __future__ import annotations
+
+import re
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import func, select
 
 from ..db.session import (
     create_async_engine_from_url,
@@ -11,6 +15,7 @@ from ..db.session import (
     init_db,
 )
 from ..services.entitlement_service import EntitlementError, EntitlementService
+from ..models.orm import VerificationCode
 
 
 @pytest_asyncio.fixture
@@ -28,9 +33,7 @@ async def account_client(tmp_path, monkeypatch):
     app = create_app()
     app.state.db_engine = engine
     app.state.db_session_factory = session_factory
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         client.session_factory = session_factory  # type: ignore[attr-defined]
         yield client
     await engine.dispose()
@@ -149,9 +152,7 @@ async def test_four_products_grant_exact_entitlements(account_client):
         assert snapshot["shared_pipeline_credits"] == 5
         assert snapshot["external_review_active"] is True
         await EntitlementService.consume_pipeline(db, user_id, "modification")
-        assert (await EntitlementService.get_snapshot(db, user_id))[
-            "shared_pipeline_credits"
-        ] == 4
+        assert (await EntitlementService.get_snapshot(db, user_id))["shared_pipeline_credits"] == 4
 
         await EntitlementService.grant_product(db, user_id, "monthly_all", "test-3")
         snapshot = await EntitlementService.get_snapshot(db, user_id)
@@ -169,12 +170,36 @@ async def test_four_products_grant_exact_entitlements(account_client):
 async def test_payment_catalog_has_the_four_required_prices(account_client):
     response = await account_client.get("/api/v1/payment/packages")
     assert response.status_code == 200, response.text
-    assert {
-        package["id"]: package["amount_cents"]
-        for package in response.json()["packages"]
-    } == {
+    assert {package["id"]: package["amount_cents"] for package in response.json()["packages"]} == {
         "paper_once": 499,
         "paper_bundle_5": 1999,
         "monthly_all": 3990,
         "monthly_pro": 5990,
     }
+
+
+@pytest.mark.asyncio
+async def test_email_delivery_failure_never_leaks_a_login_code(account_client, monkeypatch):
+    async def fail_delivery(code: str, target: str) -> None:
+        raise RuntimeError(f"smtp-secret-error code={code} target={target}")
+
+    monkeypatch.setattr(
+        "src.backend.routers.auth.send_code_background",
+        fail_delivery,
+    )
+    response = await account_client.post(
+        "/api/v1/auth/send-code",
+        json={"target": "security-test@example.com", "purpose": "login"},
+    )
+
+    assert response.status_code == 503
+    response_text = response.text
+    assert "smtp-secret-error" not in response_text
+    assert "security-test@example.com" not in response_text
+    assert re.search(r"\b\d{6}\b", response_text) is None
+
+    async with account_client.session_factory() as db:  # type: ignore[attr-defined]
+        count = await db.scalar(
+            select(func.count(VerificationCode.id)).where(VerificationCode.target == "security-test@example.com")
+        )
+    assert count == 0

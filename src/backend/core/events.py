@@ -231,11 +231,11 @@ async def startup(app: FastAPI) -> None:
                 status_code = getattr(e, "status_code", None)
                 err_str = str(e)
                 if status_code == 402 or "insufficient balance" in err_str.lower():
-                    reason = f"余额不足（HTTP 402），请前往 platform.deepseek.com 充值"
+                    reason = "余额不足（HTTP 402），请前往 platform.deepseek.com 充值"
                 elif status_code == 401:
-                    reason = f"认证失败（HTTP 401），请检查 API Key"
+                    reason = "认证失败（HTTP 401），请检查 API Key"
                 elif status_code == 429:
-                    reason = f"请求频率超限（HTTP 429）"
+                    reason = "请求频率超限（HTTP 429）"
                 else:
                     reason = f"{type(e).__name__} (HTTP {status_code}): {err_str}"
                 app.state.llm_failure_reason = reason

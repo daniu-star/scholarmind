@@ -2,6 +2,7 @@
 ScholarMind Agent Pydantic Schema
 Chat 请求/响应 DTO
 """
+
 from __future__ import annotations
 
 from typing import Any, Literal, Optional
@@ -16,11 +17,19 @@ class ChatRequest(BaseModel):
     ``mode: Literal["flash","pro"] | None``。服务端按用户套餐映射实际模型 ID，
     客户端传入任意 ``model`` 字符串将返回 422（提示已废弃，请使用 ``mode``）。
     """
+
     message: str = Field(..., min_length=1, max_length=10000, description="用户消息")
     agent_id: str = Field(
         ..., description="Agent 类型: researcher/reviewer/architect/synthesizer/polisher/external_reviewer/custom"
     )
-    session_id: str = Field(..., description="会话唯一标识")
+    session_id: str = Field(
+        ...,
+        min_length=8,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_-]+$",
+        description="会话唯一标识",
+    )
+
     context: Optional[dict[str, Any]] = Field(
         default=None, description="上下文信息（discipline/research_type/readiness/guidance_step/guidance_data）"
     )
@@ -49,6 +58,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     """Agent 对话响应"""
+
     reply: str = Field(..., description="AI 回复内容")
     options: list[str] = Field(default_factory=list, description="建议选项列表")
     skills_used: list[str] = Field(default_factory=list, description="使用的技能列表")
@@ -59,6 +69,7 @@ class ChatResponse(BaseModel):
 
 class AgentInfo(BaseModel):
     """Agent 信息"""
+
     id: str
     name: str
     icon: str
@@ -68,12 +79,14 @@ class AgentInfo(BaseModel):
 
 class AgentListResponse(BaseModel):
     """Agent 列表响应"""
+
     success: bool = True
     agents: list[AgentInfo]
 
 
 class ConversationHistoryResponse(BaseModel):
     """对话历史响应"""
+
     success: bool = True
     session_id: str
     message_count: int
@@ -82,6 +95,7 @@ class ConversationHistoryResponse(BaseModel):
 
 class ClearConversationResponse(BaseModel):
     """清空对话响应"""
+
     success: bool = True
     session_id: str
     cleared: bool
@@ -89,6 +103,7 @@ class ClearConversationResponse(BaseModel):
 
 class SessionItem(BaseModel):
     """会话列表项(含元数据)"""
+
     session_id: str
     agent_id: str
     title: str
@@ -99,6 +114,7 @@ class SessionItem(BaseModel):
 
 class SessionListResponse(BaseModel):
     """会话列表响应"""
+
     success: bool = True
     sessions: list[SessionItem]
     total: int = 0
@@ -106,11 +122,13 @@ class SessionListResponse(BaseModel):
 
 class SessionRenameRequest(BaseModel):
     """会话重命名请求"""
+
     title: str = Field(..., min_length=1, max_length=128, description="新标题")
 
 
 class SessionRenameResponse(BaseModel):
     """会话重命名响应"""
+
     success: bool = True
     session_id: str
     title: str
@@ -118,6 +136,7 @@ class SessionRenameResponse(BaseModel):
 
 class SessionDeleteResponse(BaseModel):
     """会话删除响应"""
+
     success: bool = True
     session_id: str
     deleted: int = 0

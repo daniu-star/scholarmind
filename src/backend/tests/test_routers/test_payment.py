@@ -17,6 +17,7 @@
 - 幂等与金额测试通过 monkeypatch verify_alipay_signature → True 绕过 P0 骨架
 - 所有 logger 调用使用 f-string（project_memory 硬约束）
 """
+
 from __future__ import annotations
 
 import pytest
@@ -99,6 +100,7 @@ async def payment_client(tmp_path, monkeypatch):
     monkeypatch.setattr("src.backend.config.settings.PAYMENT_VERIFY_REQUIRED", True)
     # 设 ALIPAY_APP_ID 让字段校验生效（app_id/seller_id 都用此值匹配）
     monkeypatch.setattr("src.backend.config.settings.ALIPAY_APP_ID", "2021000000000001")
+    monkeypatch.setattr("src.backend.config.settings.ALIPAY_SELLER_ID", "2021000000000001")
 
     engine = create_async_engine_from_url(db_url)
     await init_db(engine)
@@ -197,19 +199,16 @@ async def test_alipay_notify_no_signature_rejected(payment_client: AsyncClient, 
     )
     # PlainTextResponse → text/plain
     assert response.status_code == 200, f"unexpected status: {response.text}"
-    assert response.text == "failure", (
-        f"expected 'failure' for unverified signature, got: {response.text!r}"
-    )
+    assert response.text == "failure", f"expected 'failure' for unverified signature, got: {response.text!r}"
 
     # 订单状态保持 pending，未升级
     sf = payment_client._session_factory  # type: ignore[attr-defined]
     async with sf() as session:
         from sqlalchemy import select
+
         result = await session.execute(select(Order).where(Order.order_no == order_no))
         order = result.scalar_one()
-        assert order.status == "pending", (
-            f"order status should stay pending, got {order.status}"
-        )
+        assert order.status == "pending", f"order status should stay pending, got {order.status}"
         assert order.trade_no is None, "trade_no should not be set on rejection"
 
 
@@ -223,18 +222,14 @@ async def test_wechat_notify_no_signature_rejected(payment_client: AsyncClient):
     )
     assert response.status_code == 200, f"unexpected status: {response.text}"
     body = response.json()
-    assert body["code"] == "FAIL", (
-        f"expected FAIL for unverified wechat signature, got: {body}"
-    )
+    assert body["code"] == "FAIL", f"expected FAIL for unverified wechat signature, got: {body}"
 
 
 # ──── Scenario 3: 重复通知幂等 ────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_alipay_notify_idempotent_on_duplicate_trade_no(
-    payment_client: AsyncClient, monkeypatch
-):
+async def test_alipay_notify_idempotent_on_duplicate_trade_no(payment_client: AsyncClient, monkeypatch):
     """同一 trade_no 提交 2 次，全部返回 success，套餐只升级一次。
 
     通过 monkeypatch verify_alipay_signature → True 绕过 P0 骨架。
@@ -252,6 +247,7 @@ async def test_alipay_notify_idempotent_on_duplicate_trade_no(
     # 升级前快照配额 plan
     async with sf() as session:
         from sqlalchemy import select
+
         result = await session.execute(select(UserQuota).where(UserQuota.user_id == user_id))
         before = result.scalar_one()
         plan_before = before.plan
@@ -277,12 +273,9 @@ async def test_alipay_notify_idempotent_on_duplicate_trade_no(
 
         result = await session.execute(select(UserQuota).where(UserQuota.user_id == user_id))
         after = result.scalar_one()
-        assert after.plan == "pro_monthly", (
-            f"plan should be upgraded to pro_monthly, got {after.plan}"
-        )
+        assert after.plan == "pro_monthly", f"plan should be upgraded to pro_monthly, got {after.plan}"
         assert after.tokens_limit > tokens_limit_before, (
-            f"tokens_limit should increase after upgrade: "
-            f"{tokens_limit_before} -> {after.tokens_limit}"
+            f"tokens_limit should increase after upgrade: {tokens_limit_before} -> {after.tokens_limit}"
         )
 
 
@@ -290,9 +283,7 @@ async def test_alipay_notify_idempotent_on_duplicate_trade_no(
 
 
 @pytest.mark.asyncio
-async def test_alipay_notify_amount_mismatch_rejected(
-    payment_client: AsyncClient, monkeypatch
-):
+async def test_alipay_notify_amount_mismatch_rejected(payment_client: AsyncClient, monkeypatch):
     """验签通过但 total_amount 与订单金额不匹配 → "failure"，不升级套餐。
 
     P1 Task 17：订单金额改读 PRODUCTS["monthly_all"]["amount_cents"] = 3990 分 = 39.90 元。
@@ -311,33 +302,26 @@ async def test_alipay_notify_amount_mismatch_rejected(
     form = _alipay_notify_form(order_no, "TRADE_MISMATCH_001", "1.00")
     response = await payment_client.post("/api/v1/payment/alipay/notify", data=form)
     assert response.status_code == 200, f"unexpected status: {response.text}"
-    assert response.text == "failure", (
-        f"expected 'failure' for amount mismatch, got: {response.text!r}"
-    )
+    assert response.text == "failure", f"expected 'failure' for amount mismatch, got: {response.text!r}"
 
     # 订单保持 pending，未升级
     async with sf() as session:
         from sqlalchemy import select
+
         result = await session.execute(select(Order).where(Order.order_no == order_no))
         order = result.scalar_one()
-        assert order.status == "pending", (
-            f"order should stay pending on mismatch, got {order.status}"
-        )
+        assert order.status == "pending", f"order should stay pending on mismatch, got {order.status}"
 
         result = await session.execute(select(UserQuota).where(UserQuota.user_id == user_id))
         quota = result.scalar_one()
-        assert quota.plan == "free", (
-            f"plan should stay free on mismatch, got {quota.plan}"
-        )
+        assert quota.plan == "free", f"plan should stay free on mismatch, got {quota.plan}"
 
 
 # ──── Scenario 5: app_id 不匹配也被拒 ────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_alipay_notify_app_id_mismatch_rejected(
-    payment_client: AsyncClient, monkeypatch
-):
+async def test_alipay_notify_app_id_mismatch_rejected(payment_client: AsyncClient, monkeypatch):
     """验签通过但 app_id 与 settings.ALIPAY_APP_ID 不匹配 → "failure"."""
     monkeypatch.setattr(
         "src.backend.routers.payment.verify_alipay_signature",
@@ -346,11 +330,7 @@ async def test_alipay_notify_app_id_mismatch_rejected(
 
     order_no = payment_client._order_no  # type: ignore[attr-defined]
     # 用错误的 app_id（settings 是 2021000000000001）
-    form = _alipay_notify_form(
-        order_no, "TRADE_APPID_001", "39.90", app_id="0000000000000000"
-    )
+    form = _alipay_notify_form(order_no, "TRADE_APPID_001", "39.90", app_id="0000000000000000")
     response = await payment_client.post("/api/v1/payment/alipay/notify", data=form)
     assert response.status_code == 200
-    assert response.text == "failure", (
-        f"expected 'failure' for app_id mismatch, got: {response.text!r}"
-    )
+    assert response.text == "failure", f"expected 'failure' for app_id mismatch, got: {response.text!r}"

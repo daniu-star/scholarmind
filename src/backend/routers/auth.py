@@ -1,4 +1,5 @@
 """手机号注册、密码登录、令牌刷新与账户权益接口。"""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
@@ -7,7 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 
 from ..config import settings
@@ -24,8 +25,8 @@ from ..services.auth_service import (
     send_code_background,
     verify_code_and_login,
 )
-from ..services.email_service import get_last_resend_error
 from ..services.entitlement_service import EntitlementService
+
 
 # create_code 内联定义于此（避免 Railway Python 3.12 对 auth_service 的深层导入失败）
 async def create_code(db, target: str, purpose: str = "login") -> str:
@@ -59,6 +60,7 @@ async def create_code(db, target: str, purpose: str = "login") -> str:
     )
     await db.flush()
     return code
+
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer(auto_error=False)
@@ -151,6 +153,7 @@ def _public_user(user: User, entitlements: dict | None = None) -> dict:
 async def _record_login_attempt(db, identifier: str, success: bool, reason: str | None = None) -> None:
     """使用原始 SQL 记录登录尝试（避免 LoginAttempt ORM INSERT 的 NOT NULL 问题）"""
     from sqlalchemy import text as _t
+
     await db.execute(
         _t(
             "INSERT INTO login_attempts (identifier, success, failure_reason, created_at) "
@@ -232,6 +235,7 @@ async def _token_response(
         except Exception as exc:
             # 设备记录失败不应阻断登录流程
             import structlog
+
             structlog.get_logger(__name__).warning(f"upsert UserDevice failed: {exc}")
     entitlements = await EntitlementService.get_snapshot(db, user.id)
     return TokenResponse(
@@ -249,9 +253,7 @@ async def get_current_user(
     db=Depends(get_db),
 ) -> User:
     if not credentials:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="未提供认证凭证"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未提供认证凭证")
     payload = decode_token(credentials.credentials, expected_type="access")
     if not payload:
         raise HTTPException(
@@ -264,15 +266,25 @@ async def get_current_user(
         user_id = 0
     user = await get_user_by_id(db, user_id)
     if not user or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在或已停用"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在或已停用")
     return user
 
 
 class SendCodeRequest(BaseModel):
     target: str = Field(min_length=5, max_length=128, description="手机号或邮箱地址")
     purpose: str = Field(default="login", pattern="^(login|register)$")
+
+
+async def _revoke_failed_code(db, target: str, code: str) -> None:
+    """Invalidate a code that could not be delivered."""
+    await db.execute(
+        delete(VerificationCode).where(
+            VerificationCode.target == target,
+            VerificationCode.code == code,
+            VerificationCode.used.is_(False),
+        )
+    )
+    await db.commit()
 
 
 @router.post("/send-code")
@@ -291,22 +303,19 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
             raise HTTPException(status_code=429, detail=str(e))
         await db.commit()
         # 同步发送邮件，捕获错误并返回给用户
-        email_sent = True
-        email_error = None
         try:
             await send_code_background(code, target)
-        except Exception as e:
-            email_sent = False
-            email_error = str(e)
+        except Exception:
+            await _revoke_failed_code(db, target, code)
+            raise HTTPException(
+                status_code=503,
+                detail="验证码邮件暂时无法发送，请稍后重试",
+            )
         return {
             "success": True,
-            "message": "验证码已发送到您的邮箱" if email_sent else f"邮件发送失败，验证码：{code}",
-            "code": code if not email_sent else None,
+            "message": "验证码已发送到您的邮箱",
             "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
-            "email_sent": email_sent,
-            "email_error": email_error,
-            "resend_configured": bool(settings.RESEND_API_KEY),
-            "resend_error": None if email_sent else get_last_resend_error(),
+            "email_sent": True,
         }
 
     # 手机号：先归一化，检查是否关联了邮箱
@@ -324,21 +333,19 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
         except ValueError as e:
             raise HTTPException(status_code=429, detail=str(e))
         await db.commit()
-        email_sent = True
-        email_error = None
         try:
             await send_code_background(code, user.email)
-        except Exception as e:
-            email_sent = False
-            email_error = str(e)
+        except Exception:
+            await _revoke_failed_code(db, user.email, code)
+            raise HTTPException(
+                status_code=503,
+                detail="验证码邮件暂时无法发送，请稍后重试",
+            )
         return {
             "success": True,
-            "message": "验证码已发送到您绑定的邮箱" if email_sent else f"邮件发送失败，验证码：{code}",
-            "code": code if not email_sent else None,
+            "message": "验证码已发送到您绑定的邮箱",
             "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
-            "email_sent": email_sent,
-            "email_error": email_error,
-            "resend_error": None if email_sent else get_last_resend_error(),
+            "email_sent": True,
         }
 
     # 无绑定邮箱：统一返回成功提示，防止用户枚举
@@ -363,7 +370,8 @@ async def register(req: RegisterRequest, request: Request, db=Depends(get_db)):
             user.email = req.email
         await db.commit()
         return await _token_response(
-            db, user,
+            db,
+            user,
             device_fingerprint=req.device_fingerprint,
             device_name=req.device_name,
             trust_device=req.trust_device,
@@ -383,9 +391,7 @@ async def register(req: RegisterRequest, request: Request, db=Depends(get_db)):
     # 检查重复注册
     is_email = "@" in reg_identifier
     existing = await db.execute(
-        select(User).where(
-            User.email == reg_identifier if is_email else User.phone == req.normalized_phone()
-        )
+        select(User).where(User.email == reg_identifier if is_email else User.phone == req.normalized_phone())
     )
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="该邮箱已注册" if is_email else "该手机号已注册")
@@ -394,7 +400,8 @@ async def register(req: RegisterRequest, request: Request, db=Depends(get_db)):
 
     try:
         response = await _token_response(
-            db, user,
+            db,
+            user,
             device_fingerprint=req.device_fingerprint,
             device_name=req.device_name,
             trust_device=req.trust_device,
@@ -413,11 +420,13 @@ async def login(req: LoginRequest, request: Request, db=Depends(get_db)):
     # P0 修复: 登录失败速率限制（5 次/15 分钟窗口）
     identifier = req.identifier
     if identifier:
-        existing = await db.execute(
-            select(User).where((User.phone == identifier) | (User.email == identifier))
-        )
+        existing = await db.execute(select(User).where((User.phone == identifier) | (User.email == identifier)))
         user_record = existing.scalar_one_or_none()
-        if user_record and user_record.locked_until and user_record.locked_until > datetime.now(timezone.utc).replace(tzinfo=None):
+        if (
+            user_record
+            and user_record.locked_until
+            and user_record.locked_until > datetime.now(timezone.utc).replace(tzinfo=None)
+        ):
             raise HTTPException(status_code=429, detail="账户已被临时锁定，请15分钟后重试")
 
     if req.code:
@@ -437,7 +446,8 @@ async def login(req: LoginRequest, request: Request, db=Depends(get_db)):
             raise HTTPException(status_code=401, detail="验证码错误或已过期")
         await _record_login_attempt(db, identifier, True)
         return await _token_response(
-            db, user,
+            db,
+            user,
             device_fingerprint=req.device_fingerprint,
             device_name=req.device_name,
             trust_device=req.trust_device,
@@ -453,18 +463,20 @@ async def login(req: LoginRequest, request: Request, db=Depends(get_db)):
     user = await authenticate_user(db, auth_identifier, req.password)
     if not user or not user.is_active:
         await _record_login_attempt(
-            db, identifier, False,
-            "locked" if (user and not user.is_active) else "invalid_password"
+            db, identifier, False, "locked" if (user and not user.is_active) else "invalid_password"
         )
         # 记录登录失败并锁定（5 次失败后锁定 15 分钟）
         from sqlalchemy import text as _t
+
         user_result = await db.execute(
             select(User).where((User.phone == auth_identifier) | (User.email == auth_identifier))
         )
         failed_user = user_result.scalar_one_or_none()
         if failed_user:
             new_count = (failed_user.failed_login_attempts or 0) + 1
-            lock_time = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15) if new_count >= 5 else None
+            lock_time = (
+                datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=15) if new_count >= 5 else None
+            )
             await db.execute(
                 _t("UPDATE users SET failed_login_attempts=:c, locked_until=:lt WHERE id=:uid"),
                 {"c": new_count, "lt": lock_time, "uid": failed_user.id},
@@ -473,6 +485,7 @@ async def login(req: LoginRequest, request: Request, db=Depends(get_db)):
         raise HTTPException(status_code=401, detail="邮箱/手机号或密码错误")
     # 登录成功：重置失败计数 + 记录审计日志
     from sqlalchemy import text as _t2
+
     if user.failed_login_attempts > 0:
         await db.execute(
             _t2("UPDATE users SET failed_login_attempts=0, locked_until=NULL WHERE id=:uid"),
@@ -480,7 +493,8 @@ async def login(req: LoginRequest, request: Request, db=Depends(get_db)):
         )
     await _record_login_attempt(db, identifier, True)
     return await _token_response(
-        db, user,
+        db,
+        user,
         device_fingerprint=req.device_fingerprint,
         device_name=req.device_name,
         trust_device=req.trust_device,
@@ -516,14 +530,13 @@ async def get_me(user: User = Depends(get_current_user), db=Depends(get_db)):
 # 设备指纹+信任设备登录策略：设备管理端点
 # ═══════════════════════════════════════════════════════════════
 
+
 @router.get("/devices")
 async def list_user_devices(user: User = Depends(get_current_user), db=Depends(get_db)):
     """列出当前用户的所有设备（按最后登录时间倒序）。"""
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     result = await db.execute(
-        select(UserDevice)
-        .where(UserDevice.user_id == user.id)
-        .order_by(UserDevice.last_login_at.desc())
+        select(UserDevice).where(UserDevice.user_id == user.id).order_by(UserDevice.last_login_at.desc())
     )
     devices = result.scalars().all()
     return {
@@ -534,9 +547,7 @@ async def list_user_devices(user: User = Depends(get_current_user), db=Depends(g
                 "device_fingerprint": d.device_fingerprint,
                 "trusted": d.trusted,
                 "trusted_until": d.trusted_until.isoformat() if d.trusted_until else None,
-                "is_current_active": bool(
-                    d.trusted and d.trusted_until and d.trusted_until > now
-                ),
+                "is_current_active": bool(d.trusted and d.trusted_until and d.trusted_until > now),
                 "last_login_at": d.last_login_at.isoformat() if d.last_login_at else None,
                 "last_login_ip": d.last_login_ip,
                 "created_at": d.created_at.isoformat() if d.created_at else None,
@@ -651,9 +662,7 @@ async def validate_device(
         }
 
     # 4. 检查信任状态是否仍有效
-    is_still_trusted = bool(
-        device.trusted and device.trusted_until and device.trusted_until > now
-    )
+    is_still_trusted = bool(device.trusted and device.trusted_until and device.trusted_until > now)
     if is_still_trusted:
         return {
             "valid": True,

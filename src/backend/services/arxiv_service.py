@@ -25,7 +25,7 @@ class ArxivService:
     AcademicPaper 数据结构。内置内存缓存与速率限制控制。
     """
 
-    BASE_URL = "http://export.arxiv.org/api/query"
+    BASE_URL = "https://export.arxiv.org/api/query"
     TIMEOUT = 15  # 请求超时（秒）
     RATE_LIMIT_INTERVAL = 3.0  # arXiv API 要求请求间隔至少 3 秒
     CACHE_TTL = 1800  # 缓存 TTL：30 分钟

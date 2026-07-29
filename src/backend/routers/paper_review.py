@@ -3,13 +3,14 @@
 P0 Task 3.3：所有端点强制鉴权（get_current_user 返回 int user_id），
 跨用户访问 review_id 返回 404（不暴露存在性）。
 """
+
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config import settings
 from ..services.paper_review_service import get_paper_review_service, PaperReviewService
 from ..core.exceptions import NotFoundError
+
 # P0 Task 3.3：强制鉴权（替代 get_optional_user_id 可选鉴权）
 from ..core.dependencies import get_current_user, get_db
 from ..services.entitlement_service import EntitlementError, EntitlementService
@@ -38,17 +39,11 @@ async def start_review(
     基于 cyclical-paper-review 技能,9 Agent 循环式审稿优化:
     约束注入 → 外审专家 → 对抗评分 → 意见路由 → 并行修改 → 风格守卫 → 指令守卫 → 格式输出
     """
-    if settings.PAYMENT_ENABLED:
-        try:
-            reservation = await EntitlementService.consume_pipeline(
-                db, user_id, request.pipeline_type
-            )
-        except EntitlementError as exc:
-            raise HTTPException(
-                status_code=402, detail={"code": exc.code, "message": exc.message}
-            ) from exc
-    else:
-        reservation = {"consumed": "dev_mode", "capability": request.pipeline_type}
+    # 支付开关只控制购买入口，不能让未获授权的用户绕过额度校验。
+    try:
+        reservation = await EntitlementService.consume_pipeline(db, user_id, request.pipeline_type)
+    except EntitlementError as exc:
+        raise HTTPException(status_code=402, detail={"code": exc.code, "message": exc.message}) from exc
     try:
         result = await service.start_review(
             paper_text=request.paper_text,

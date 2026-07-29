@@ -2,6 +2,7 @@
 ScholarMind 知识库 API 路由
 多源学术搜索聚合、状态检查、热门关键词
 """
+
 import asyncio
 import structlog
 from datetime import datetime
@@ -60,12 +61,14 @@ async def get_knowledge_status(
     - ``disconnected``：全部数据源断开
     """
     try:
-        sources = await academic_service.check_status()
+        status_payload = await academic_service.check_status()
+        sources = status_payload.get("sources", status_payload)
+        if not isinstance(sources, dict):
+            sources = {}
 
         # 根据各数据源状态聚合出整体状态
         connected_count = sum(
-            1 for info in sources.values()
-            if info.get("status") == "connected"
+            1 for info in sources.values() if isinstance(info, dict) and info.get("status") == "connected"
         )
         total = len(sources)
         if connected_count == total and total > 0:
@@ -90,11 +93,13 @@ async def get_knowledge_status(
 
 # ── 热门关键词端点 ────────────────────────────────────────
 
+
 @router.get("/keywords/hot")
 async def get_hot_keywords(limit: int = 20):
     """获取热门关键词"""
     try:
         from ..services.db_service import get_db_service
+
         db = get_db_service()
         safe_limit = max(1, min(limit, 200))
         keywords = await asyncio.to_thread(db.get_hot_keywords, limit=safe_limit)

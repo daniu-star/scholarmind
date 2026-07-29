@@ -5,6 +5,7 @@
 
 从 cnki_service.py 拆分出独立文件（原 1248 行 → 762 行 + 本文件 466 行）。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -62,9 +63,7 @@ class AcademicSearchService:
         self._cache = CacheManager(default_ttl=cache_ttl)
 
     @staticmethod
-    def _cache_key(
-        query: str, count: int, source_filter: Optional[str], year_filter: str
-    ) -> str:
+    def _cache_key(query: str, count: int, source_filter: Optional[str], year_filter: str) -> str:
         return f"multi:{query}|{count}|{source_filter}|{year_filter}"
 
     # ── CNKIResult 转换 ────────────────────────────────────
@@ -101,9 +100,7 @@ class AcademicSearchService:
 
     # ── 单源检索方法 ────────────────────────────────────────
 
-    async def _search_cnki(
-        self, query: str, count: int, year_filter: str
-    ) -> tuple[list[dict], str]:
+    async def _search_cnki(self, query: str, count: int, year_filter: str) -> tuple[list[dict], str]:
         """通过 CNKI 服务检索"""
         if not self.cnki_service:
             return [], "CNKI 服务未配置"
@@ -112,17 +109,13 @@ class AcademicSearchService:
                 self.cnki_service.search(query, year_filter, count),
                 timeout=self.timeout,
             )
-            return [
-                self._convert_cnki_result(r, "cnki") for r in results
-            ], ""
+            return [self._convert_cnki_result(r, "cnki") for r in results], ""
         except asyncio.TimeoutError:
             return [], f"CNKI 检索超时（{self.timeout}s）"
         except Exception as e:
             return [], f"CNKI 检索失败: {e}"
 
-    async def _search_semantic_scholar(
-        self, query: str, count: int
-    ) -> tuple[list[dict], str]:
+    async def _search_semantic_scholar(self, query: str, count: int) -> tuple[list[dict], str]:
         if not self.semantic_scholar_service:
             return [], "Semantic Scholar 服务未配置"
         try:
@@ -136,9 +129,7 @@ class AcademicSearchService:
         except Exception as e:
             return [], f"Semantic Scholar 检索失败: {e}"
 
-    async def _search_arxiv(
-        self, query: str, count: int
-    ) -> tuple[list[dict], str]:
+    async def _search_arxiv(self, query: str, count: int) -> tuple[list[dict], str]:
         if not self.arxiv_service:
             return [], "arXiv 服务未配置"
         try:
@@ -152,9 +143,7 @@ class AcademicSearchService:
         except Exception as e:
             return [], f"arXiv 检索失败: {e}"
 
-    async def _search_crossref(
-        self, query: str, count: int, year_filter: str
-    ) -> tuple[list[dict], str]:
+    async def _search_crossref(self, query: str, count: int, year_filter: str) -> tuple[list[dict], str]:
         if not self.cnki_service:
             return [], "CrossRef 检索不可用（CNKI 服务未配置）"
         try:
@@ -162,17 +151,13 @@ class AcademicSearchService:
                 self.cnki_service.search_crossref(query, count, year_filter),
                 timeout=self.timeout,
             )
-            return [
-                self._convert_cnki_result(r, "crossref") for r in results
-            ], ""
+            return [self._convert_cnki_result(r, "crossref") for r in results], ""
         except asyncio.TimeoutError:
             return [], f"CrossRef 检索超时（{self.timeout}s）"
         except Exception as e:
             return [], f"CrossRef 检索失败: {e}"
 
-    async def _search_pubmed(
-        self, query: str, count: int, year_filter: str
-    ) -> tuple[list[dict], str]:
+    async def _search_pubmed(self, query: str, count: int, year_filter: str) -> tuple[list[dict], str]:
         if not self.cnki_service:
             return [], "PubMed 检索不可用（CNKI 服务未配置）"
         try:
@@ -180,9 +165,7 @@ class AcademicSearchService:
                 self.cnki_service.search_pubmed(query, count, year_filter),
                 timeout=self.timeout,
             )
-            return [
-                self._convert_cnki_result(r, "pubmed") for r in results
-            ], ""
+            return [self._convert_cnki_result(r, "pubmed") for r in results], ""
         except asyncio.TimeoutError:
             return [], f"PubMed 检索超时（{self.timeout}s）"
         except Exception as e:
@@ -220,11 +203,7 @@ class AcademicSearchService:
 
         # 确定要查询的数据源
         if source_filter:
-            sources = [
-                s.strip()
-                for s in source_filter.split(",")
-                if s.strip() in self.ALL_SOURCES
-            ]
+            sources = [s.strip() for s in source_filter.split(",") if s.strip() in self.ALL_SOURCES]
         else:
             sources = list(self.ALL_SOURCES)
 
@@ -284,17 +263,13 @@ class AcademicSearchService:
         # 写入缓存
         self._cache.set(cache_key, result_dict)
 
-        logger.info(
-            f"多源检索完成: query={query!r}, 聚合后 {len(all_results)} 条结果"
-        )
+        logger.info(f"多源检索完成: query={query!r}, 聚合后 {len(all_results)} 条结果")
         return result_dict
 
     @staticmethod
     def _deduplicate_and_sort(results: list[dict]) -> list[dict]:
         """按标题去重，按引用数降序排序"""
-        sorted_results = sorted(
-            results, key=lambda x: x.get("citation_count", 0), reverse=True
-        )
+        sorted_results = sorted(results, key=lambda x: x.get("citation_count", 0), reverse=True)
         deduplicated: list[dict] = []
         seen_titles: list[str] = []
         for result in sorted_results:
@@ -319,11 +294,24 @@ class AcademicSearchService:
         """检查各数据源连通状态"""
         sources_status = {}
         start_time = time.time()
+        # Start all probes together so the endpoint is bounded by the slowest
+        # source instead of the sum of three independent timeouts.
+        cnki_probe = (
+            asyncio.create_task(self.cnki_service.search("test", count=1))
+            if self.cnki_service
+            else asyncio.create_task(asyncio.sleep(0))
+        )
+        semantic_probe = (
+            asyncio.create_task(self.semantic_scholar_service.search("test", count=1))
+            if self.semantic_scholar_service
+            else None
+        )
+        arxiv_probe = asyncio.create_task(self.arxiv_service.search("test", count=1)) if self.arxiv_service else None
 
         # CNKI status
         try:
             await asyncio.wait_for(
-                self.cnki_service.search("test", count=1) if self.cnki_service else asyncio.sleep(0),
+                cnki_probe,
                 timeout=5.0,
             )
             sources_status["cnki"] = {
@@ -353,7 +341,7 @@ class AcademicSearchService:
             try:
                 t0 = time.time()
                 await asyncio.wait_for(
-                    self.semantic_scholar_service.search("test", count=1),
+                    semantic_probe,
                     timeout=5.0,
                 )
                 sources_status["semantic_scholar"] = {
@@ -389,7 +377,7 @@ class AcademicSearchService:
             try:
                 t0 = time.time()
                 await asyncio.wait_for(
-                    self.arxiv_service.search("test", count=1),
+                    arxiv_probe,
                     timeout=5.0,
                 )
                 sources_status["arxiv"] = {

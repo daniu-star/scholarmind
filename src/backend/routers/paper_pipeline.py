@@ -6,6 +6,7 @@
 P0 Task 3.3：所有端点强制鉴权（get_current_user 返回 int user_id），
 跨用户访问 pipeline_id 返回 404（不暴露存在性）。
 """
+
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
@@ -18,8 +19,8 @@ from ..models.schemas.paper_pipeline import (
     PipelineResultResponse,
     PipelineListResponse,
 )
-from ..config import settings
 from ..core.exceptions import NotFoundError
+
 # P0 Task 3.3：强制鉴权（替代 get_optional_user_id 可选鉴权）
 from ..core.dependencies import get_current_user, get_db
 from ..services.entitlement_service import EntitlementError, EntitlementService
@@ -43,18 +44,11 @@ async def start_pipeline(
     接收引导流程收集的数据，启动 13 Agent 循环式论文生成 Pipeline。
     Pipeline 在后台异步执行，返回 pipeline_id 用于后续状态查询。
     """
-    # 开发模式：PAYMENT_ENABLED=false 时跳过额度检查，允许无限使用
-    if settings.PAYMENT_ENABLED:
-        try:
-            reservation = await EntitlementService.consume_pipeline(
-                db, user_id, "generation"
-            )
-        except EntitlementError as exc:
-            raise HTTPException(
-                status_code=402, detail={"code": exc.code, "message": exc.message}
-            ) from exc
-    else:
-        reservation = {"consumed": "dev_mode", "capability": "generation"}
+    # 支付开关只控制购买入口，不能绕过已经发放的功能权益。
+    try:
+        reservation = await EntitlementService.consume_pipeline(db, user_id, "generation")
+    except EntitlementError as exc:
+        raise HTTPException(status_code=402, detail={"code": exc.code, "message": exc.message}) from exc
 
     service = get_paper_pipeline_service()
     try:
@@ -74,10 +68,15 @@ async def start_pipeline(
         logger.exception(f"pipeline_start_failed user_id={user_id} error={e}")
         # Distinguish LLM unavailability from other errors
         error_msg = str(e).lower()
-        if any(kw in error_msg for kw in ["timeout", "connection", "unreachable", "refused", "api_key", "authenticate"]):
+        if any(
+            kw in error_msg for kw in ["timeout", "connection", "unreachable", "refused", "api_key", "authenticate"]
+        ):
             raise HTTPException(
                 status_code=503,
-                detail={"code": "LLM_UNAVAILABLE", "message": "AI服务暂不可用，请稍后重试。Pipeline 依赖大语言模型，当前模型服务无法访问。"},
+                detail={
+                    "code": "LLM_UNAVAILABLE",
+                    "message": "AI服务暂不可用，请稍后重试。Pipeline 依赖大语言模型，当前模型服务无法访问。",
+                },
             ) from e
         raise HTTPException(
             status_code=503,

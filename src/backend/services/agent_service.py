@@ -8,7 +8,6 @@ import re
 import uuid
 import time
 from pathlib import Path
-from datetime import datetime
 
 from ..services.skills_service import SkillsService
 from ..services import chart_service
@@ -21,7 +20,9 @@ from .interfaces import IAgentService
 
 # ── 从 agent 子包导入拆分后的模块（agent_service.py 拆分 → 5 模块） ──
 from .agent.prompt_builder import (
-    _get_agent_llm_config, CONTEXT_TEMPLATES, VALID_AGENTS,
+    _get_agent_llm_config,
+    CONTEXT_TEMPLATES,
+    VALID_AGENTS,
 )
 from .agent.skill_router import SkillRouter
 from .agent.session_manager import SessionManager
@@ -37,7 +38,6 @@ logger = structlog.get_logger(__name__)
 # AGENT_PROMPTS, CONTEXT_TEMPLATES, VALID_AGENTS 等均已从 prompt_builder 导入（第 21-24 行）。
 # 本文件不再重复定义，避免双源维护不一致。
 # 文件模式下的路径常量使用 settings 中的配置。
-_CONVERSATIONS_DIR = Path(settings.CONVERSATIONS_DIR)
 _UPLOADS_DIR = Path(settings.UPLOAD_DIR)
 
 TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".py", ".r", ".bib"}
@@ -117,29 +117,16 @@ class AgentService(IAgentService):
     # ── Conversation persistence ──────────────────────────
 
     def _load_all_conversations(self) -> None:
-        """Load all persisted conversations from data/conversations/"""
-        _CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
-        for fp in _CONVERSATIONS_DIR.glob("*.json"):
-            try:
-                data = json.loads(fp.read_text(encoding="utf-8"))
-                session_id = fp.stem
-                self.conversations[session_id] = data.get("messages", [])
-            except Exception as e:
-                logger.warning(f"Failed to load conversation {fp.name}: {e}")
+        """Load all user-scoped fallback conversations."""
+        self._sessions.load_all_conversations()
 
-    def _save_conversation(self, session_id: str) -> None:
-        """Persist a single conversation to data/conversations/{session_id}.json"""
-        _CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
-        filepath = _CONVERSATIONS_DIR / f"{session_id}.json"
-        try:
-            payload = {
-                "session_id": session_id,
-                "updated_at": datetime.now().isoformat(),
-                "messages": self.conversations.get(session_id, []),
-            }
-            filepath.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception as e:
-            logger.error(f"Failed to save conversation {session_id}: {e}")
+    def _save_conversation(self, session_id: str, user_id: int, agent_id: str) -> None:
+        """Persist a user-scoped fallback conversation."""
+        self._sessions.save_conversation(
+            session_id,
+            user_id,
+            agent_id=agent_id,
+        )
 
     # ── Context preparation (shared by chat & stream_chat) ──
 
@@ -176,14 +163,9 @@ class AgentService(IAgentService):
         # Get or create conversation history (with user_id isolation)
         if self._use_db:
             db_history = await self.conversation_repo.get_by_session(session_id, user_id)
-            history = [
-                {"role": msg.role, "content": msg.content}
-                for msg in db_history
-            ]
+            history = [{"role": msg.role, "content": msg.content} for msg in db_history]
         else:
-            if session_id not in self.conversations:
-                self.conversations[session_id] = []
-            history = self.conversations[session_id]
+            history = self._sessions.load_conversation(session_id, user_id)
 
         # Build system prompt (with skills injection)
         if context is None:
@@ -240,8 +222,11 @@ class AgentService(IAgentService):
 
         # Task 7: 抽取公共上下文准备逻辑（历史加载、Prompt 构建、上传上下文加载、messages 组装）
         messages, system_prompt, history = await self._prepare_context(
-            user_id=user_id, session_id=session_id, message=message,
-            agent_id=agent_id, context=context,
+            user_id=user_id,
+            session_id=session_id,
+            message=message,
+            agent_id=agent_id,
+            context=context,
         )
 
         # P1: 使用统一 LLM 客户端（tenacity 重试 + 超时 + 熔断器保护）
@@ -260,10 +245,20 @@ class AgentService(IAgentService):
             latency_ms = int((time.monotonic() - llm_start) * 1000)
             # P1: 记录 LLM 调用成功日志
             await self._log_agent_execution(
-                user_id=user_id, agent_id=agent_id, session_id=session_id,
-                model=llm_model, status="success", latency_ms=latency_ms,
-                prompt_tokens=getattr(response.raw, "usage", None) and getattr(response.raw.usage, "prompt_tokens", None) if response.raw else None,
-                completion_tokens=getattr(response.raw, "usage", None) and getattr(response.raw.usage, "completion_tokens", None) if response.raw else None,
+                user_id=user_id,
+                agent_id=agent_id,
+                session_id=session_id,
+                model=llm_model,
+                status="success",
+                latency_ms=latency_ms,
+                prompt_tokens=getattr(response.raw, "usage", None)
+                and getattr(response.raw.usage, "prompt_tokens", None)
+                if response.raw
+                else None,
+                completion_tokens=getattr(response.raw, "usage", None)
+                and getattr(response.raw.usage, "completion_tokens", None)
+                if response.raw
+                else None,
             )
         except Exception as e:
             latency_ms = int((time.monotonic() - llm_start) * 1000)
@@ -271,14 +266,22 @@ class AgentService(IAgentService):
             error_reason = _classify_llm_error(e)
             logger.error(f"DeepSeek API call failed: {e} reason={error_reason}")
             await self._log_agent_execution(
-                user_id=user_id, agent_id=agent_id, session_id=session_id,
-                model=llm_model, status="failed", latency_ms=latency_ms,
-                error_code="LLM_API_FAILED", error_message=f"{error_reason}: {e}",
+                user_id=user_id,
+                agent_id=agent_id,
+                session_id=session_id,
+                model=llm_model,
+                status="failed",
+                latency_ms=latency_ms,
+                error_code="LLM_API_FAILED",
+                error_message=f"{error_reason}: {e}",
             )
             # P0 修复: LLM 调用失败时降级到 Mock 模式，而非抛出 AgentChatFailedError(500)
             # Task 9: 精细化披露失败原因（余额不足/认证失败/网络不可达等）
             mock_content = self._generate_mock_reply(
-                message=message, agent_id=agent_id, session_id=session_id, context=context,
+                message=message,
+                agent_id=agent_id,
+                session_id=session_id,
+                context=context,
             )
             reply = f"⚠️ {error_reason}，已降级为离线引导模式\n\n{mock_content}"
             logger.info(
@@ -297,8 +300,9 @@ class AgentService(IAgentService):
             # Task 24.5: 从 config 读取 MAX_HISTORY_MESSAGES
             max_history_messages = settings.MAX_HISTORY_MESSAGES
             if len(history) > max_history_messages:
-                self.conversations[session_id] = history[-max_history_messages:]
-            self._save_conversation(session_id)
+                key = self._sessions._conversation_key(session_id, user_id)
+                self.conversations[key] = history[-max_history_messages:]
+            self._save_conversation(session_id, user_id, agent_id)
 
         # Parse options from reply
         options = self._skills.parse_options(reply)
@@ -365,8 +369,11 @@ class AgentService(IAgentService):
 
         # Task 7: 抽取公共上下文准备逻辑（历史加载、Prompt 构建、上传上下文加载、messages 组装）
         messages, system_prompt, history = await self._prepare_context(
-            user_id=user_id, session_id=session_id, message=message,
-            agent_id=agent_id, context=context,
+            user_id=user_id,
+            session_id=session_id,
+            message=message,
+            agent_id=agent_id,
+            context=context,
         )
 
         # P1: 使用统一 LLM 客户端流式调用（熔断器保护，无重试因流已在进行中）
@@ -398,14 +405,22 @@ class AgentService(IAgentService):
             error_reason = _classify_llm_error(e)
             logger.error(f"DeepSeek stream API failed: {e} reason={error_reason}")
             await self._log_agent_execution(
-                user_id=user_id, agent_id=agent_id, session_id=session_id,
-                model=llm_model, status="failed", latency_ms=latency_ms,
-                error_code="LLM_STREAM_FAILED", error_message=f"{error_reason}: {e}",
+                user_id=user_id,
+                agent_id=agent_id,
+                session_id=session_id,
+                model=llm_model,
+                status="failed",
+                latency_ms=latency_ms,
+                error_code="LLM_STREAM_FAILED",
+                error_message=f"{error_reason}: {e}",
             )
             # P0 修复: 流式 LLM 调用失败时降级到 Mock 模式，而非 yield 裸错误后 return
             # Task 9: 精细化披露失败原因（余额不足/认证失败/网络不可达等）
             mock_content = self._generate_mock_reply(
-                message=message, agent_id=agent_id, session_id=session_id, context=context,
+                message=message,
+                agent_id=agent_id,
+                session_id=session_id,
+                context=context,
             )
             full_reply = f"⚠️ {error_reason}，已降级为离线引导模式\n\n{mock_content}"
             # 将降级回复作为 token 事件流式输出（单次 yield，保证前端按 token 渲染）
@@ -420,23 +435,26 @@ class AgentService(IAgentService):
         if not degraded:
             latency_ms = int((time.monotonic() - llm_start) * 1000)
             await self._log_agent_execution(
-                user_id=user_id, agent_id=agent_id, session_id=session_id,
-                model=llm_model, status="success", latency_ms=latency_ms,
+                user_id=user_id,
+                agent_id=agent_id,
+                session_id=session_id,
+                model=llm_model,
+                status="success",
+                latency_ms=latency_ms,
             )
 
         # ═══ 同步保存对话历史（DB 写入 < 10ms），然后立即发送 done ═══
         history.append({"role": "user", "content": message})
         history.append({"role": "assistant", "content": full_reply})
         if self._use_db:
-            await self.conversation_repo.add_message(
-                session_id, agent_id, "user", message, user_id)
-            await self.conversation_repo.add_message(
-                session_id, agent_id, "assistant", full_reply, user_id)
+            await self.conversation_repo.add_message(session_id, agent_id, "user", message, user_id)
+            await self.conversation_repo.add_message(session_id, agent_id, "assistant", full_reply, user_id)
         else:
             max_history_messages = 40
             if len(history) > max_history_messages:
-                self.conversations[session_id] = history[-max_history_messages:]
-            self._save_conversation(session_id)
+                key = self._sessions._conversation_key(session_id, user_id)
+                self.conversations[key] = history[-max_history_messages:]
+            self._save_conversation(session_id, user_id, agent_id)
 
         # 快速检测技能（纯 CPU，不阻塞）
         skills_used = self._skills.detect_skills(full_reply, message)
@@ -452,13 +470,21 @@ class AgentService(IAgentService):
 
         # ── 仅延迟慢操作（图表/CNKI 需要额外 LLM 调用）到后台 ──
         if "chart_generation" in skills_used or "cnki_search" in skills_used:
-            asyncio.create_task(self._deferred_skills(
-                message=message, full_reply=full_reply, session_id=session_id,
-                skills_used=skills_used,
-            ))
+            asyncio.create_task(
+                self._deferred_skills(
+                    message=message,
+                    full_reply=full_reply,
+                    session_id=session_id,
+                    skills_used=skills_used,
+                )
+            )
 
     async def _deferred_skills(
-        self, *, message: str, full_reply: str, session_id: str,
+        self,
+        *,
+        message: str,
+        full_reply: str,
+        session_id: str,
         skills_used: list[str],
     ) -> None:
         """后台执行慢技能（图表生成/CNKI 检索需额外 LLM 调用），不影响用户交互"""
@@ -475,8 +501,14 @@ class AgentService(IAgentService):
     # ── Post-processing (fire-and-forget, does not block user response) ──
 
     async def _post_process_async(
-        self, *, message: str, full_reply: str, agent_id: str,
-        session_id: str, user_id: int, history: list[dict],
+        self,
+        *,
+        message: str,
+        full_reply: str,
+        agent_id: str,
+        session_id: str,
+        user_id: int,
+        history: list[dict],
     ) -> None:
         """后台异步后处理：保存历史、检测技能、执行图表/CNKI 技能。
 
@@ -497,8 +529,9 @@ class AgentService(IAgentService):
                 # Task 24.5: 从 config 读取 MAX_HISTORY_MESSAGES
                 max_history_messages = settings.MAX_HISTORY_MESSAGES
                 if len(history) > max_history_messages:
-                    self.conversations[session_id] = history[-max_history_messages:]
-                self._save_conversation(session_id)
+                    key = self._sessions._conversation_key(session_id, user_id)
+                    self.conversations[key] = history[-max_history_messages:]
+                self._save_conversation(session_id, user_id, agent_id)
 
             # 2. 解析选项和检测技能（纯 CPU，不阻塞）
             self._skills.parse_options(full_reply)
@@ -527,9 +560,7 @@ class AgentService(IAgentService):
 
     # ── System prompt building with skills injection ──────
 
-    async def _build_system_prompt(
-        self, agent_id: str, context: Optional[dict] = None
-    ) -> str:
+    async def _build_system_prompt(self, agent_id: str, context: Optional[dict] = None) -> str:
         """Build system prompt for the agent using Jinja2 template engine.
 
         性能优化：
@@ -574,6 +605,7 @@ class AgentService(IAgentService):
             try:
                 if not self._rag_warmed_up:
                     from .rag_service import get_rag_service
+
                     self.rag_service = get_rag_service()
                     self._rag_warmed_up = True
                 if self.rag_service:
@@ -595,9 +627,7 @@ class AgentService(IAgentService):
                     )
                     rag_text = rag_result.get("context", "") if isinstance(rag_result, dict) else ""
             except asyncio.TimeoutError:
-                logger.warning(
-                    f"rag_timeout agent={agent_id} query_len={len(context.get('last_message', ''))}"
-                )
+                logger.warning(f"rag_timeout agent={agent_id} query_len={len(context.get('last_message', ''))}")
                 rag_text = ""
             except Exception as e:
                 logger.warning(f"RAG context injection failed: {e}")
@@ -665,6 +695,7 @@ class AgentService(IAgentService):
         P0: 使用 safe_session_path 防御路径穿越攻击。
         """
         from ..core.path_safety import validate_session_id, safe_session_path
+
         try:
             safe_sid = validate_session_id(session_id)
             upload_dir = safe_session_path(Path(settings.UPLOAD_DIR), safe_sid)
@@ -713,9 +744,7 @@ class AgentService(IAgentService):
 
     # ── Chart generation skill ────────────────────────────
 
-    async def _execute_chart_skill(
-        self, message: str, reply: str, session_id: str
-    ) -> Optional[dict]:
+    async def _execute_chart_skill(self, message: str, reply: str, session_id: str) -> Optional[dict]:
         """When chart_generation skill is detected, use DeepSeek to recommend chart type
         and generate the chart via chart_service."""
         try:
@@ -748,7 +777,7 @@ AI回复：{reply}
 
             # Parse the JSON from the analysis
             # Try to extract JSON from the response (may be wrapped in markdown code block)
-            json_match = re.search(r'\{[\s\S]*\}', analysis_text)
+            json_match = re.search(r"\{[\s\S]*\}", analysis_text)
             if not json_match:
                 logger.warning("Failed to parse chart analysis response as JSON")
                 return None
@@ -841,8 +870,9 @@ AI回复：{reply}
             ]
 
         if chart_type in ("bubble_kde",):
-            return [(x, x * 2 + np.random.randn() * 5, abs(np.random.randn()) * 30 + 10)
-                    for x in np.linspace(0, 50, 30)]
+            return [
+                (x, x * 2 + np.random.randn() * 5, abs(np.random.randn()) * 30 + 10) for x in np.linspace(0, 50, 30)
+            ]
 
         if chart_type in ("gradient_area",):
             x = list(np.linspace(0, 10, 50))
@@ -871,9 +901,7 @@ AI回复：{reply}
 
     # ── CNKI search skill ─────────────────────────────────
 
-    async def _execute_cnki_skill(
-        self, message: str, session_id: str
-    ) -> Optional[list]:
+    async def _execute_cnki_skill(self, message: str, session_id: str) -> Optional[list]:
         """When cnki_search skill is detected, extract keywords and search CNKI"""
         try:
             # Extract search keywords from the message using DeepSeek
@@ -896,7 +924,7 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
             keyword_text = keyword_response.content.strip()
 
             # Parse JSON
-            json_match = re.search(r'\{[\s\S]*\}', keyword_text)
+            json_match = re.search(r"\{[\s\S]*\}", keyword_text)
             if not json_match:
                 logger.warning("Failed to parse keyword extraction response")
                 return None
@@ -919,6 +947,7 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
             else:
                 # Fallback: create standalone instance (no cache/circuit breaker)
                 from ..services.cnki_service import CNKIService
+
                 cnki = CNKIService()
                 results = await cnki.search(query=keywords, year_filter=year_filter, count=10)
                 await cnki.close()
@@ -932,9 +961,7 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
 
     # ── Skill hint detection ──────────────────────────────
 
-    def _detect_skill_hint(
-        self, reply: str, user_message: str, skills_used: list[str]
-    ) -> Optional[str]:
+    def _detect_skill_hint(self, reply: str, user_message: str, skills_used: list[str]) -> Optional[str]:
         """对未匹配技能的需求提供提示建议。
 
         ⚠ 此方法与 SkillRouter.detect_skill_hint 签名不同（多接受 skills_used 参数），
@@ -958,7 +985,10 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
         combined = reply + user_message
         for keyword, skill_name in unmatched_keywords.items():
             if keyword in combined:
-                if not any(s in skills_used for s in ["cnki_search", "chart_generation", "polish", "literature_review", "architecture"]):
+                if not any(
+                    s in skills_used
+                    for s in ["cnki_search", "chart_generation", "polish", "literature_review", "architecture"]
+                ):
                     return f"检测到您可能需要「{skill_name}」相关功能，当前暂无对应技能。您可以在技能管理中创建自定义技能来满足此需求。"
 
         return None
@@ -1069,7 +1099,9 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
     async def get_conversation_history(self, session_id: str, user_id: int = 0) -> list[dict]:
         return await self._sessions.get_conversation_history(session_id, user_id)
 
-    async def list_sessions_with_meta(self, user_id: int = 0, agent_id: str | None = None, limit: int = 50) -> list[dict]:
+    async def list_sessions_with_meta(
+        self, user_id: int = 0, agent_id: str | None = None, limit: int = 50
+    ) -> list[dict]:
         return await self._sessions.list_sessions_with_meta(user_id, agent_id, limit)
 
     async def rename_session(self, session_id: str, title: str, user_id: int = 0) -> bool:
@@ -1079,10 +1111,18 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
         return await self._sessions.delete_session(session_id, user_id)
 
     async def _log_agent_execution(
-        self, *, user_id: int, agent_id: str, session_id: str,
-        model: str, status: str, latency_ms: int = 0,
-        prompt_tokens: int | None = None, completion_tokens: int | None = None,
-        error_code: str | None = None, error_message: str | None = None,
+        self,
+        *,
+        user_id: int,
+        agent_id: str,
+        session_id: str,
+        model: str,
+        status: str,
+        latency_ms: int = 0,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        error_code: str | None = None,
+        error_message: str | None = None,
     ) -> None:
         """P1: 写入 AgentExecutionLog 用于成本分析、延迟监控与故障排查。
 
@@ -1153,22 +1193,37 @@ year_filter格式示例："2020-2024" 或 "2024" 或 ""（不限年份）
     # 子学科 → 大学科映射表（与 agent.py valid_disciplines 对应）
     _SUBDISCIPLINE_MAP: dict[str, str] = {
         # 人文社科子学科
-        "communication": "humanities", "sociology": "humanities",
-        "psychology": "humanities", "education": "humanities",
-        "journalism": "humanities", "ethnology": "humanities",
-        "anthropology": "humanities", "literature": "humanities",
-        "history": "humanities", "management": "humanities", "economics": "humanities",
+        "communication": "humanities",
+        "sociology": "humanities",
+        "psychology": "humanities",
+        "education": "humanities",
+        "journalism": "humanities",
+        "ethnology": "humanities",
+        "anthropology": "humanities",
+        "literature": "humanities",
+        "history": "humanities",
+        "management": "humanities",
+        "economics": "humanities",
         # 工科子学科
-        "computer_science": "engineering", "electronic_engineering": "engineering",
-        "mechanical_engineering": "engineering", "civil_engineering": "engineering",
-        "materials_science": "engineering", "automation": "engineering",
+        "computer_science": "engineering",
+        "electronic_engineering": "engineering",
+        "mechanical_engineering": "engineering",
+        "civil_engineering": "engineering",
+        "materials_science": "engineering",
+        "automation": "engineering",
         # 理科子学科
-        "mathematics": "science", "physics": "science", "chemistry": "science",
-        "biology": "science", "astronomy": "science", "earth_science": "science",
+        "mathematics": "science",
+        "physics": "science",
+        "chemistry": "science",
+        "biology": "science",
+        "astronomy": "science",
+        "earth_science": "science",
         # 交叉学科子学科
         "computational_social_science": "interdisciplinary",
-        "digital_humanities": "interdisciplinary", "bioinformatics": "interdisciplinary",
-        "cognitive_science": "interdisciplinary", "environmental_studies": "interdisciplinary",
+        "digital_humanities": "interdisciplinary",
+        "bioinformatics": "interdisciplinary",
+        "cognitive_science": "interdisciplinary",
+        "environmental_studies": "interdisciplinary",
         "complex_systems": "interdisciplinary",
     }
 

@@ -155,7 +155,7 @@ class EntitlementService:
         except Exception as e:
             raise EntitlementError(
                 "ENTITLEMENT_SERVICE_ERROR",
-                f"配额服务暂时不可用，请稍后重试。",
+                "配额服务暂时不可用，请稍后重试。",
             ) from e
         if result.rowcount != 1:
             raise EntitlementError(

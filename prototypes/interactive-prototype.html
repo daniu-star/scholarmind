@@ -8725,7 +8725,13 @@ async function _accountApi(path, options) {
   var response = await _nativeFetch(API_BASE + path, Object.assign({}, options, {headers: headers}));
   var body = await response.json().catch(function(){ return {}; });
   if (!response.ok) {
-    var error = new Error(_apiError(body, '请求失败（' + response.status + '）'));
+    var fallback = '请求失败（' + response.status + '）';
+    if (response.status === 404 && path.indexOf('/api/v1/auth/') === 0) {
+      fallback = '登录服务暂时不可用（后端未连接），请稍后重试';
+    } else if (response.status >= 500) {
+      fallback = '服务暂时不可用，请稍后重试';
+    }
+    var error = new Error(_apiError(body, fallback));
     error.status = response.status;
     error.body = body;
     throw error;

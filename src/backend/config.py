@@ -82,15 +82,15 @@ class Settings(BaseSettings):
     MIN_FILES_PER_SESSION: int = 1
     MAX_FILE_SIZE_MB: int = 20
 
-    ALLOWED_EXTENSIONS: set = {
-        "csv", "xlsx", "json", "pdf", "docx",
-        "md", "txt", "r", "py", "ipynb", "tex", "bib"
-    }
+    ALLOWED_EXTENSIONS: set = {"csv", "xlsx", "json", "pdf", "docx", "md", "txt", "r", "py", "ipynb", "tex", "bib"}
 
     CORS_ORIGINS: list = [
-        "http://localhost:5173", "http://127.0.0.1:5173",  # Vite 前端
-        "http://localhost:8080", "http://127.0.0.1:8080",  # 备用
-        "http://localhost:8000", "http://127.0.0.1:8000",  # 后端直连
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",  # Vite 前端
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",  # 备用
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",  # 后端直连
     ]
     CORS_ALLOW_ALL_IN_DEV: bool = False  # P0 修复：默认关闭全放通，开发环境显式开启
 
@@ -104,9 +104,9 @@ class Settings(BaseSettings):
     DB_PATH: str = "data/scholarmind.db"
 
     # 爬虫配置
-    CRAWL_RATE_LIMIT: float = 3.0       # 请求间隔（秒）
-    CRAWL_MAX_RETRIES: int = 3          # 最大重试次数
-    CRAWL_DATA_RETENTION_DAYS: int = 30 # 数据保留天数
+    CRAWL_RATE_LIMIT: float = 3.0  # 请求间隔（秒）
+    CRAWL_MAX_RETRIES: int = 3  # 最大重试次数
+    CRAWL_DATA_RETENTION_DAYS: int = 30  # 数据保留天数
 
     # RAG 配置
     RAG_TOP_K: int = 5
@@ -149,7 +149,7 @@ class Settings(BaseSettings):
         description="Semantic Scholar API 基础 URL",
     )
     ARXIV_BASE_URL: str = Field(
-        default="http://export.arxiv.org/api/query",
+        default="https://export.arxiv.org/api/query",
         description="arXiv API 基础 URL",
     )
     ACADEMIC_SEARCH_TIMEOUT: int = Field(
@@ -179,7 +179,7 @@ class Settings(BaseSettings):
     LOG_FORMAT: str = "json"  # "json" | "console"
 
     # ── 新增：速率限制配置 ──────────────────────────────────
-    RATE_LIMIT_REQUESTS: int = 60     # 每分钟最大请求数
+    RATE_LIMIT_REQUESTS: int = 60  # 每分钟最大请求数
     RATE_LIMIT_ENABLED: bool = True
     # 限流身份解析：受信任代理 IP（逗号分隔），仅当直连客户端 IP 在此集合内时
     # 才信任 X-Forwarded-For 最左值作为真实客户端 IP；默认仅信任本地回环。
@@ -267,8 +267,12 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = Field(default="", description="邮箱授权码")
     SMTP_FROM_NAME: str = "ScholarMind"
     RESEND_API_KEY: str = Field(default="", description="Resend API Key（绕过 Railway SMTP 限制）")
-    RESEND_FROM_DOMAIN: str = Field(default="", description="Resend 已验证的发件域名（如 quannengyanjiu.cn），留空则使用 resend.dev")
-    VERCEL_EMAIL_PROXY_URL: str = Field(default="", description="Vercel 邮件代理函数 URL（如 https://www.quannengyanjiu.cn/api/send-email）")
+    RESEND_FROM_DOMAIN: str = Field(
+        default="", description="Resend 已验证的发件域名（如 quannengyanjiu.cn），留空则使用 resend.dev"
+    )
+    VERCEL_EMAIL_PROXY_URL: str = Field(
+        default="", description="Vercel 邮件代理函数 URL（如 https://www.quannengyanjiu.cn/api/send-email）"
+    )
     VERCEL_EMAIL_PROXY_KEY: str = Field(default="", description="Vercel 邮件代理认证密钥")
     VERIFICATION_CODE_EXPIRE_MINUTES: int = 5
     VERIFICATION_CODE_LENGTH: int = 6
@@ -321,15 +325,12 @@ class Settings(BaseSettings):
                 self.DATABASE_URL = f"{prefix}:///{p.resolve().as_posix()}"
 
     def ensure_dirs(self):
-        for d in [self.UPLOAD_DIR, self.SKILLS_DIR, self.CHARTS_DIR,
-                  self.CONVERSATIONS_DIR, self.CHROMA_DIR]:
+        for d in [self.UPLOAD_DIR, self.SKILLS_DIR, self.CHARTS_DIR, self.CONVERSATIONS_DIR, self.CHROMA_DIR]:
             Path(d).mkdir(parents=True, exist_ok=True)
         # 确保 DB_PATH 的父目录存在
         Path(self.DB_PATH).parent.mkdir(parents=True, exist_ok=True)
         # 确保 ORM 数据库父目录存在
-        Path(self.DATABASE_URL.replace("sqlite+aiosqlite:///", "")).parent.mkdir(
-            parents=True, exist_ok=True
-        )
+        Path(self.DATABASE_URL.replace("sqlite+aiosqlite:///", "")).parent.mkdir(parents=True, exist_ok=True)
 
     def get_cors_origins(self) -> list:
         """获取 CORS 允许的来源列表
@@ -441,21 +442,23 @@ class Settings(BaseSettings):
                 for url_field in ("ALIPAY_NOTIFY_URL", "ALIPAY_RETURN_URL"):
                     url_value = getattr(self, url_field, "")
                     if url_value and "your-domain.com" in url_value:
-                        errors.append(f"{url_field} 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）")
+                        errors.append(
+                            f"{url_field} 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）"
+                        )
             if _wechat_cfg:
                 url_value = getattr(self, "WECHAT_PAY_NOTIFY_URL", "")
                 if url_value and "your-domain.com" in url_value:
-                    errors.append("WECHAT_PAY_NOTIFY_URL 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）")
+                    errors.append(
+                        "WECHAT_PAY_NOTIFY_URL 仍为 your-domain.com 占位符，请配置真实公网 HTTPS 域名（如 https://api.quannengyanjiu.cn/...）"
+                    )
         # P1 修复: 生产环境 CORS_ORIGINS 必须包含真实公网域名，不得仅 localhost
         cors_origins_lower = [o.lower() for o in self.CORS_ORIGINS]
         has_public_origin = any(
-            o.startswith("https://") and "localhost" not in o and "127.0.0.1" not in o
-            for o in cors_origins_lower
+            o.startswith("https://") and "localhost" not in o and "127.0.0.1" not in o for o in cors_origins_lower
         )
         if not has_public_origin:
             errors.append(
-                "CORS_ORIGINS 在生产环境必须包含真实公网 HTTPS 域名"
-                "（如 https://quannengyanjiu.cn），不得仅含 localhost"
+                "CORS_ORIGINS 在生产环境必须包含真实公网 HTTPS 域名（如 https://quannengyanjiu.cn），不得仅含 localhost"
             )
         if errors:
             raise RuntimeError("生产环境配置校验失败:\n  " + "\n  ".join(errors))

@@ -15,26 +15,19 @@
  */
 const nodemailer = require('nodemailer');
 
-// 代理认证密钥（随机字符串，仅用于防止外部滥用，非真实账户密码）
-const PROXY_API_KEY = 'vJAC4wDxVy1cbvkgiK-Woa18zDQmxxUixZxl_sZC7ao';
-
 module.exports = async (req, res) => {
-  // CORS 预检
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-Key');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
-  // 密钥认证（防止外部滥用）
+  const proxyApiKey = process.env.VERCEL_EMAIL_PROXY_KEY;
+  if (!proxyApiKey) {
+    return res.status(503).json({ success: false, error: 'Email proxy is not configured' });
+  }
+
+  // 密钥必须由 Vercel 环境变量提供，禁止把生产密钥提交到源码。
   const apiKey = req.headers['x-api-key'];
-  if (!apiKey || apiKey !== PROXY_API_KEY) {
+  if (!apiKey || apiKey !== proxyApiKey) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
 

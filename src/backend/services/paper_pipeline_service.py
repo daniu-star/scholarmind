@@ -11,6 +11,7 @@
 4. asyncio 任务引用保留在内存中，用于取消正在运行的 Pipeline
 5. 学科 → 期刊格式自动映射
 """
+
 from __future__ import annotations
 
 import sys
@@ -45,12 +46,12 @@ _PIPELINE_PROGRESS_SYNC_INTERVAL_SECONDS = settings.PIPELINE_PROGRESS_SYNC_INTER
 
 # ── 技能目录路径（P4-T7：从环境变量读取，避免硬编码） ─────
 # 主目录：可能被 Railway volume 挂载覆盖
-_SKILLS_BASE = os.environ.get('SKILLS_DIR', str(Path.home() / ".trae-cn" / "skills"))
+_SKILLS_BASE = os.environ.get("SKILLS_DIR", str(Path.home() / ".trae-cn" / "skills"))
 SKILL_DIR = Path(_SKILLS_BASE) / "cyclical-paper-generation"
 PIPELINE_DIR = SKILL_DIR / "pipeline"
 
 # 备用目录：Docker 构建时复制到 /app/skills_builtin/，不会被 volume 覆盖
-_SKILLS_BUILTIN = os.environ.get('SKILLS_BUILTIN_DIR', '')
+_SKILLS_BUILTIN = os.environ.get("SKILLS_BUILTIN_DIR", "")
 if _SKILLS_BUILTIN:
     _BUILTIN_SKILL_DIR = Path(_SKILLS_BUILTIN) / "cyclical-paper-generation"
     _BUILTIN_PIPELINE_DIR = _BUILTIN_SKILL_DIR / "pipeline"
@@ -123,13 +124,18 @@ def _try_import_pipeline() -> bool:
         sys.path.insert(0, skill_path)
 
         # 从正确目录预加载所有子模块（注册为 pipeline.xxx）
-        _pipeline_mods = ["llm_executor", "style_constraints", "word_validation",
-                          "gan_scorer", "shared_learning", "voice_extractor"]
+        _pipeline_mods = [
+            "llm_executor",
+            "style_constraints",
+            "word_validation",
+            "gan_scorer",
+            "shared_learning",
+            "voice_extractor",
+        ]
         for _mod_name in _pipeline_mods:
             _f = _active_pipeline_dir / f"{_mod_name}.py"
             if _f.exists():
-                _spec = importlib.util.spec_from_file_location(
-                    f"pipeline.{_mod_name}", str(_f))
+                _spec = importlib.util.spec_from_file_location(f"pipeline.{_mod_name}", str(_f))
                 if _spec and _spec.loader:
                     _mod = importlib.util.module_from_spec(_spec)
                     sys.modules[f"pipeline.{_mod_name}"] = _mod
@@ -159,9 +165,7 @@ def _try_import_pipeline() -> bool:
         return False
     except Exception as e:
         _PIPELINE_INIT_ERROR = f"{type(e).__name__}: {e}"
-        logger.warning(
-            f"cyclical_paper_pipeline_unavailable reason=unexpected_error error={e}"
-        )
+        logger.warning(f"cyclical_paper_pipeline_unavailable reason=unexpected_error error={e}")
         return False
 
 
@@ -170,6 +174,7 @@ class PipelineUnavailableError(RuntimeError):
 
 
 # ── 线程安全：同步 Pipeline 执行包装器 ─────────────────────
+
 
 def _run_pipeline_with_cancel(
     paper_content: str,
@@ -234,9 +239,7 @@ class PaperPipelineService:
         """
         if not self._real_available:
             reason = _PIPELINE_INIT_ERROR or "unknown reason"
-            raise PipelineUnavailableError(
-                f"论文生成 Pipeline 依赖未安装，无法启动。原因：{reason}"
-            )
+            raise PipelineUnavailableError(f"论文生成 Pipeline 依赖未安装，无法启动。原因：{reason}")
 
         pipeline_id = str(uuid.uuid4())
 
@@ -305,9 +308,7 @@ class PaperPipelineService:
             "config": config,
         }
 
-    async def get_status(
-        self, pipeline_id: str, user_id: Optional[str] = None
-    ) -> Optional[dict[str, Any]]:
+    async def get_status(self, pipeline_id: str, user_id: Optional[str] = None) -> Optional[dict[str, Any]]:
         """查询 Pipeline 状态
 
         P0 Task 3.3：若提供 user_id，校验 pipeline 归属；不属于当前用户返回 None
@@ -342,9 +343,7 @@ class PaperPipelineService:
             "simulation_mode": p.get("simulation_mode", False),
         }
 
-    async def get_result(
-        self, pipeline_id: str, user_id: Optional[str] = None
-    ) -> Optional[dict[str, Any]]:
+    async def get_result(self, pipeline_id: str, user_id: Optional[str] = None) -> Optional[dict[str, Any]]:
         """获取 Pipeline 最终结果
 
         P0 Task 3.3：若提供 user_id，校验 pipeline 归属；不属于当前用户返回 None。
@@ -393,21 +392,21 @@ class PaperPipelineService:
             if session_id and p.get("config", {}).get("session_id") != session_id:
                 continue
             cfg = {k: v for k, v in p.get("config", {}).items() if k != "guidance_data"}
-            result.append({
-                "pipeline_id": p["pipeline_id"],
-                "status": p.get("status"),
-                "current_round": p.get("current_round", 0),
-                "score": p.get("score"),
-                "started_at": p.get("started_at"),
-                "completed_at": p.get("completed_at"),
-                "config": cfg,
-            })
+            result.append(
+                {
+                    "pipeline_id": p["pipeline_id"],
+                    "status": p.get("status"),
+                    "current_round": p.get("current_round", 0),
+                    "score": p.get("score"),
+                    "started_at": p.get("started_at"),
+                    "completed_at": p.get("completed_at"),
+                    "config": cfg,
+                }
+            )
         result.sort(key=lambda x: x["started_at"] or "", reverse=True)
         return result
 
-    async def cancel_pipeline(
-        self, pipeline_id: str, user_id: Optional[str] = None
-    ) -> bool:
+    async def cancel_pipeline(self, pipeline_id: str, user_id: Optional[str] = None) -> bool:
         """取消运行中的 Pipeline
 
         P0 Task 3.3：若提供 user_id，校验 pipeline 归属；不属于当前用户返回 False
@@ -435,7 +434,8 @@ class PaperPipelineService:
         task.cancel()
         # 更新状态
         await self._repo.update_status(
-            pipeline_id, "cancelled",
+            pipeline_id,
+            "cancelled",
             completed_at=datetime.now().isoformat(),
             current_step="用户取消",
             current_agent=None,
@@ -451,18 +451,15 @@ class PaperPipelineService:
         # 改为 try/except asyncio.TimeoutError 抛 AppException(503)，让客户端可重试。
         # 注意：超时分支不持有信号量，不可进入下面的 finally release()。
         acquire_timeout = (
-            settings.PIPELINE_ACQUIRE_TIMEOUT_SECONDS
-            if hasattr(settings, "PIPELINE_ACQUIRE_TIMEOUT_SECONDS")
-            else 30.0
+            settings.PIPELINE_ACQUIRE_TIMEOUT_SECONDS if hasattr(settings, "PIPELINE_ACQUIRE_TIMEOUT_SECONDS") else 30.0
         )
         try:
-            await asyncio.wait_for(
-                _PIPELINE_SEMAPHORE.acquire(), timeout=acquire_timeout
-            )
+            await asyncio.wait_for(_PIPELINE_SEMAPHORE.acquire(), timeout=acquire_timeout)
         except asyncio.TimeoutError:
             # 标记 pipeline 失败状态（避免状态机停在 pending），然后抛 503
             await self._repo.update_status(
-                pipeline_id, "failed",
+                pipeline_id,
+                "failed",
                 error="Pipeline 并发已达上限，请稍后重试",
                 completed_at=datetime.now().isoformat(),
             )
@@ -478,15 +475,14 @@ class PaperPipelineService:
 
         try:
             await self._repo.update_status(
-                pipeline_id, "running",
+                pipeline_id,
+                "running",
                 current_step="Pipeline 开始执行",
             )
             await self._repo.append_log(pipeline_id, "Pipeline 开始执行")
 
             # 启动心跳协程：每 15 秒更新一次心跳，确保前端知道 Pipeline 未卡死
-            heartbeat_task = asyncio.create_task(
-                self._heartbeat(pipeline_id, cancel_event)
-            )
+            heartbeat_task = asyncio.create_task(self._heartbeat(pipeline_id, cancel_event))
 
             try:
                 await asyncio.wait_for(
@@ -496,7 +492,8 @@ class PaperPipelineService:
             except asyncio.TimeoutError:
                 cancel_event.set()
                 await self._repo.update_status(
-                    pipeline_id, "failed",
+                    pipeline_id,
+                    "failed",
                     error=f"Pipeline 执行超时（{_PIPELINE_TIMEOUT_SECONDS}s）",
                     completed_at=datetime.now().isoformat(),
                 )
@@ -514,7 +511,8 @@ class PaperPipelineService:
         except Exception as e:
             cancel_event.set()
             await self._repo.update_status(
-                pipeline_id, "failed",
+                pipeline_id,
+                "failed",
                 error=str(e),
                 completed_at=datetime.now().isoformat(),
                 current_step=f"失败: {e}",
@@ -542,8 +540,7 @@ class PaperPipelineService:
                 # P1 Task 8.1：心跳失败不影响主流程，但需记录便于排查
                 logger.error(f"heartbeat failed task_id={pipeline_id} exc={e}")
 
-    async def _run_real_pipeline(self, pipeline_id: str, config: dict[str, Any],
-                                 cancel_event: threading.Event):
+    async def _run_real_pipeline(self, pipeline_id: str, config: dict[str, Any], cancel_event: threading.Event):
         """运行真实 Pipeline（需要 langgraph 等依赖）
 
         在线程池中运行 Pipeline，通过 cancel_event 支持取消。
@@ -587,7 +584,8 @@ class PaperPipelineService:
                     score = progress_shared["score"]
                     if node:
                         await self._repo.update_status(
-                            pipeline_id, "running",
+                            pipeline_id,
+                            "running",
                             current_round=rnd,
                             current_agent=node,
                             current_step=f"执行中: {node} (第 {rnd} 轮)",
@@ -606,7 +604,7 @@ class PaperPipelineService:
                     config=pc,
                     cancel_event=cancel_event,
                     progress_callback=progress_callback,
-                )
+                ),
             )
 
             if result is None:
@@ -617,7 +615,6 @@ class PaperPipelineService:
                 "current_round": result.get("round_number", config["max_rounds"]),
                 "score": result.get("review_score"),
                 "score_history": result.get("score_history", []),
-                "status": "completed",
                 "completed_at": datetime.now().isoformat(),
                 "current_step": "已完成",
                 "current_agent": None,
@@ -632,9 +629,7 @@ class PaperPipelineService:
                 },
             }
             await self._repo.update_status(pipeline_id, "completed", **update)
-            await self._repo.append_log(
-                pipeline_id, f"✅ Pipeline 完成，最终评分: {update['score']}"
-            )
+            await self._repo.append_log(pipeline_id, f"✅ Pipeline 完成，最终评分: {update['score']}")
         finally:
             sync_task.cancel()
             try:
