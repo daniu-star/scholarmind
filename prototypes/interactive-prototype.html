@@ -8554,14 +8554,26 @@ const API_BASE = (function() {
   if (configuredBase) {
     return configuredBase.replace(/\/+$/, '');
   }
+  var canonicalLocalPath = '/app/interactive-prototype.html';
   if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
     var isLoopback = window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1' ||
       window.location.hostname === '[::1]';
-    if (isLoopback && window.location.port !== '8000') {
+    if (isLoopback &&
+        (window.location.hostname !== '127.0.0.1' ||
+         window.location.port !== '8000' ||
+         window.location.pathname !== canonicalLocalPath)) {
+      window.location.replace(
+        'http://127.0.0.1:8000' + canonicalLocalPath + window.location.hash
+      );
       return 'http://127.0.0.1:8000';
     }
     return window.location.origin;
+  }
+  if (window.location.protocol === 'file:') {
+    window.location.replace(
+      'http://127.0.0.1:8000' + canonicalLocalPath + window.location.hash
+    );
   }
   return 'http://127.0.0.1:8000';
 })();

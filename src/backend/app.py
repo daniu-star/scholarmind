@@ -10,7 +10,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +49,18 @@ def create_app() -> FastAPI:
         request_body_max_size=10 * 1024 * 1024,
     )
     app.debug = settings.DEBUG
+
+    @app.middleware("http")
+    async def no_cache_local_frontend(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path in {
+            "/app/interactive-prototype.html",
+            "/app/",
+        }:
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        return response
 
     # ── 中间件层（按优先级顺序注册） ──────────────────────────
     from src.backend.middleware.request_id import RequestIDMiddleware
@@ -148,6 +160,10 @@ def create_app() -> FastAPI:
             "llm_failure_reason": getattr(request.app.state, "llm_failure_reason", None),
             "deepseek_key_configured": bool(settings.DEEPSEEK_API_KEY),
         }
+
+    @app.get("/", include_in_schema=False)
+    async def local_frontend():
+        return RedirectResponse("/app/interactive-prototype.html", status_code=307)
 
     @app.get("/api/v1/readyz")  # readiness: 检查 DB 连通性
     async def readiness_check(request: Request):
