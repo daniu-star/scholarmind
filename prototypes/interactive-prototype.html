@@ -8722,7 +8722,25 @@ async function _accountApi(path, options) {
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-  var response = await _nativeFetch(API_BASE + path, Object.assign({}, options, {headers: headers}));
+  var controller = new AbortController();
+  var timeoutId = setTimeout(function(){ controller.abort(); }, 15000);
+  var response;
+  try {
+    response = await _nativeFetch(
+      API_BASE + path,
+      Object.assign({}, options, {headers: headers, signal: controller.signal})
+    );
+  } catch (err) {
+    var message = err && err.name === 'AbortError'
+      ? '登录服务连接超时，请稍后重试'
+      : '登录服务暂时不可用（后端未连接），请稍后重试';
+    var networkError = new Error(message);
+    networkError.status = 503;
+    networkError.code = 'BACKEND_UNREACHABLE';
+    throw networkError;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   var body = await response.json().catch(function(){ return {}; });
   if (!response.ok) {
     var fallback = '请求失败（' + response.status + '）';

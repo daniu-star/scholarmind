@@ -31,7 +31,6 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    continue-on-error: true
     services:
       redis:
         image: redis:7-alpine
@@ -54,6 +53,20 @@ jobs:
           RATE_LIMIT_ENABLED: "false"
           ENVIRONMENT: test
 
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run build:frontend
+      - run: node --check api/send-email.js
+      - run: node --check api/send-team-invite.js
+      - run: node --check api/platform-status.js
+
   security:
     runs-on: ubuntu-latest
     continue-on-error: true
@@ -67,7 +80,7 @@ jobs:
       - run: safety check --full-report || true
 
   build:
-    needs: [lint]
+    needs: [lint, type-check, test, frontend-build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

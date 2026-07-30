@@ -1,0 +1,19 @@
+name: Production Health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check frontend
+        run: curl --fail --silent --show-error --retry 3 --retry-delay 5 https://www.quannengyanjiu.cn/ > /dev/null
+      - name: Check backend and database through production
+        run: curl --fail --silent --show-error --retry 3 --retry-delay 5 https://www.quannengyanjiu.cn/api/platform-status

@@ -40,6 +40,64 @@ class PaymentProviderError(RuntimeError):
     pass
 
 
+def validate_alipay_configuration() -> dict[str, object]:
+    """Validate Alipay credentials and RSA2 signing without a network request."""
+    required = {
+        "ALIPAY_APP_ID": settings.ALIPAY_APP_ID,
+        "ALIPAY_PRIVATE_KEY": settings.ALIPAY_PRIVATE_KEY,
+        "ALIPAY_PUBLIC_KEY": settings.ALIPAY_PUBLIC_KEY,
+        "ALIPAY_SELLER_ID": settings.ALIPAY_SELLER_ID,
+        "ALIPAY_NOTIFY_URL": settings.ALIPAY_NOTIFY_URL,
+        "ALIPAY_RETURN_URL": settings.ALIPAY_RETURN_URL,
+    }
+    missing = [name for name, value in required.items() if not value]
+    if missing:
+        raise PaymentConfigurationError(f"支付宝配置不完整：{', '.join(missing)}")
+    if not settings.ALIPAY_NOTIFY_URL.startswith("https://"):
+        raise PaymentConfigurationError("支付宝异步回调地址必须使用 HTTPS")
+    if not settings.ALIPAY_RETURN_URL.startswith("https://"):
+        raise PaymentConfigurationError("支付宝同步返回地址必须使用 HTTPS")
+    if not _HAS_ALIPAY:
+        raise PaymentConfigurationError("缺少 python-alipay-sdk")
+
+    try:
+        try:
+            from Crypto.PublicKey import RSA
+        except ImportError:
+            from Cryptodome.PublicKey import RSA
+
+        private_key = RSA.import_key(_load_secret(settings.ALIPAY_PRIVATE_KEY))
+        public_key = RSA.import_key(_load_secret(settings.ALIPAY_PUBLIC_KEY))
+    except Exception as exc:
+        raise PaymentConfigurationError("支付宝 RSA2 密钥格式无效") from exc
+
+    if not private_key.has_private() or private_key.size_in_bits() < 2048:
+        raise PaymentConfigurationError("支付宝应用私钥必须是至少 2048 位的 RSA 私钥")
+    if public_key.has_private() or public_key.size_in_bits() < 2048:
+        raise PaymentConfigurationError("支付宝公钥必须是至少 2048 位的 RSA 公钥")
+
+    try:
+        order_string = AlipayGateway()._client().api_alipay_trade_page_pay(
+            out_trade_no="CONFIGURATIONCHECK000000000001",
+            total_amount="0.01",
+            subject="ScholarMind configuration check",
+            return_url=settings.ALIPAY_RETURN_URL,
+            notify_url=settings.ALIPAY_NOTIFY_URL,
+        )
+    except Exception as exc:
+        raise PaymentConfigurationError("支付宝 RSA2 签名初始化失败") from exc
+    if "sign=" not in order_string:
+        raise PaymentConfigurationError("支付宝 RSA2 签名生成失败")
+
+    return {
+        "provider": "alipay",
+        "mode": "sandbox" if settings.ALIPAY_SANDBOX else "production",
+        "rsa_bits": private_key.size_in_bits(),
+        "notify_https": True,
+        "return_https": True,
+    }
+
+
 def _load_secret(value: str) -> str:
     """加载密钥/证书，自动处理多种格式。
 

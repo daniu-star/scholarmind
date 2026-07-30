@@ -128,6 +128,16 @@ async def startup(app: FastAPI) -> None:
         # 生产环境落入下方 validate_production() 抛 RuntimeError
     # P0 修复：生产环境安全校验移至 startup 事件（避免模块导入时副作用）
     settings.validate_production()
+    if settings.PAYMENT_ENABLED and settings.ALIPAY_APP_ID:
+        from ..services.payment_gateway import validate_alipay_configuration
+
+        payment_status = validate_alipay_configuration()
+        logger.info(
+            "payment_configuration_valid "
+            f"provider={payment_status['provider']} "
+            f"mode={payment_status['mode']} "
+            f"rsa_bits={payment_status['rsa_bits']}"
+        )
     logger.info(f"ScholarMind API starting up version={settings.VERSION} environment={settings.ENVIRONMENT}")
 
     # 确保目录存在

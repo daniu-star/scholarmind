@@ -17,8 +17,10 @@ from ..db.session import (
 )
 from ..services.payment_gateway import (
     AlipayGateway,
+    PaymentConfigurationError,
     PaymentProviderError,
     WeChatGateway,
+    validate_alipay_configuration,
 )
 from ..config import settings
 
@@ -219,6 +221,46 @@ def test_real_alipay_rsa2_signature_verification(monkeypatch):
     assert AlipayGateway().verify_notification(signed) is True
     signed["total_amount"] = "0.01"
     assert AlipayGateway().verify_notification(signed) is False
+
+
+def test_alipay_production_configuration_is_validated_before_startup(monkeypatch):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_pem = private_key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    ).decode()
+    public_pem = private_key.public_key().public_bytes(
+        serialization.Encoding.PEM,
+        serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode()
+    monkeypatch.setattr(settings, "ALIPAY_APP_ID", "app-rsa")
+    monkeypatch.setattr(settings, "ALIPAY_SELLER_ID", "seller-rsa")
+    monkeypatch.setattr(settings, "ALIPAY_PRIVATE_KEY", private_pem)
+    monkeypatch.setattr(settings, "ALIPAY_PUBLIC_KEY", public_pem)
+    monkeypatch.setattr(
+        settings,
+        "ALIPAY_NOTIFY_URL",
+        "https://example.com/api/v1/payment/alipay/notify",
+    )
+    monkeypatch.setattr(settings, "ALIPAY_RETURN_URL", "https://example.com/#payment")
+    monkeypatch.setattr(settings, "ALIPAY_SANDBOX", False)
+
+    status = validate_alipay_configuration()
+    assert status == {
+        "provider": "alipay",
+        "mode": "production",
+        "rsa_bits": 2048,
+        "notify_https": True,
+        "return_https": True,
+    }
+
+    monkeypatch.setattr(settings, "ALIPAY_PRIVATE_KEY", "invalid-key")
+    with pytest.raises(PaymentConfigurationError, match="RSA2"):
+        validate_alipay_configuration()
 
 
 def test_real_wechat_api_v3_signature_and_aesgcm_decryption(monkeypatch):
