@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
+import ipaddress
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -287,8 +288,31 @@ async def _revoke_failed_code(db, target: str, code: str) -> None:
     await db.commit()
 
 
+def _is_local_development_request(request: Request) -> bool:
+    """Allow a code to be shown only to a loopback client in development."""
+    if settings.ENVIRONMENT != "development" or not request.client:
+        return False
+    try:
+        return ipaddress.ip_address(request.client.host).is_loopback
+    except ValueError:
+        return request.client.host.lower() == "localhost"
+
+
+def _local_verification_response(code: str) -> dict:
+    return {
+        "success": True,
+        "message": "本地开发模式：验证码已直接显示",
+        "expires_in_seconds": settings.VERIFICATION_CODE_EXPIRE_MINUTES * 60,
+        "email_sent": False,
+        "delivery_mode": "local",
+        "code": code,
+    }
+
+
 @router.post("/send-code")
-async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
+async def send_verification_code(
+    req: SendCodeRequest, request: Request, db=Depends(get_db)
+):
     """发送验证码到指定手机号或邮箱。
 
     - 若 target 包含 @ → 视作邮箱，直接发送邮件验证码
@@ -302,6 +326,8 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
         except ValueError as e:
             raise HTTPException(status_code=429, detail=str(e))
         await db.commit()
+        if _is_local_development_request(request):
+            return _local_verification_response(code)
         # 同步发送邮件，捕获错误并返回给用户
         try:
             await send_code_background(code, target)
@@ -333,6 +359,8 @@ async def send_verification_code(req: SendCodeRequest, db=Depends(get_db)):
         except ValueError as e:
             raise HTTPException(status_code=429, detail=str(e))
         await db.commit()
+        if _is_local_development_request(request):
+            return _local_verification_response(code)
         try:
             await send_code_background(code, user.email)
         except Exception:

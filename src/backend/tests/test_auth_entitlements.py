@@ -180,6 +180,8 @@ async def test_payment_catalog_has_the_four_required_prices(account_client):
 
 @pytest.mark.asyncio
 async def test_email_delivery_failure_never_leaks_a_login_code(account_client, monkeypatch):
+    monkeypatch.setattr("src.backend.routers.auth.settings.ENVIRONMENT", "production")
+
     async def fail_delivery(code: str, target: str) -> None:
         raise RuntimeError(f"smtp-secret-error code={code} target={target}")
 
@@ -203,3 +205,34 @@ async def test_email_delivery_failure_never_leaks_a_login_code(account_client, m
             select(func.count(VerificationCode.id)).where(VerificationCode.target == "security-test@example.com")
         )
     assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_loopback_development_code_login_is_immediate(account_client, monkeypatch):
+    monkeypatch.setattr("src.backend.routers.auth.settings.ENVIRONMENT", "development")
+
+    async def should_not_call_external_email(code: str, target: str) -> None:
+        raise AssertionError("loopback development must not wait for external email")
+
+    monkeypatch.setattr(
+        "src.backend.routers.auth.send_code_background",
+        should_not_call_external_email,
+    )
+    target = "local-login-check@example.invalid"
+    response = await account_client.post(
+        "/api/v1/auth/send-code",
+        json={"target": target, "purpose": "login"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["email_sent"] is False
+    assert payload["delivery_mode"] == "local"
+    assert re.fullmatch(r"\d{6}", payload["code"])
+
+    login = await account_client.post(
+        "/api/v1/auth/login",
+        json={"email": target, "code": payload["code"]},
+    )
+    assert login.status_code == 200, login.text
+    assert login.json()["access_token"]

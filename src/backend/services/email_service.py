@@ -29,6 +29,9 @@ _smtp_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="smtp-")
 # 失败通道不写入缓存；配置变更需重启服务清空缓存。
 _channel_health: dict[str, tuple[float, float]] = {}
 _HEALTH_TTL = 300.0  # 5 分钟
+_channel_backoff_until: dict[str, float] = {}
+_CHANNEL_FAILURE_BACKOFF_SECONDS = 300.0
+_EMAIL_CHANNEL_TIMEOUT_SECONDS = 7.0
 
 
 def _is_channel_healthy(name: str) -> bool:
@@ -44,6 +47,22 @@ def _mark_channel_healthy(name: str) -> None:
 
 def _clear_channel_health(name: str) -> None:
     _channel_health.pop(name, None)
+
+
+def _is_channel_backed_off(name: str) -> bool:
+    return _channel_backoff_until.get(name, 0.0) > time.monotonic()
+
+
+def _mark_channel_failed(name: str) -> None:
+    _clear_channel_health(name)
+    _channel_backoff_until[name] = (
+        time.monotonic() + _CHANNEL_FAILURE_BACKOFF_SECONDS
+    )
+
+
+def _mark_channel_available(name: str) -> None:
+    _channel_backoff_until.pop(name, None)
+    _mark_channel_healthy(name)
 
 
 def _mask_email(email: str) -> str:
@@ -353,6 +372,26 @@ async def _dispatch_channel(name: str, target_email: str, code: str) -> None:
             raise EmailSendError(f"Resend failed: {err}")
 
 
+async def _dispatch_channel_with_deadline(
+    name: str, target_email: str, code: str
+) -> None:
+    """Apply one deadline to the entire delivery channel operation.
+
+    ``smtplib`` applies its socket timeout to connect, TLS, login and send
+    separately. A five-second socket timeout can therefore block the API for
+    more than twenty seconds. This outer deadline keeps login responsive.
+    """
+    try:
+        await asyncio.wait_for(
+            _dispatch_channel(name, target_email, code),
+            timeout=_EMAIL_CHANNEL_TIMEOUT_SECONDS,
+        )
+    except TimeoutError as exc:
+        raise EmailSendError(
+            f"{name} delivery exceeded {_EMAIL_CHANNEL_TIMEOUT_SECONDS:g}s"
+        ) from exc
+
+
 async def send_verification_email(target_email: str, code: str) -> None:
     """发送验证码邮件 — 并发竞速 + 健康通道优先。
 
@@ -380,26 +419,40 @@ async def send_verification_email(target_email: str, code: str) -> None:
     for name in ("smtp", "vercel", "resend"):
         if _is_channel_healthy(name):
             try:
-                await _dispatch_channel(name, target_email, code)
-                _mark_channel_healthy(name)  # 刷新 TTL
+                await _dispatch_channel_with_deadline(name, target_email, code)
+                _mark_channel_available(name)  # 刷新 TTL
                 logger.info(f"email_sent_via_healthy_channel name={name} to={_mask_email(target_email)}")
                 return
             except Exception as e:
                 logger.warning(f"healthy_channel_failed name={name} error={e}")
-                _clear_channel_health(name)
+                _mark_channel_failed(name)
                 # 健康通道失败 → 走并发竞速
                 break
 
     # 2. 并发竞速 — 用 dict[task, name] 正确映射，避免索引错位
     task_to_name: dict[asyncio.Task, str] = {}
-    if settings.SMTP_USER and settings.SMTP_PASSWORD:
-        t = asyncio.create_task(_send_via_smtp_safe(target_email, code))
+    if (
+        settings.SMTP_USER
+        and settings.SMTP_PASSWORD
+        and not _is_channel_backed_off("smtp")
+    ):
+        t = asyncio.create_task(
+            _dispatch_channel_with_deadline("smtp", target_email, code)
+        )
         task_to_name[t] = "smtp"
-    if settings.VERCEL_EMAIL_PROXY_URL and settings.VERCEL_EMAIL_PROXY_KEY:
-        t = asyncio.create_task(_send_via_vercel_proxy(target_email, code))
+    if (
+        settings.VERCEL_EMAIL_PROXY_URL
+        and settings.VERCEL_EMAIL_PROXY_KEY
+        and not _is_channel_backed_off("vercel")
+    ):
+        t = asyncio.create_task(
+            _dispatch_channel_with_deadline("vercel", target_email, code)
+        )
         task_to_name[t] = "vercel"
-    if settings.RESEND_API_KEY:
-        t = asyncio.create_task(_send_via_resend(target_email, code))
+    if settings.RESEND_API_KEY and not _is_channel_backed_off("resend"):
+        t = asyncio.create_task(
+            _dispatch_channel_with_deadline("resend", target_email, code)
+        )
         task_to_name[t] = "resend"
 
     if not task_to_name:
@@ -417,27 +470,19 @@ async def send_verification_email(target_email: str, code: str) -> None:
         for t in done:
             name = task_to_name[t]  # 正确映射：从 dict 查询，不依赖迭代顺序
             try:
-                result = t.result()
-                if name == "smtp":
-                    # _send_via_smtp_safe 成功返回 None，失败已抛异常（被 except 捕获）
-                    first_success_name = name
-                    break
-                else:
-                    # Vercel/Resend 返回 (success, error) 元组
-                    success, err = result
-                    if success:
-                        first_success_name = name
-                        break
-                    errors.append(f"{name}: {err}")
+                t.result()
+                first_success_name = name
+                break
             except Exception as e:
                 errors.append(f"{name}: {e}")
+                _mark_channel_failed(name)
 
     # 取消所有尚未完成的任务（有成功通道时，其他通道无需继续）
     for t in pending:
         t.cancel()
 
     if first_success_name:
-        _mark_channel_healthy(first_success_name)
+        _mark_channel_available(first_success_name)
         logger.info(
             f"email_sent_winning_channel={first_success_name} to={_mask_email(target_email)}"
         )

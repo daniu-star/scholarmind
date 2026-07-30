@@ -8747,8 +8747,12 @@ async function _accountApi(path, options) {
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
+  var isLocalApi = API_BASE.indexOf('http://127.0.0.1:8000') === 0;
+  // Password verification can be intentionally expensive. Give login enough
+  // time while keeping other account calls bounded.
+  var requestTimeoutMs = path === '/api/v1/auth/login' ? 60000 : 30000;
   var controller = new AbortController();
-  var timeoutId = setTimeout(function(){ controller.abort(); }, 15000);
+  var timeoutId = setTimeout(function(){ controller.abort(); }, requestTimeoutMs);
   var response;
   try {
     response = await _nativeFetch(
@@ -8757,8 +8761,12 @@ async function _accountApi(path, options) {
     );
   } catch (err) {
     var message = err && err.name === 'AbortError'
-      ? '登录服务连接超时，请稍后重试'
-      : '登录服务暂时不可用（后端未连接），请稍后重试';
+      ? (isLocalApi
+          ? '本地服务未响应，请确认本地服务窗口仍在运行，然后刷新页面'
+          : '在线服务响应过慢，请稍后重试')
+      : (isLocalApi
+          ? '未能连接本地服务，请从 http://127.0.0.1:8000/ 重新打开产品'
+          : '在线登录服务暂时不可用，请稍后重试');
     var networkError = new Error(message);
     networkError.status = 503;
     networkError.code = 'BACKEND_UNREACHABLE';
@@ -8770,7 +8778,9 @@ async function _accountApi(path, options) {
   if (!response.ok) {
     var fallback = '请求失败（' + response.status + '）';
     if (response.status === 404 && path.indexOf('/api/v1/auth/') === 0) {
-      fallback = '登录服务暂时不可用（后端未连接），请稍后重试';
+      fallback = isLocalApi
+        ? '当前页面不是本地服务提供的最新版，请从 http://127.0.0.1:8000/ 重新打开'
+        : '在线登录服务暂时不可用，请稍后重试';
     } else if (response.status >= 500) {
       fallback = '服务暂时不可用，请稍后重试';
     }
@@ -8936,7 +8946,12 @@ function showAuthDialog(initialMode) {
       sendCodeBtn.classList.add('counting');
       errorEl.textContent = '';
       // 检查邮件是否真正发送成功
-      if (result && result.email_sent === false) {
+      if (result && result.delivery_mode === 'local' && result.code) {
+        codeInput.value = result.code;
+        emailHint.textContent = '本地验证码：' + result.code + '（仅在本机开发模式显示）';
+        emailHint.style.color = 'var(--accent-green)';
+        showToast('本地验证码已生成并自动填入', 'success');
+      } else if (result && result.email_sent === false) {
         // 邮件发送失败 — 显示明文验证码 + 警告
         if (result.code) {
           codeInput.value = result.code;
