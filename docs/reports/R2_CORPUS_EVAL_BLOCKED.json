@@ -1,0 +1,92 @@
+{
+  "generated_at": "2026-11-20T14:44:53+08:00",
+  "corpus": "C:\\Users\\13067\\Desktop\\全能研究Agent\\tmp\\r2-corpus",
+  "model": {
+    "name": "deepseek-v4-flash",
+    "stub": false
+  },
+  "samples": [
+    {
+      "sample_id": "p14-intelligent-communication",
+      "language": "zh",
+      "bytes": 50280,
+      "sha256_ok": true,
+      "document_id": "rdoc_6cf500db7ed5478e80edb66d110540a3",
+      "document_version_id": "rver_9ed4c50c61a74d5fbc242fed2d5b72a3",
+      "codepoints": 13301,
+      "blocks": 69,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_656c56188ee7434a8a4917e9185f1589",
+        "status": "recoverable",
+        "quality_verdict": null,
+        "error": {
+          "code": "MODEL_UNAVAILABLE",
+          "message": "模型调用失败：APIStatusError: Error code: 402 - {'error': {'message': 'Insufficient Balance (request_id: acf6ac10-4147-430e-ab75-a3bf890bcd65)', 'type': 'insufficient_balance_error', 'param': None, 'code': 'invalid_request_error'}}",
+          "retryable": true,
+          "details": {
+            "provider": "deepseek",
+            "model": "deepseek-v4-flash",
+            "exception": "APIStatusError"
+          }
+        },
+        "duration_seconds": null,
+        "wall_seconds": 7.6,
+        "model_calls": 0,
+        "tokens": 0,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 0,
+          "total_blocks": 69,
+          "ratio": 0.0,
+          "unassessed": []
+        },
+        "findings_total": 0,
+        "findings_model": 0,
+        "findings_structural": 0,
+        "severity": {},
+        "category": {},
+        "findings_with_locator_ratio": null,
+        "findings_with_evidence_ratio": null,
+        "findings_per_10k_codepoints": 0.0,
+        "artifacts": []
+      },
+      "elapsed_seconds": 7.72
+    }
+  ],
+  "aggregate": {
+    "samples": 1,
+    "succeeded": 0,
+    "failed": 1,
+    "succeeded_ratio": 0.0,
+    "verdicts": {
+      "null": 1
+    },
+    "mean_codepoints": 13301.0,
+    "mean_coverage_ratio": 0.0,
+    "findings_total": 0,
+    "findings_per_10k_mean": 0.0,
+    "severity_totals": {
+      "critical": 0,
+      "major": 0,
+      "minor": 0
+    },
+    "model_findings_ratio": 0.0,
+    "mean_model_calls": 0.0,
+    "mean_tokens": 0.0,
+    "mean_review_seconds": 7.6,
+    "revision": {
+      "papers": 0,
+      "proposals": 0,
+      "proposals_valid": 0,
+      "valid_ratio": null,
+      "papers_with_errors": 0
+    },
+    "human_labels": {
+      "available": false,
+      "defect_recall": null,
+      "false_positive_rate": null,
+      "note": "本批语料没有人工作为参照的缺陷标注与第二评审，按 PRD 规定不计算召回率/误报率。"
+    }
+  }
+}

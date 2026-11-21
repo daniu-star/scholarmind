@@ -1,0 +1,927 @@
+{
+  "generated_at": "2026-11-20T14:51:45+08:00",
+  "corpus": "C:\\Users\\13067\\Desktop\\全能研究Agent\\tmp\\r2-corpus",
+  "model": {
+    "name": "stub",
+    "stub": true,
+    "quality_evidence": false
+  },
+  "samples": [
+    {
+      "sample_id": "p01-xinjiang-platform",
+      "language": "zh",
+      "bytes": 1593962,
+      "sha256_ok": true,
+      "document_id": "rdoc_9a1227c2d2984b2bb1a1e11dcc97da44",
+      "document_version_id": "rver_5b29bb048665443e8de6fa3282f6b6ae",
+      "codepoints": 22365,
+      "blocks": 134,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_e03ffc2259824259b481896f830900dd",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 0.42,
+        "wall_seconds": 0.4,
+        "model_calls": 23,
+        "tokens": 19186,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 134,
+          "total_blocks": 134,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 4,
+        "findings_model": 0,
+        "findings_structural": 4,
+        "severity": {
+          "major": 4
+        },
+        "category": {
+          "evidence": 1,
+          "format": 3
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 1.79,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 2237,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_4e102a0d44c14da8a67a7d0167b18590",
+        "status": "failed",
+        "error": {
+          "code": "REVISION_NO_VALID_HUNKS",
+          "message": "未生成通过校验的修改补丁，不能交付修改建议",
+          "retryable": false,
+          "details": {
+            "proposal_id": "prop_f0e986da74cd4f4a847ce579f83ae541",
+            "issues": []
+          }
+        },
+        "duration_seconds": 0.07,
+        "model_calls": 0,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 0,
+        "proposals_with_hunks": 0,
+        "proposals_valid": 0,
+        "error_code": "REVISION_NO_VALID_HUNKS",
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 0.66
+    },
+    {
+      "sample_id": "p02-bot-parasitism",
+      "language": "zh",
+      "bytes": 564097,
+      "sha256_ok": true,
+      "document_id": "rdoc_6632598c42124a3d8053f0114f1c47af",
+      "document_version_id": "rver_e77aa282070b46528b0468da5b1a6439",
+      "codepoints": 27186,
+      "blocks": 154,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_d7383ddd477d464aa865145ae7baee2d",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 0.35,
+        "wall_seconds": 0.34,
+        "model_calls": 27,
+        "tokens": 21957,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 154,
+          "total_blocks": 154,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 4,
+        "findings_model": 0,
+        "findings_structural": 4,
+        "severity": {
+          "major": 4
+        },
+        "category": {
+          "format": 3,
+          "evidence": 1
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 1.47,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 2237,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_0a2bd8e88b1a472489e57af196a98ef3",
+        "status": "failed",
+        "error": {
+          "code": "REVISION_NO_VALID_HUNKS",
+          "message": "未生成通过校验的修改补丁，不能交付修改建议",
+          "retryable": false,
+          "details": {
+            "proposal_id": "prop_8fbd7c7a57044c9aa106fe2d88649e2f",
+            "issues": []
+          }
+        },
+        "duration_seconds": 0.07,
+        "model_calls": 0,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 0,
+        "proposals_with_hunks": 0,
+        "proposals_valid": 0,
+        "error_code": "REVISION_NO_VALID_HUNKS",
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 0.57
+    },
+    {
+      "sample_id": "p03-lianghui-media",
+      "language": "zh",
+      "bytes": 1075054,
+      "sha256_ok": true,
+      "document_id": "rdoc_864af792bf6d4f58a42894edfd807cb0",
+      "document_version_id": "rver_8ddf184493654e899ce6767f0372b509",
+      "codepoints": 17757,
+      "blocks": 124,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_aa5ec4e807ae47b3809b2ee9ab2eb2b2",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 0.27,
+        "wall_seconds": 0.25,
+        "model_calls": 18,
+        "tokens": 16237,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 124,
+          "total_blocks": 124,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 4,
+        "findings_model": 0,
+        "findings_structural": 4,
+        "severity": {
+          "major": 4
+        },
+        "category": {
+          "evidence": 1,
+          "format": 3
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 2.25,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 2237,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_a68f57e7891342a781695966d4f969bf",
+        "status": "failed",
+        "error": {
+          "code": "REVISION_NO_VALID_HUNKS",
+          "message": "未生成通过校验的修改补丁，不能交付修改建议",
+          "retryable": false,
+          "details": {
+            "proposal_id": "prop_ba991121a3174790948c0ff22dda6084",
+            "issues": []
+          }
+        },
+        "duration_seconds": 0.06,
+        "model_calls": 0,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 0,
+        "proposals_with_hunks": 0,
+        "proposals_valid": 0,
+        "error_code": "REVISION_NO_VALID_HUNKS",
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 0.46
+    },
+    {
+      "sample_id": "p04-emotional-structure",
+      "language": "zh",
+      "bytes": 994550,
+      "sha256_ok": true,
+      "document_id": "rdoc_d4466996badc46e5a4b0a82a39502dbe",
+      "document_version_id": "rver_2f0f84402ca94dbc8bbf0b85908d26d0",
+      "codepoints": 20017,
+      "blocks": 158,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_486a645063a74af291060a41e021c63d",
+        "status": "succeeded",
+        "quality_verdict": "no_major_issues_found",
+        "error": null,
+        "duration_seconds": 0.29,
+        "wall_seconds": 0.29,
+        "model_calls": 20,
+        "tokens": 17611,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 158,
+          "total_blocks": 158,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 0,
+        "findings_model": 0,
+        "findings_structural": 0,
+        "severity": {},
+        "category": {},
+        "findings_with_locator_ratio": null,
+        "findings_with_evidence_ratio": null,
+        "findings_per_10k_codepoints": 0.0,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 926,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "elapsed_seconds": 0.47
+    },
+    {
+      "sample_id": "p05-africa-media",
+      "language": "zh",
+      "bytes": 709090,
+      "sha256_ok": true,
+      "document_id": "rdoc_51b769f4a4fa42e38541461a0564f693",
+      "document_version_id": "rver_a97c77de9dfc4ba7abf56b6113cc98c6",
+      "codepoints": 18251,
+      "blocks": 139,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_d438507f051b4d569e79a47121f5e10d",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 0.33,
+        "wall_seconds": 0.32,
+        "model_calls": 19,
+        "tokens": 17299,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 139,
+          "total_blocks": 139,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 4,
+        "findings_model": 0,
+        "findings_structural": 4,
+        "severity": {
+          "major": 4
+        },
+        "category": {
+          "format": 3,
+          "evidence": 1
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 2.19,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 2237,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_d41a24331ff44f5c9766d302dbc9ccf2",
+        "status": "failed",
+        "error": {
+          "code": "REVISION_NO_VALID_HUNKS",
+          "message": "未生成通过校验的修改补丁，不能交付修改建议",
+          "retryable": false,
+          "details": {
+            "proposal_id": "prop_be873e62d0b24ee991d5021c6fd33d59",
+            "issues": []
+          }
+        },
+        "duration_seconds": 0.07,
+        "model_calls": 0,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 0,
+        "proposals_with_hunks": 0,
+        "proposals_valid": 0,
+        "error_code": "REVISION_NO_VALID_HUNKS",
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 0.61
+    },
+    {
+      "sample_id": "p06-border-algorithm",
+      "language": "zh",
+      "bytes": 956725,
+      "sha256_ok": true,
+      "document_id": "rdoc_02627da956f34ba8bf452df2bb5d11cc",
+      "document_version_id": "rver_51d86d5f679e427fb181a9a9575873fd",
+      "codepoints": 21936,
+      "blocks": 192,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_b9368744e46c4b808ce08a8b1ec31c09",
+        "status": "succeeded",
+        "quality_verdict": "no_major_issues_found",
+        "error": null,
+        "duration_seconds": 0.35,
+        "wall_seconds": 0.32,
+        "model_calls": 22,
+        "tokens": 21906,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 192,
+          "total_blocks": 192,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 0,
+        "findings_model": 0,
+        "findings_structural": 0,
+        "severity": {},
+        "category": {},
+        "findings_with_locator_ratio": null,
+        "findings_with_evidence_ratio": null,
+        "findings_per_10k_codepoints": 0.0,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 924,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "elapsed_seconds": 0.48
+    },
+    {
+      "sample_id": "p07-vanishing-elderly",
+      "language": "zh",
+      "bytes": 1654081,
+      "sha256_ok": true,
+      "document_id": "rdoc_2c1d58a49a01489c80cdb065117171cb",
+      "document_version_id": "rver_ab7c7ed2f82142c8ace09bde6f594e1a",
+      "codepoints": 21052,
+      "blocks": 158,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_914b4822560b4badb6c336a42c33424d",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 0.32,
+        "wall_seconds": 0.31,
+        "model_calls": 22,
+        "tokens": 19442,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 158,
+          "total_blocks": 158,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 4,
+        "findings_model": 0,
+        "findings_structural": 4,
+        "severity": {
+          "major": 4
+        },
+        "category": {
+          "format": 3,
+          "evidence": 1
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 1.9,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 2237,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_5a170019b6b641e3877b58dc23a3344a",
+        "status": "failed",
+        "error": {
+          "code": "REVISION_NO_VALID_HUNKS",
+          "message": "未生成通过校验的修改补丁，不能交付修改建议",
+          "retryable": false,
+          "details": {
+            "proposal_id": "prop_8b1261fe16d448c5ba4a653b2e0c8db5",
+            "issues": []
+          }
+        },
+        "duration_seconds": 0.07,
+        "model_calls": 0,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 0,
+        "proposals_with_hunks": 0,
+        "proposals_valid": 0,
+        "error_code": "REVISION_NO_VALID_HUNKS",
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 0.59
+    },
+    {
+      "sample_id": "p08-ai-imaginary-people",
+      "language": "zh",
+      "bytes": 1588608,
+      "sha256_ok": true,
+      "document_id": "rdoc_fa8a95cd80764e9c97764af03e00c24f",
+      "document_version_id": "rver_c061501887f0432abc87c6d29f1d4351",
+      "codepoints": 16390,
+      "blocks": 129,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_8f32f469b1a64cc2adb59a7534739064",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 0.26,
+        "wall_seconds": 0.25,
+        "model_calls": 18,
+        "tokens": 16076,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 129,
+          "total_blocks": 129,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 4,
+        "findings_model": 0,
+        "findings_structural": 4,
+        "severity": {
+          "major": 4
+        },
+        "category": {
+          "format": 3,
+          "evidence": 1
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 2.44,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 2237,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_f32febeff82049139911ff2a304f177b",
+        "status": "failed",
+        "error": {
+          "code": "REVISION_NO_VALID_HUNKS",
+          "message": "未生成通过校验的修改补丁，不能交付修改建议",
+          "retryable": false,
+          "details": {
+            "proposal_id": "prop_8b5e6378661341e1a9211a30493462ac",
+            "issues": []
+          }
+        },
+        "duration_seconds": 0.07,
+        "model_calls": 0,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 0,
+        "proposals_with_hunks": 0,
+        "proposals_valid": 0,
+        "error_code": "REVISION_NO_VALID_HUNKS",
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 0.49
+    },
+    {
+      "sample_id": "p09-farmers-retire",
+      "language": "en",
+      "bytes": 205328,
+      "sha256_ok": true,
+      "document_id": "rdoc_9d799b68222a41988d445a3d8d011c31",
+      "document_version_id": "rver_5a3f5d4b04684713ac08c3c0a0a0fddb",
+      "codepoints": 48132,
+      "blocks": 138,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_aeabafb9160a4b50ae0102f05dabaec6",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 0.57,
+        "wall_seconds": 0.56,
+        "model_calls": 51,
+        "tokens": 21787,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 138,
+          "total_blocks": 138,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 1,
+        "findings_model": 0,
+        "findings_structural": 1,
+        "severity": {
+          "major": 1
+        },
+        "category": {
+          "format": 1
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 0.21,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 1458,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 1,
+        "task_id": "task_ee13c0053ee346898bdcd286da75650f",
+        "status": "failed",
+        "error": {
+          "code": "REVISION_NO_VALID_HUNKS",
+          "message": "未生成通过校验的修改补丁，不能交付修改建议",
+          "retryable": false,
+          "details": {
+            "proposal_id": "prop_77d42abe35b640debed3223c50266ec5",
+            "issues": []
+          }
+        },
+        "duration_seconds": 0.07,
+        "model_calls": 0,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 0,
+        "proposals_with_hunks": 0,
+        "proposals_valid": 0,
+        "error_code": "REVISION_NO_VALID_HUNKS",
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 0.81
+    },
+    {
+      "sample_id": "p10-class-imagination",
+      "language": "zh",
+      "bytes": 6550901,
+      "sha256_ok": true,
+      "document_id": "rdoc_b321b4bdfdc14c4cb7f2da276f265f50",
+      "document_version_id": "rver_61d8fa224f0e4777904bbaa03400e70f",
+      "codepoints": 59582,
+      "blocks": 146,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_3abfe14d335643feb3d7a055920e7e3b",
+        "status": "succeeded",
+        "quality_verdict": "no_major_issues_found",
+        "error": null,
+        "duration_seconds": 0.94,
+        "wall_seconds": 0.9,
+        "model_calls": 73,
+        "tokens": 28323,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 146,
+          "total_blocks": 146,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 0,
+        "findings_model": 0,
+        "findings_structural": 0,
+        "severity": {},
+        "category": {},
+        "findings_with_locator_ratio": null,
+        "findings_with_evidence_ratio": null,
+        "findings_per_10k_codepoints": 0.0,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 924,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "elapsed_seconds": 1.1
+    },
+    {
+      "sample_id": "p11-ghosts-comments",
+      "language": "en",
+      "bytes": 5868082,
+      "sha256_ok": true,
+      "document_id": "rdoc_412a98fccf664a8bb84ab725455cf454",
+      "document_version_id": "rver_ca3bd7e53cf443dda65dafb950b22db0",
+      "codepoints": 38421,
+      "blocks": 109,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_140edcd3697b4bfbb8f7bd4623f7a6ba",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 0.57,
+        "wall_seconds": 0.57,
+        "model_calls": 46,
+        "tokens": 18411,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 109,
+          "total_blocks": 109,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 2,
+        "findings_model": 0,
+        "findings_structural": 2,
+        "severity": {
+          "major": 2
+        },
+        "category": {
+          "format": 2
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 0.52,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 1969,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_9956abf7d26d4ffc9c96619d8040990a",
+        "status": "failed",
+        "error": {
+          "code": "REVISION_NO_VALID_HUNKS",
+          "message": "未生成通过校验的修改补丁，不能交付修改建议",
+          "retryable": false,
+          "details": {
+            "proposal_id": "prop_f353c5e57b164338a7002548a51554f3",
+            "issues": []
+          }
+        },
+        "duration_seconds": 0.07,
+        "model_calls": 0,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 0,
+        "proposals_with_hunks": 0,
+        "proposals_valid": 0,
+        "error_code": "REVISION_NO_VALID_HUNKS",
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 0.8
+    },
+    {
+      "sample_id": "p12-journalism-education",
+      "language": "zh",
+      "bytes": 2279542,
+      "sha256_ok": true,
+      "document_id": "rdoc_00ddc3ddd8764d02bcaed23f3e2f8ede",
+      "document_version_id": "rver_424dcf99ca454b13a84463a30a459312",
+      "codepoints": 24970,
+      "blocks": 176,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_ab80a2ff21bd45efa35f7c8b57ac6a4d",
+        "status": "succeeded",
+        "quality_verdict": "no_major_issues_found",
+        "error": null,
+        "duration_seconds": 0.51,
+        "wall_seconds": 0.5,
+        "model_calls": 25,
+        "tokens": 26110,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 176,
+          "total_blocks": 176,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 0,
+        "findings_model": 0,
+        "findings_structural": 0,
+        "severity": {},
+        "category": {},
+        "findings_with_locator_ratio": null,
+        "findings_with_evidence_ratio": null,
+        "findings_per_10k_codepoints": 0.0,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 924,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "elapsed_seconds": 0.66
+    },
+    {
+      "sample_id": "p13-trust-source-context",
+      "language": "zh",
+      "bytes": 486801,
+      "sha256_ok": true,
+      "document_id": "rdoc_c8cbb697c85241b98e92e850bc7b2133",
+      "document_version_id": "rver_28ab265a4b744291abade77591f13f01",
+      "codepoints": 16512,
+      "blocks": 119,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_ba82793625d2414a845caddf253f9d35",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 0.4,
+        "wall_seconds": 0.42,
+        "model_calls": 18,
+        "tokens": 15795,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 119,
+          "total_blocks": 119,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 4,
+        "findings_model": 0,
+        "findings_structural": 4,
+        "severity": {
+          "major": 4
+        },
+        "category": {
+          "format": 3,
+          "evidence": 1
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 2.42,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 2237,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_5e36080594f047b187069717622141d4",
+        "status": "failed",
+        "error": {
+          "code": "REVISION_NO_VALID_HUNKS",
+          "message": "未生成通过校验的修改补丁，不能交付修改建议",
+          "retryable": false,
+          "details": {
+            "proposal_id": "prop_8ef29afe3eae44a58394c0c6ae660060",
+            "issues": []
+          }
+        },
+        "duration_seconds": 0.11,
+        "model_calls": 0,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 0,
+        "proposals_with_hunks": 0,
+        "proposals_valid": 0,
+        "error_code": "REVISION_NO_VALID_HUNKS",
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 0.75
+    },
+    {
+      "sample_id": "p14-intelligent-communication",
+      "language": "zh",
+      "bytes": 50280,
+      "sha256_ok": true,
+      "document_id": "rdoc_ec5e43c90e0e4e769b9422e9e4d0e7bb",
+      "document_version_id": "rver_f641a76f75df474885c65017fdae0d12",
+      "codepoints": 13301,
+      "blocks": 69,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_4975e1b61ecf411f8fe07fc857e1a2be",
+        "status": "succeeded",
+        "quality_verdict": "no_major_issues_found",
+        "error": null,
+        "duration_seconds": 0.29,
+        "wall_seconds": 0.28,
+        "model_calls": 14,
+        "tokens": 12171,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 69,
+          "total_blocks": 69,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 0,
+        "findings_model": 0,
+        "findings_structural": 0,
+        "severity": {},
+        "category": {},
+        "findings_with_locator_ratio": null,
+        "findings_with_evidence_ratio": null,
+        "findings_per_10k_codepoints": 0.0,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 922,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "elapsed_seconds": 0.38
+    }
+  ],
+  "aggregate": {
+    "samples": 14,
+    "succeeded": 14,
+    "failed": 0,
+    "succeeded_ratio": 1.0,
+    "verdicts": {
+      "issues_found": 9,
+      "no_major_issues_found": 5
+    },
+    "mean_codepoints": 26133.7,
+    "mean_coverage_ratio": 1.0,
+    "findings_total": 31,
+    "findings_per_10k_mean": 1.08,
+    "severity_totals": {
+      "critical": 0,
+      "major": 31,
+      "minor": 0
+    },
+    "model_findings_ratio": 0.0,
+    "mean_model_calls": 28.29,
+    "mean_tokens": 19450.8,
+    "mean_review_seconds": 0.41,
+    "revision": {
+      "papers": 9,
+      "proposals": 9,
+      "hunks": 0,
+      "proposals_with_hunks": 0,
+      "proposals_valid": 0,
+      "valid_ratio": 0.0,
+      "papers_with_errors": 9,
+      "error_codes": [
+        "REVISION_NO_VALID_HUNKS"
+      ]
+    },
+    "human_labels": {
+      "available": false,
+      "defect_recall": null,
+      "false_positive_rate": null,
+      "note": "本批语料没有人工作为参照的缺陷标注与第二评审，按 PRD 规定不计算召回率/误报率。"
+    }
+  }
+}

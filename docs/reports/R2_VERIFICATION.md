@@ -1,0 +1,201 @@
+# R2 验证报告（T21–T23 / AT-044—AT-056）
+
+- 阶段：R2 质量验证版
+- 编制：2026-11-20，**Lead 主编**（合并 Lead 复核与本轮独立 verifier 报告）
+- 独立报告原文：`docs/reports/R2_VERIFICATION_VERIFIER.md`（未改动，作为本报告附录 A）
+- 依据：`docs/prd/ScholarMind_Optimization_PRD_v1.0.md`、`ScholarMind_Coding_Agent_Playbook_v1.0.md`（T21–T23）、`ScholarMind_Acceptance_Matrix_v1.0.md`（AT-044—AT-056，矩阵第 86–100 行）
+- 配套：`docs/reports/R2_DELIVERY.md`、`R2_EVAL_STATUS.md`、`R2_BUDGET_PROTOCOL.md`、`R2_E2E.md`
+
+## 0. 结论
+
+**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 58 passed、ruff 全绿、三套回归 507 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过、AT-056 的 20000 字真实对照未做**，因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
+
+### 0.1 放行条件
+
+1. **AT-050**：语料与真实模型评估已完成（14 篇、13 succeeded / 1 partial、覆盖率 97.00%、引文保真 95.44%）；**仍缺两位真人独立盲评** → 召回/误报/人工时间无数字（盲评工具 `tools/research_quality_eval.py` 已就绪）。
+2. **AT-056**：同一 20000 字论文、真实模型，跑短流程 vs 多角色流程，记录覆盖率、P95、调用与 token。
+3. ~~**D1**：产品书面确认"图表数据仅支持文档正文中的 Markdown 管道表 / CSV 代码块"，或补 XLSX/JSON 表格导入入口。~~ **已闭环（2026-11-20）**：已支持 CSV/XLSX（`document_parser` 新增 `_parse_csv`/`_parse_xlsx`，多 sheet 按 `table_index` 选表），新增 `test_chart_data_files.py`（7 条）；JSON 仍不支持，见 §8。
+4. ~~**浏览器项**：装 Playwright 后 `npm run test:research:e2e` 默认模式必须 exit 0（当前 exit 3，不伪装）。~~ **已闭环（2026-11-20）**：`playwright@1.65.1` 已入 devDependencies，默认模式实测 exit 0（详见 §8）。
+5. **部署项**：生产环境演练 PG/Redis/Celery 恢复语义；`ENABLE_VERIFIED_CHARTS` 保持默认关闭。
+6. 发布说明必须写明：仅 12 种图表类型、仅全数值表、预算费用显示"未知"、图表能力默认关闭。
+
+### 0.2 两份报告的关系（如实说明）
+
+本轮有两个执行体：Lead 与独立 R2 verifier 子代理。verifier 在 12:12 报告"独占目录被并行写入"后继续新增测试（未覆盖他人文件，只加新文件），共新增 5 文件 22 条用例，并产出独立报告。本文件为**合并权威版**：
+
+- 数字、AT 判定、缺陷编号（D1–D6）以 verifier 的实测为准，Lead 版早期结论（AT-048 pass、AT-052/054 pass 等）已按矩阵语义改判；
+- 独立性限制：D2/D3/D5 由 Lead 修复、Lead 复跑验证，因此这三项不具备"复核者独立"性质；
+- 若需正式签核，第三方按 §1 命令重跑即可。
+
+## 1. 命令与真实结果
+
+| # | 命令 | 结果 |
+| --- | --- | --- |
+| 1 | `pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` | **495 passed**（R2=45、R1=160、R0=290） |
+| 2 | `pytest src/backend/tests/test_research_r2 -q` | **45 passed**（9 文件） |
+| 3 | `ruff check src/backend/research src/backend/routers/research.py src/backend/tests/test_research{,_r1,_r2} src/backend/middleware tools/research_quality_eval.py tools/research_budget_report.py scripts/research_migration_check.py` | All checks passed |
+| 4 | `python scripts/research_migration_check.py` | 离线 SQL 建 15 张研究表 + 4 个唯一约束；upgrade→downgrade→upgrade 可重复，`users` 保留 |
+| 5 | `npm run build:frontend` | exit 0，`dist/index.html` 引用 `/assets/index-*.js` 模块入口，无原型标记 |
+| 6 | `node scripts/research_e2e.mjs --api-only` | exit 0（review `succeeded`、findings 0、导出 1101 B） |
+| 7 | `node scripts/research_e2e.mjs --serve-only --duration=10` | exit 0（首页入口、health 200、无 token 401、带 token 18 项能力） |
+| 8 | `node scripts/research_e2e.mjs` | **exit 3**（缺 Playwright，打印安装命令） |
+| 9 | `python tools/research_quality_eval.py …` | 10 样本 exit 0；<10 样本/模型评审 id/缺列 exit 2；缺一条评分 exit 3 |
+| 10 | `python tools/research_budget_report.py --db …` | 越界 `exceeded[tokens]`、覆盖率 8/10、费用"未知"、缺失显示 `-` |
+
+真实浏览器验收（Chrome DevTools MCP，Chrome 157，桌面 1440px）：注册 → 建项目 → 上传 585 码点文档 → review 任务 `succeeded`（12/12 块、覆盖率 100%、`no_major_issues_found`、findings=0）→ 导出 201（正文含诊断摘要）→ 数值表文档 gradient_area/ribbon/violin 各 201 且 `value_ranges` 与表数据一致、PNG 签名校验通过。步骤与截图证据见 `R2_DELIVERY.md` §4。
+
+## 2. AT 逐条判定（矩阵语义为准）
+
+| AT | 判定 | 依据与缺口 |
+| --- | --- | --- |
+| AT-044 迁移/归属 | partial | 迁移可重入与回退已验证；多 owner 共用 session、旧会话缓存未复现 |
+| AT-045 V2 导出/DOCX | partial | 绑已存版本、DOCX 重开段落数校验、未知样式 422、导出幂等均有测试；"浏览器另有未保存 V3"组合未测 |
+| AT-046 冷启动/日志目录 | not_covered | 无远端 CI 冷启动记录；路径与日志目录未专项演练 |
+| AT-047 浏览器 1440/390、键盘 | partial | 1440px 全链路已用真实 Playwright 跑通（含真实 UI 注册/登出/登录、图表前端面板）；390px 窄屏与键盘可达性仍未验证 |
+| AT-048 构建产物/唯一模块化 | partial | `dist` 模块入口存在且构建断言通过；但后端 `GET /` 仍 307 到原型页（D6），"root 只交付模块化产物"无法从应用入口自证 |
+| AT-049 安全/日志负例 | partial | 代码执行默认关闭、来源 URL 阻断 file/私网/回环有测试；日志泄露面未专项扫描 |
+| AT-050 ≥10 授权论文 + 2 位真人 | **partial** | 14 篇真实论文 + 真实模型全跑通（13 succeeded / 1 partial、覆盖率 97.00%、1,974 条诊断、引文保真 95.44%、纯编造 0.00%）；**缺两位真人盲评** → 召回/误报/时间无数字；工具硬约束（<10→exit 2、model 评审→exit 2、缺评分→exit 3）已被测试锁定 |
+| AT-051 retry/预算不清零 | partial | 受理预算落库、retry 不膨胀、越界降级已测；并发重试/预留释放未测。D2 曾使生产路径 export 得 160 调用，已修 |
+| AT-052 隔离/指标聚合 | not_covered | 矩阵语义为"切换项目/用户、检索降级、指标聚合、埋点去重"；R2 只回归未新增证据 |
+| AT-053 同浏览器双账号 | not_covered | 未做 A 退出/B 登录与 refresh≠access 用例 |
+| AT-054 删除撤权/迟到 worker | not_covered | 未测删除后索引清理、迟到 worker 与事件重放泄露 |
+| AT-055 R2 图表数据一致性 | partial | 摘要可独立复算、值域与表数据一致、PNG sha256/宽高互证、同输入字节一致、越权 404、失败不落 Artifact；缺口：输入格式收窄（D1）、单位校验未显式（D5 已补策略字段） |
+| AT-056 R2 预算/20000 字对照 | partial | 越界→`partial`+`BUDGET_EXCEEDED` 且成果保留、未知费用 `None`/报表"未知"、事件按 sequence 去重；缺口：真实 20000 字对照未跑 |
+
+## 3. 关键证据
+
+### 3.1 图表数值保真（AT-055，`test_charts_api.py` + `test_charts_edges.py`）
+
+- 成功路径独立复算：用 `load_table`+`select_columns` 重算 `data_digest` 与 `value_ranges`，与 API 返回一致；下载 PNG 的 sha256/IHDR 宽高与 validation 互证；同输入两次渲染字节级一致。
+- 失败语义：503（开关关闭）/422（无表、未知列、非数值含 `hint`、空数据、不支持类型）/413（超行数）/404（跨用户与项目版本不匹配）/500（渲染异常，`retryable=true`）——**每种失败都不落 Artifact**，不使用 `generate_chart` 的"图表生成失败"占位图。
+- `validation` 新增 `cleaning{steps[],missing_value_policy:"reject",filtered_rows:0,note}`（D5），使"非数值即拒绝、不清洗不插值"成为可审计记录。
+
+### 3.2 预算（AT-051/AT-056，`test_budget_contract.py` / `test_budget_runner.py` / `test_budget_report_tool.py`）
+
+- 默认预算：review 160 调用/100000 tokens/1200s、revision 128、export 0/0、chart 0/0（**枚举入口与字符串入口一致**，D2 回归锁）。
+- 超限：`state=exceeded`、`overruns=["model_calls","tokens"]`、`cost_known=false`、`cost_usd is None`；任务终态 `BUDGET_EXCEEDED`、不 `succeeded`、成果保留。
+- 报表：未知费用"未知"、缺失 `-`、重复 sequence 去重、空库不造表。
+
+### 3.3 结构性检查出口（`test_findings_mapping.py`）
+
+库内 `structural` 保留（导出文案用），API 出口映射为契约四值之一（`tool`）；`GET /tasks/{id}/findings` 200 返回 `{"items":[...]}`，不再 500。
+
+### 3.4 人工评估工具诚实性（AT-052 工具侧，`test_eval_cli.py` + `test_eval_cli_edges.py`）
+
+报告 `source=human_raters`；拒绝 `model/ai/self/gpt/…` 评审 id；同 id 不能冒充双评审；样本不足/缺列 exit 2；缺一条评分 exit 3 且不补 0；`time_minutes` 不算一致性（`agreement=None`）。
+
+## 4. 发现的问题与处置
+
+| 编号 | 级别 | 问题 | 处置 |
+| --- | --- | --- | --- |
+| D1 | 重要 | FR-13 输入格式收窄为"文档正文里的 Markdown/CSV 表"，无 XLSX/JSON 导入入口 | **已修（2026-11-20）**：新增 CSV/XLSX 解析与多表 `table_index`，7 条用例；JSON 仍不支持 |
+| D2 | 重要 | `budget.py` 用 `str(kind)`，生产路径传 `TaskKind` 枚举 → export/chart 得 160 调用、100000 tokens | **已修**：新增 `_normalize_kind`（取 `.value` 再剥前缀）；`TaskKind.EXPORT/CHART` 现为 0/0；xfail 改为回归锁，枚举与字符串双入口断言 |
+| D3 | 次要 | 报表工具只重配 stdout，stderr 走 cp936 → 诊断信息乱码 | **已修**：stdout/stderr 同时 `reconfigure(encoding="utf-8")`；新增严格 UTF-8 解码回归用例 |
+| D4 | 次要（测试卫生） | `test_charts_api.py` 同步用例带 asyncio 标记产生告警 | **已修**：删文件级 `pytestmark`，逐 async 用例加标记，套件零 warning |
+| D5 | 次要 | FR-13 清洗步骤/缺失值规则未落库 | **已补**：`validation.cleaning` 显式记录策略，成功路径断言 |
+| D6 | 信息级 | `GET /` 仍 307 到 `prototypes/interactive-prototype.html`，`dist/` 未挂到 FastAPI | **刻意保留**（旧链接兼容），登记为 AT-048 缺口说明 |
+
+## 5. 未覆盖与风险
+
+| 项 | 原因 | 影响 |
+| --- | --- | --- |
+| AT-050 真人盲评 | 真实模型评估已完成；**无真人评审**（用户指示越过） | 无召回率/误报率/人工时间真实数字（覆盖率/引文保真/重复率已有） |
+| AT-056 20000 字对照 | 禁网、禁真实模型 | 无覆盖率/P95/真实消耗 |
+| AT-047/048/053 浏览器与 a11y | Playwright 已装并跑通桌面 1440px；窄屏/键盘/双账号仍未验 | 移动端与 a11y 不能宣称通过 |
+| AT-052/054 | 属 R1 范围，R2 未新增 | 依赖 R1 证据，本次仅回归未破坏 |
+| 图表 12 种渲染器 | 只抽测 gradient_area 全链路 + 纯函数覆盖类型表 | 其余 11 种未逐一冒烟 |
+| 图表单位校验 | 实现无显式单位字段 | AT-055"单位"项未验证 |
+| SQLite≠PG/Redis/Celery | 本机环境不具备 | 生产恢复语义未验证 |
+
+## 6. 放行结论
+
+- **研究域自动化验收**：通过——R2 58 passed、R0 290 passed、R1 160 passed（合计 508，实跑 507 passed + 1 skipped）、ruff 全绿、迁移可重入、构建唯一模块化入口、真实 Playwright 浏览器全链路 exit 0（含图表前端面板）、14 篇真实论文语料链路可复跑。
+- **T21**：**机器可验证部分完成**（14 篇真实论文真实模型全跑通，13 succeeded / 1 partial、覆盖率 97.00%、引文保真 95.44%、纯编造 0.00%、locator 0 错位；`R2_CORPUS_EVAL.md`/`R2_EVAL_STATUS.md`），**人工盲评按用户指示越过 → 质量召回/误报仍属未测量**；**T22**：通过（含 D1/D5 偏差）；**T23**：有条件通过（协议与降级证据齐备，真实对照未跑）。
+- **对外表述基线**："研究域自动化验收通过、图表数值可核验、预算与评估工具诚实可用"；禁止："质量已验证""诊断准确率达标""桌面与移动端全适配"。
+- **2026-11-20 复核更新**：XLSX/CSV 已可直接出图（D1 闭环），但仅支持"全数值表"，分类轴仍 422 `CHART_NON_NUMERIC`。
+
+## 7. 附录：真实语料补充（2026-11-20）
+
+- 用户提供论文目录并指示跳过人工盲评（m02717）；14 篇 docx 暂存 `tmp/r2-corpus`（manifest 不含正文）。
+- 新增 `tools/research_corpus_stage.py`（只读暂存）与 `tools/research_corpus_eval.py`（建项目→上传→review→revision→采集）；真实模型 `deepseek-v4-flash` 返回 402 `Insufficient Balance`，任务进 `recoverable` + `MODEL_UNAVAILABLE`（0 调用、0 tokens、覆盖率 0），证据 `docs/reports/R2_CORPUS_EVAL_BLOCKED.json`。
+- 替身演练：14/14 `succeeded`、覆盖率 100%、31 条 structural findings、平均 28.29 次调用 / 19,450.8 tokens；9 篇有诊断项的 revision 全部 `REVISION_NO_VALID_HUNKS`（结构性 finding 无补丁区间，属诚实拒绝）。
+- 演练同时暴露并修复 **D7 跨任务采纳缺陷**：revision 任务引用 review finding 时 422 `FINDING_NOT_FOUND`；已改 `revision_service._load_findings` 与 `task_service._require_owned_inputs`，新增 `test_revision_cross_task.py`（2 条）。
+- 计数更新：R2 47、合计 497（此为语料补充时点；D1 与图表 UI 用例加入后见 §8）。AT-050 判定不变（仍需真实质量对照）。
+
+## 8. 附录：D1 闭环、真实 Playwright E2E 与提交时序缺陷（2026-11-20 16:5x）
+
+### 8.1 D1（FR-13 输入格式收窄）已闭环
+
+- `src/backend/research/document_parser.py` 新增 CSV（`text/csv`、`	`/`;`/`,` 分隔探测、utf-8-sig）与 XLSX
+  （openpyxl 只读、≤5 sheet、每 sheet 输出 `## Sheet: <name>` + Markdown 管道表、`|`/`\` 转义、超码点记
+  `xlsx_truncated`）解析；`document_service` 的 415 文案同步列出 CSV/XLSX；
+  `chart_data_source._split_pipe_row` 支持转义竖线。
+- 新增 `src/backend/tests/test_research_r2/test_chart_data_files.py`（7 条：xlsx/csv 201、非数值 422 hint、
+  坏 xlsx 422、多 sheet `table_index`、行数上限 413 等）。
+- 仍不支持：JSON 表格、XLSX 合并单元格展开、日期列（按 ISO 字符串处理）。属可接受偏差，已写入交付文档。
+
+### 8.2 真实 Playwright 浏览器 E2E：exit 0
+
+- 依赖：`playwright@1.65.1`（根 devDependencies）+ `npx playwright install chromium`；脚本保留
+  `E2E_CHROMIUM_EXECUTABLE` 与 `%LOCALAPPDATA%\ms-playwright` 兜底。
+- 结果：`node scripts/research_e2e.mjs` **exit 0**（脚本内 34.7–40 s），页面控制台错误 0；覆盖真实 UI 注册 →
+  刷新登录态 → 登出 → 登录、`#research` 能力/项目/上传、review 任务 SSE 5 条事件、诊断 0 findings 空态、
+  导出 201 并真实下载 md 1315 B、图表 API 201 PNG、**图表前端面板**（识别 2 张表 → 选全数值表 → 生成 →
+  1351×963 图片 → 校验信息含「重开校验通过 / PNG 摘要 / 值域」）。
+- 证据：`docs/reports/R2_E2E_BROWSER.md`（含 4 次失败迭代与未覆盖项）、`tmp/e2e-evidence/` 截图。
+- 未覆盖（不得宣称通过）：390px 窄屏、键盘可达性、同浏览器双账号、有 findings 的卡片渲染。
+
+### 8.3 新缺陷 R2-A8（提交时序，已修）
+
+- 现象：`POST /research/exports` 201 后紧接 `GET /artifacts/{id}/download` 偶发 404；上传成功后紧接建
+  review 任务偶发 `NOT_FOUND: 文档版本不存在`。
+- 根因：`src/backend/db/session.py` 的 `get_db` 在响应发出后才 `commit`，客户端立即读取刚创建的资源会撞提交竞态。
+- 修复：`src/backend/routers/research.py` 增加 `_commit(db)`，在 12 个写端点返回前显式提交（项目建/改、
+  上传/删除、来源、任务建/续跑/取消/重试、图表、采纳、导出）。修复后连跑 3 次 E2E，无 404。
+
+### 8.4 计数与门禁（2026-11-20 终态）
+
+- `pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q`
+  → **503 passed, 1 skipped in 475.90s**（收集 504：R2 54、R1 160、R0 290；1 skip 为既有条件跳过）。
+- `ruff check`（研究域 + 三个测试目录 + tools + 迁移脚本）→ All checks passed。
+- `npm run build:frontend` → 唯一模块化入口 `/assets/index-*.js`；`node scripts/research_e2e.mjs` → exit 0。
+
+## 9. 附录：真实模型评估完成与两处真实缺陷（2026-11-21）
+
+### 9.1 真实模型评估结果（`deepseek-v4-flash`，stub=false）
+
+| 指标 | 结果 |
+| --- | --- |
+| 论文 | 14 篇（12 中 + 2 英，13k–60k 码点） |
+| 状态 | 13 succeeded / 1 partial |
+| 平均覆盖率 | **97.00%** |
+| 诊断项 | 1,974 条（每万码点 56.57） |
+| 严重度 | critical 262 / major 765 / minor 673 |
+| 引文保真 | **95.44%** 逐字可核对；纯编造 **0.00%**；重复 **0.00%** |
+| 引用偏移 | locator 与引文不一致 **0 条**（修复后 14 篇全部重跑） |
+| 修改提案 | 14 份 / 28 个补丁，`validate_hunks` 全部通过 |
+| 平均调用/tokens/耗时 | 24.85 次 / 53,714 / 173.75 s |
+
+数据：`R2_CORPUS_EVAL.md`、`R2_CORPUS_EVAL_RESULTS.json`。**无真人标注 → 召回率/误报率/节省时间仍为"未测量"，不补 0。**
+
+### 9.2 partial 的唯一原因：PRD 预算边界
+
+p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%），按最小交付契约诚实返回
+`partial` + `INCOMPLETE_DELIVERABLE`（`全文诊断覆盖不足: 88/146`），报告与诊断项仍交付。
+约需 1.6 倍预算才能全覆盖 → 属 PRD §9 边界，改进方向（放大窗口/精简提示词/长文单独提预算）留待产品决策。
+
+### 9.3 本次真实运行暴露并修复的两处缺陷
+
+1. **输出截断**：`finish_reason=length` 时内容为空或被截断（推理模型吃光预算 / 4096 上限不足）。
+   修复：默认 `RESEARCH_DISABLE_MODEL_THINKING=true`、`RESEARCH_MODEL_MAX_OUTPUT_TOKENS` 8192，
+   并对 length 结果做「关闭思维链 + 上限翻倍（8192→16384）」最多两次重试，日志 `research.model_output_length_retry`。
+2. **引用偏移**：重叠分块被重复拼进窗口正文，`块起点 + 块内下标` 换算全文偏移错位（真实语料 12 条）。
+   修复：`review_workflow._chunk_text_for_block` 改为区间**并集去重**并从 `block.text` 切片；新增 `test_review_locator.py`（4 条）。
+
+两处修复后 14 篇全部重跑，得到 §9.1 的结果；修复前的 partial/错位记录保留在 `tmp/r2-corpus-eval-v3.json` 与历史审计 JSON。
+
+### 10.3 真实浏览器 E2E 最终状态（2026-11-21 02:2x）
+
+- `node scripts/research_e2e.mjs --keep` → **exit 0（PASS）**，139.3 s，控制台错误 0；含图表前端面板（识别 2 张表 → 生成 1351×963 → 校验信息）。
+- 期间修掉两个环境级缺陷：`DISABLE_VECTOR_PREWARM`（预热线程饿死事件循环 → health 长时间不可达）与 `E2E_HEALTH_TIMEOUT_MS`（健康检查超时改为可配置，默认 180 s）。
+- 因此 §2 中 AT-047 的"真实 Playwright 桌面已跑通"进一步固定为：**整脚本 exit 0、含图表前端**；窄屏/键盘/双账号仍未覆盖。

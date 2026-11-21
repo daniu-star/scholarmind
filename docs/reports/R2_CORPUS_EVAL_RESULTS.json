@@ -1,0 +1,1116 @@
+{
+  "generated_at": "2026-11-20T17:32:02.389331Z",
+  "model": {
+    "name": "deepseek-v4-flash",
+    "stub": false,
+    "quality_evidence": true
+  },
+  "sources": {
+    "eval": [
+      "tmp/r2-corpus-eval-v5.json",
+      "tmp/r2-corpus-eval-v6.json",
+      "tmp/r2-corpus-eval-v7.json",
+      "tmp/r2-corpus-eval-v8.json",
+      "tmp/r2-corpus-eval-v9.json"
+    ],
+    "audit": [
+      "tmp/r2-corpus-v5-audit.json",
+      "tmp/r2-corpus-v6-audit.json",
+      "tmp/r2-corpus-v7-audit.json",
+      "tmp/r2-corpus-v8-audit.json",
+      "tmp/r2-corpus-v9-audit.json"
+    ]
+  },
+  "aggregate": {
+    "papers": 14,
+    "succeeded": 13,
+    "partial": 1,
+    "other_status": {},
+    "mean_codepoints": 26133.71,
+    "mean_coverage_ratio": 0.97,
+    "mean_findings_per_10k": 56.57,
+    "findings_total": 1974,
+    "severity_totals": {
+      "critical": 262,
+      "major": 765,
+      "minor": 673
+    },
+    "category_totals": {
+      "evidence": 376,
+      "expression": 270,
+      "argument": 401,
+      "method": 221,
+      "format": 432
+    },
+    "mean_model_calls": 24.85,
+    "mean_tokens": 53714.31,
+    "mean_seconds": 173.75,
+    "revision": {
+      "papers_with_proposals": 14,
+      "proposals": 14,
+      "proposals_valid": 14,
+      "valid_ratio": 1.0,
+      "hunks": 28
+    },
+    "audit": {
+      "papers": 14,
+      "findings_total": 1974,
+      "quote_coverage_ratio": 0.9544,
+      "pure_hallucination_ratio": 0.0,
+      "duplicate_ratio": 0.0,
+      "locator_bad": 0
+    },
+    "budget_boundary": [
+      {
+        "sample_id": "p10-class-imagination",
+        "codepoints": 59582,
+        "blocks": 146,
+        "tokens": 98824,
+        "coverage": 0.6027
+      }
+    ]
+  },
+  "samples": [
+    {
+      "sample_id": "p01-xinjiang-platform",
+      "language": "zh",
+      "bytes": 1593962,
+      "sha256_ok": true,
+      "document_id": "rdoc_f7cf07967c204d62a6502e4fe6d9abcf",
+      "document_version_id": "rver_d551e6d88c28491eb87ba8e59031ad24",
+      "codepoints": 22365,
+      "blocks": 134,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_e2ff4f027030495a85cbd58adec4c577",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 172.31,
+        "wall_seconds": 172.29,
+        "model_calls": 23,
+        "tokens": 50306,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 134,
+          "total_blocks": 134,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 119,
+        "findings_model": 115,
+        "findings_structural": 4,
+        "severity": {
+          "critical": 30,
+          "minor": 45,
+          "major": 44
+        },
+        "category": {
+          "evidence": 34,
+          "expression": 13,
+          "argument": 21,
+          "method": 16,
+          "format": 35
+        },
+        "findings_with_locator_ratio": 0.9916,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 53.21,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 116538,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_0381dad8cac14fd7beeb56fd67ddccd4",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 4.56,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 177.04
+    },
+    {
+      "sample_id": "p02-bot-parasitism",
+      "language": "zh",
+      "bytes": 564097,
+      "sha256_ok": true,
+      "document_id": "rdoc_bef490be2e1046aca783b6a0d78fef0f",
+      "document_version_id": "rver_3a31df0c5e2d4c2299c9577493a570cc",
+      "codepoints": 27186,
+      "blocks": 154,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_7a53ec819f004423a90e5955b670aca0",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 230.82,
+        "wall_seconds": 230.83,
+        "model_calls": 27,
+        "tokens": 59148,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 154,
+          "total_blocks": 154,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 137,
+        "findings_model": 133,
+        "findings_structural": 4,
+        "severity": {
+          "minor": 52,
+          "major": 61,
+          "critical": 24
+        },
+        "category": {
+          "format": 39,
+          "argument": 30,
+          "expression": 18,
+          "evidence": 32,
+          "method": 18
+        },
+        "findings_with_locator_ratio": 0.9343,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 50.39,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 137488,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_46e74b7a541e49b7a09c1bfb6e614eab",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 5.44,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 236.42
+    },
+    {
+      "sample_id": "p03-lianghui-media",
+      "language": "zh",
+      "bytes": 1075054,
+      "sha256_ok": true,
+      "document_id": "rdoc_4e2be9ddb65b4689b40657bdf637e237",
+      "document_version_id": "rver_91ce5bef2f354418a3a82c1498dfad96",
+      "codepoints": 17757,
+      "blocks": 124,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_0c6b187e97d84620a4e892429f0c45ca",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 130.28,
+        "wall_seconds": 130.27,
+        "model_calls": 18,
+        "tokens": 42266,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 124,
+          "total_blocks": 124,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 107,
+        "findings_model": 103,
+        "findings_structural": 4,
+        "severity": {
+          "critical": 21,
+          "major": 48,
+          "minor": 38
+        },
+        "category": {
+          "method": 17,
+          "evidence": 22,
+          "format": 35,
+          "argument": 21,
+          "expression": 12
+        },
+        "findings_with_locator_ratio": 0.9907,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 60.26,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 99026,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_05f09301b8614a2b90c22fc1316285b9",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 3.27,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 133.67
+    },
+    {
+      "sample_id": "p04-emotional-structure",
+      "language": "zh",
+      "bytes": 994550,
+      "sha256_ok": true,
+      "document_id": "rdoc_513bb61ee23343248dd7cb138e4e536b",
+      "document_version_id": "rver_41b34cbd33f14aa5a38f433b747bf3ef",
+      "codepoints": 20017,
+      "blocks": 158,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_1b22ce1794b6487faa5ddac5d16e78f4",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 143.04,
+        "wall_seconds": 143.04,
+        "model_calls": 20,
+        "tokens": 48499,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 158,
+          "total_blocks": 158,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 109,
+        "findings_model": 109,
+        "findings_structural": 0,
+        "severity": {
+          "minor": 44,
+          "major": 42,
+          "critical": 23
+        },
+        "category": {
+          "expression": 12,
+          "argument": 20,
+          "method": 20,
+          "format": 39,
+          "evidence": 18
+        },
+        "findings_with_locator_ratio": 0.9817,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 54.45,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 119657,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_7228e3006cbb4e8bb3c56138fabc19a8",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 3.01,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 146.19
+    },
+    {
+      "sample_id": "p05-africa-media",
+      "language": "zh",
+      "bytes": 709090,
+      "sha256_ok": true,
+      "document_id": "rdoc_58f9269c09794f238929a04f8828eb16",
+      "document_version_id": "rver_f368956710bb4b2e9edc7728e31f981d",
+      "codepoints": 18251,
+      "blocks": 139,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_e8e62369a1b6401fb83ef8d368d541c5",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 143.43,
+        "wall_seconds": 143.45,
+        "model_calls": 19,
+        "tokens": 44484,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 139,
+          "total_blocks": 139,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 112,
+        "findings_model": 108,
+        "findings_structural": 4,
+        "severity": {
+          "minor": 46,
+          "major": 41,
+          "critical": 25
+        },
+        "category": {
+          "expression": 17,
+          "argument": 25,
+          "format": 37,
+          "method": 17,
+          "evidence": 16
+        },
+        "findings_with_locator_ratio": 0.9286,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 61.37,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 103040,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_c892577bcee34db4a7388b4b2f4f9b14",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 2.79,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 146.37
+    },
+    {
+      "sample_id": "p06-border-algorithm",
+      "language": "zh",
+      "bytes": 956725,
+      "sha256_ok": true,
+      "document_id": "rdoc_ce29808d9a544404bdebe7bbfd872a93",
+      "document_version_id": "rver_e7176f66ac8940cd89f5edca59870f14",
+      "codepoints": 21936,
+      "blocks": 192,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_de8c8b59fe604985a6f237e1baa45931",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 153.11,
+        "wall_seconds": 153.11,
+        "model_calls": 22,
+        "tokens": 54365,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 192,
+          "total_blocks": 192,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 117,
+        "findings_model": 117,
+        "findings_structural": 0,
+        "severity": {
+          "major": 59,
+          "minor": 35,
+          "critical": 23
+        },
+        "category": {
+          "evidence": 27,
+          "format": 17,
+          "argument": 37,
+          "expression": 23,
+          "method": 13
+        },
+        "findings_with_locator_ratio": 0.9487,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 53.34,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 118885,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_318586b4ef0144e4b939fdc090e2f01c",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 2.39,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 155.62
+    },
+    {
+      "sample_id": "p07-vanishing-elderly",
+      "language": "zh",
+      "bytes": 1654081,
+      "sha256_ok": true,
+      "document_id": "rdoc_3b93286527fc4b3ab4151d7262c46132",
+      "document_version_id": "rver_d5cb363e1188469b829d247772398bdf",
+      "codepoints": 21052,
+      "blocks": 158,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_e518f27a2c11453cb162daac236f976a",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 174.89,
+        "wall_seconds": 174.89,
+        "model_calls": 22,
+        "tokens": 53175,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 158,
+          "total_blocks": 158,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 128,
+        "findings_model": 124,
+        "findings_structural": 4,
+        "severity": {
+          "major": 60,
+          "critical": 31,
+          "minor": 37
+        },
+        "category": {
+          "evidence": 29,
+          "argument": 32,
+          "expression": 18,
+          "method": 18,
+          "format": 31
+        },
+        "findings_with_locator_ratio": 0.9844,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 60.8,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 126714,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_0b18c88d230b44c5bfed3015a848e492",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 2.26,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 177.29
+    },
+    {
+      "sample_id": "p08-ai-imaginary-people",
+      "language": "zh",
+      "bytes": 1588608,
+      "sha256_ok": true,
+      "document_id": "rdoc_1456159a93be4ec19a574f14dceae54e",
+      "document_version_id": "rver_ec9379d7d5b24332bae7a063892c710b",
+      "codepoints": 16390,
+      "blocks": 129,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_8a6bc86722ff4982a7a0a3a7cc5a0278",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 123.73,
+        "wall_seconds": 123.73,
+        "model_calls": 18,
+        "tokens": 43219,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 129,
+          "total_blocks": 129,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 104,
+        "findings_model": 100,
+        "findings_structural": 4,
+        "severity": {
+          "critical": 18,
+          "minor": 37,
+          "major": 49
+        },
+        "category": {
+          "method": 15,
+          "format": 26,
+          "argument": 21,
+          "evidence": 25,
+          "expression": 17
+        },
+        "findings_with_locator_ratio": 0.9519,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 63.45,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 102182,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_377c0993980b4169ac38e091a5cad298",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 3.99,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 127.87
+    },
+    {
+      "sample_id": "p09-farmers-retire",
+      "language": "en",
+      "bytes": 205328,
+      "sha256_ok": true,
+      "document_id": "rdoc_ab756e56381f41ffbdd3ae56c190a2c3",
+      "document_version_id": "rver_cc550ef3aa0b49fa8bd934ed724ea8ad",
+      "codepoints": 48132,
+      "blocks": 138,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_e1309fe6a833421c858994751f271758",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 296.65,
+        "wall_seconds": 296.68,
+        "model_calls": 51,
+        "tokens": 83638,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 138,
+          "total_blocks": 138,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 233,
+        "findings_model": 232,
+        "findings_structural": 1,
+        "severity": {
+          "major": 100,
+          "minor": 127,
+          "critical": 6
+        },
+        "category": {
+          "evidence": 55,
+          "format": 64,
+          "expression": 45,
+          "argument": 50,
+          "method": 19
+        },
+        "findings_with_locator_ratio": 0.9614,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 48.41,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 243748,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_3c2ff9da0aa447ce96e7340d4ef5358e",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 2.85,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 299.7
+    },
+    {
+      "sample_id": "p10-class-imagination",
+      "language": "zh",
+      "bytes": 6550901,
+      "sha256_ok": true,
+      "document_id": "rdoc_fd8a6f23ff4d42e384ea95fd7e4e4a13",
+      "document_version_id": "rver_f5f2d775c8af4a8f87469ed5cd013aa4",
+      "codepoints": 59582,
+      "blocks": 146,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_10840c35e1f241e5b1cfc5928430cf54",
+        "status": "partial",
+        "quality_verdict": null,
+        "error": {
+          "code": "INCOMPLETE_DELIVERABLE",
+          "message": "成果未通过最小交付校验",
+          "errors": [
+            "全文诊断覆盖不足: 88/146"
+          ],
+          "budget_evaluation": {
+            "schema_version": "budget-1.0",
+            "state": "within",
+            "overruns": [],
+            "cost_known": false,
+            "budget": {
+              "max_model_calls": 160,
+              "max_tokens": 100000,
+              "max_duration_seconds": 1200.0,
+              "max_cost_usd": null
+            },
+            "usage": {
+              "model_calls": 59,
+              "tokens": 98824,
+              "duration_seconds": 367.414,
+              "cost_usd": null
+            },
+            "checks": {
+              "model_calls": {
+                "limit": 160,
+                "used": 59,
+                "over": false,
+                "ratio": 0.3688
+              },
+              "tokens": {
+                "limit": 100000,
+                "used": 98824,
+                "over": false,
+                "ratio": 0.9882
+              },
+              "duration_seconds": {
+                "limit": 1200.0,
+                "used": 367.414,
+                "over": false,
+                "ratio": 0.3062
+              },
+              "cost_usd": {
+                "limit": null,
+                "used": null,
+                "over": false,
+                "ratio": null
+              }
+            }
+          }
+        },
+        "duration_seconds": 367.85,
+        "wall_seconds": 367.9,
+        "model_calls": 59,
+        "tokens": 98824,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 88,
+          "total_blocks": 146,
+          "ratio": 0.6027,
+          "unassessed": [
+            "block:88（预算不足，未能分析）",
+            "block:89（预算不足，未能分析）",
+            "block:90（预算不足，未能分析）",
+            "block:91（预算不足，未能分析）",
+            "block:92（预算不足，未能分析）",
+            "block:93（预算不足，未能分析）",
+            "block:94（预算不足，未能分析）",
+            "block:95（预算不足，未能分析）",
+            "block:96（预算不足，未能分析）",
+            "block:97（预算不足，未能分析）"
+          ]
+        },
+        "findings_total": 274,
+        "findings_model": 274,
+        "findings_structural": 0,
+        "severity": {
+          "minor": 124,
+          "major": 141,
+          "critical": 9
+        },
+        "category": {
+          "expression": 73,
+          "argument": 73,
+          "format": 28,
+          "method": 37,
+          "evidence": 63
+        },
+        "findings_with_locator_ratio": 0.9964,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 45.99,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 297571,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_9b8ec52e51b04b15ba0370bb3be58d49",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 2.73,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 370.87
+    },
+    {
+      "sample_id": "p11-ghosts-comments",
+      "language": "en",
+      "bytes": 5868082,
+      "sha256_ok": true,
+      "document_id": "rdoc_695a47e18c9e47abb1871dc2eb4d50d0",
+      "document_version_id": "rver_f90e1689d2d244009be9fea6df81a1c1",
+      "codepoints": 38421,
+      "blocks": 109,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_5661cd31dc2e4d51b40261b9848e0f72",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 291.73,
+        "wall_seconds": 291.74,
+        "model_calls": 46,
+        "tokens": 79181,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 109,
+          "total_blocks": 109,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 221,
+        "findings_model": 219,
+        "findings_structural": 2,
+        "severity": {
+          "minor": 98,
+          "major": 116,
+          "critical": 7
+        },
+        "category": {
+          "format": 37,
+          "argument": 52,
+          "evidence": 58,
+          "method": 31,
+          "expression": 43
+        },
+        "findings_with_locator_ratio": 0.9774,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 57.52,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 242495,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_1a9667c371e344d797eebf2ff44d0d45",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 2.94,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 294.8
+    },
+    {
+      "sample_id": "p12-journalism-education",
+      "language": "zh",
+      "bytes": 2279542,
+      "sha256_ok": true,
+      "document_id": "rdoc_abd6e0b5ee3f4733809b0c713a8f8d4e",
+      "document_version_id": "rver_b5e2bcecc25542ef9d0d168b77bac271",
+      "codepoints": 24970,
+      "blocks": 176,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_4a556c9144f348b8abd8ef29f551c308",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 177.5,
+        "wall_seconds": 177.53,
+        "model_calls": 25,
+        "tokens": 63833,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 176,
+          "total_blocks": 176,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 135,
+        "findings_model": 135,
+        "findings_structural": 0,
+        "severity": {
+          "major": 62,
+          "critical": 22,
+          "minor": 51
+        },
+        "category": {
+          "argument": 32,
+          "evidence": 28,
+          "method": 22,
+          "expression": 21,
+          "format": 32
+        },
+        "findings_with_locator_ratio": 0.9481,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 54.06,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 138360,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_bf82e1f2801a4e39b75bd73e2f118292",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 2.89,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 180.58
+    },
+    {
+      "sample_id": "p13-trust-source-context",
+      "language": "zh",
+      "bytes": 486801,
+      "sha256_ok": true,
+      "document_id": "rdoc_4866a5a20a69463fb0624d4ddf2eb777",
+      "document_version_id": "rver_46a37bc700644f12af6890716faf6eb7",
+      "codepoints": 16512,
+      "blocks": 119,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_b9737342fdcf406bb923dc6bf5cf55e8",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 126.59,
+        "wall_seconds": 126.7,
+        "model_calls": 18,
+        "tokens": 43681,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 119,
+          "total_blocks": 119,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 107,
+        "findings_model": 103,
+        "findings_structural": 4,
+        "severity": {
+          "major": 54,
+          "minor": 35,
+          "critical": 18
+        },
+        "category": {
+          "evidence": 23,
+          "expression": 17,
+          "format": 25,
+          "method": 13,
+          "argument": 29
+        },
+        "findings_with_locator_ratio": 1.0,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 64.8,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 104992,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_ca0f1d744cdb46d5b9e2d62295df17d9",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 2.75,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 129.71
+    },
+    {
+      "sample_id": "p14-intelligent-communication",
+      "language": "zh",
+      "bytes": 50280,
+      "sha256_ok": true,
+      "document_id": "rdoc_759b5b3e60db4236af5752a69f511461",
+      "document_version_id": "rver_f4aba6529a6c46339358570490f9b0fb",
+      "codepoints": 13301,
+      "blocks": 69,
+      "parse_status": "complete",
+      "review": {
+        "task_id": "task_7bd4e29d23ec42f6ae494ec69aa89c97",
+        "status": "succeeded",
+        "quality_verdict": "issues_found",
+        "error": null,
+        "duration_seconds": 94.72,
+        "wall_seconds": 94.72,
+        "model_calls": 14,
+        "tokens": 32491,
+        "cost_usd": null,
+        "coverage": {
+          "analyzed_blocks": 69,
+          "total_blocks": 69,
+          "ratio": 1.0,
+          "unassessed": []
+        },
+        "findings_total": 71,
+        "findings_model": 71,
+        "findings_structural": 0,
+        "severity": {
+          "major": 29,
+          "minor": 28,
+          "critical": 14
+        },
+        "category": {
+          "argument": 31,
+          "format": 15,
+          "expression": 14,
+          "evidence": 9,
+          "method": 2
+        },
+        "findings_with_locator_ratio": 0.9577,
+        "findings_with_evidence_ratio": 0.0,
+        "findings_per_10k_codepoints": 53.38,
+        "artifacts": [
+          {
+            "kind": "review_report",
+            "bytes": 75086,
+            "mime": "text/markdown"
+          }
+        ]
+      },
+      "revision": {
+        "selected": 2,
+        "task_id": "task_bbd576a61a2e4047a61d51792c43571a",
+        "status": "succeeded",
+        "error": null,
+        "duration_seconds": 3.22,
+        "model_calls": 2,
+        "tokens": 0,
+        "proposals": 1,
+        "hunks": 2,
+        "proposals_with_hunks": 1,
+        "proposals_valid": 1,
+        "error_code": null,
+        "hunk_issues": [],
+        "protected_violations": []
+      },
+      "elapsed_seconds": 98.14
+    }
+  ]
+}
