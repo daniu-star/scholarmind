@@ -39,6 +39,7 @@ const pageLoaders = {
   'writing':        () => import('../pages/WritingWorkspace.js').then(m => m.WritingWorkspace),
   'computational':  () => import('../pages/ComputationalPage.js').then(m => m.ComputationalPage),
   'about':          () => import('../pages/AboutPage.js').then(m => m.AboutPage),
+  'research':       () => import('../pages/ResearchWorkspace.js').then(m => m.ResearchWorkspace),
 };
 
 const routes = {
@@ -62,6 +63,7 @@ const routes = {
   'writing':        { title: '写作工作台', props: {} },
   'computational':  { title: '计算社会科学', props: {} },
   'about':          { title: '关于 ScholarMind', props: {} },
+  'research':       { title: '研究工作区', props: {} },
 };
 
 // Track navigation direction for transitions
