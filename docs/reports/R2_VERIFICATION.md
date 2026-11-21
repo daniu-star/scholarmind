@@ -60,7 +60,7 @@
 | AT-053 同浏览器双账号 | **partial** | 已做双账号隔离：新注册账号 B 在 UI 中看不到账号 A 的项目，B 直连 A 的项目 ID 得统一 404（`NOT_FOUND`），见 §11.3；refresh≠access 的 token 混用仍由 R1 用例覆盖、未在浏览器里做 |
 | AT-054 删除撤权/迟到 worker | **partial** | 新增 `test_research_r2/test_deletion_revocation.py` 5 条：删除后读路径全 404 且不泄露文件名、已删版本建任务 404、版本与分块级联清理、非 owner 删除前后均 404、租约 `LEASE_HELD`、终态任务 `TASK_NOT_CLAIMABLE` 且迟到执行器不写事件；未覆盖事件重放泄露（需 Redis 生产环境） |
 | AT-055 R2 图表数据一致性 | partial | 摘要可独立复算、值域与表数据一致、PNG sha256/宽高互证、同输入字节一致、越权 404、失败不落 Artifact；缺口：输入格式收窄（D1）、单位校验未显式（D5 已补策略字段） |
-| AT-056 R2 预算/20000 字对照 | partial | 越界→`partial`+`BUDGET_EXCEEDED` 且成果保留、未知费用 `None`/报表"未知"、事件按 sequence 去重；**已补真实 A/B**：同一篇真实论文只改预算三臂，默认 69/69 succeeded、tokens 收紧到 12,000 → 18/69 partial、调用收紧到 8 → 31/69 partial（`R2_BUDGET_AB.md`）；缺口：多角色 vs 短流程的流程增益对照未跑 |
+| AT-056 R2 预算/20000 字对照 | partial | 越界→`partial`+`BUDGET_EXCEEDED` 且成果保留、未知费用 `None`/报表"未知"、事件按 sequence 去重；**已补真实 A/B**：同一篇真实论文只改预算三臂，默认 69/69 succeeded、tokens 收紧到 12,000 → 18/69 partial、调用收紧到 8 → 31/69 partial（`R2_BUDGET_AB.md`）；**流程增益对照已跑**（同一篇 20,017 码点论文：single 20 调用/47,943 tokens/109 条 → multi_role 40 调用/95,840 tokens/203 条，覆盖均 100%，见 `R2_FLOW_AB.md`）；缺口：单篇单次、P95 未统计、无真人标注 |
 
 ## 3. 关键证据
 
@@ -259,3 +259,13 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 - 结果（`docs/reports/R2_BUDGET_AB.md`）：默认预算 160 calls / 100,000 tokens → **succeeded**，14 次调用 / 32,125 tokens，覆盖 69/69；tokens 收紧到 12,000 → **partial**，5 次调用 / 11,460 tokens，覆盖 18/69；调用收紧到 8 → **partial**，8 次调用 / 20,548 tokens，覆盖 31/69。
 - 语义说明：闸门在「将要越界」前停止继续调用，因此三臂的 `budget_evaluation.state` 都是 `within`；越界的可见后果是覆盖不足并终态降为 `partial`，**没有任何一臂 succeeded**，符合 FR-15。
 - 边界：单篇、单次测量，不是统计基准；`cost_usd` 仍为 `null`（未接供应商计费）。
+
+## 15. 附录：T23 流程增益 A/B（single vs multi_role，2026-11-21）
+
+- 新增流程：`constraints.review_mode`（`single` | `multi_role`，默认 `single`）。`multi_role` = 通用审稿一遍 + 「方法/证据核查员」再读一遍全文，两遍诊断项按（引文，问题）去重合并，覆盖取并集；两轮平分预算。
+- 命令：`python tools/research_budget_ab.py --corpus tmp/r2-corpus --only p04-emotional-structure --modes single,multi_role --db tmp/flow-ab-20k.db --out tmp/flow-ab-20k.json --md docs/reports/R2_FLOW_AB.md`
+- 20,017 码点样本：single succeeded（20 调用 / 47,943 tokens / 155.22 s / 109 条）；multi_role succeeded（40 调用 / 95,840 tokens / 314.88 s / 203 条）；两者覆盖均 158/158。
+- 13,301 码点样本：single 14 调用 / 32,817 tokens / 70 条；multi_role 28 调用 / 64,853 tokens / 131 条；覆盖均 69/69。
+- 维度变化：p14 的 `method` 从 0 条变成 13 条；p04 的 `method` 16→53、`evidence` 23→42。属可复现的行为差异，不等于质量提升（无真人标注）。
+- 预算边界：p04 的 multi_role 用掉默认预算 95.8%；更长文档（p10 单遍已 98,824 tokens）两遍必然转 `partial`。因此默认 `single`，`multi_role` 仅作显式可选项。
+- 测量中发现并修复：第二轮预算上限误用「份额」而非「已用+份额」，导致第二遍只跑 2 次调用却报 succeeded；修复后 40 调用 / 95,840 tokens / 覆盖 100%。回归用例 `src/backend/tests/test_research_r1/test_review_roles.py`（2 条）。

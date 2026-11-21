@@ -295,6 +295,17 @@ class TaskConstraints(BaseModel):
     target_word_count: Optional[int] = Field(default=None, ge=1, le=1_000_000)
     journal_style: str = Field(default="generic", max_length=64)
     no_new_empirical_claims: bool = True
+    # 诊断流程：single=单遍通用审稿；multi_role=通用审稿 + 方法/证据核查员两遍全文，
+    # 结果按（引文，问题）去重合并。默认 single，保持既有行为不变。
+    review_mode: str = Field(default="single", max_length=32)
+
+    @field_validator("review_mode")
+    @classmethod
+    def _validate_review_mode(cls, value: str) -> str:
+        normalized = str(value or "single").strip().lower()
+        if normalized not in {"single", "multi_role"}:
+            raise ValueError(f"未知诊断流程: {value!r}（只支持 single / multi_role）")
+        return normalized
 
     @field_validator("preserve")
     @classmethod

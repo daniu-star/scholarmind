@@ -205,3 +205,13 @@ def evaluate_budget(budget, usage) -> dict         # {"state":"within|exceeded",
 评估工具拒绝 <10 样本 / <2 真人 / model 评审人；预算 `cost_usd=None` 不为 0、超预算不得 succeeded、
 事件去重；E2E 脚本静态契约（用 dist、不连生产、缺 Playwright 退出 3）；以及"不得出现真实论文
 正文/伪造评分"的检查。报告逐条映射 AT-055/AT-056/AT-050，并写明未覆盖项。
+
+### §2.7 诊断流程选择（T23）
+
+`ResearchTaskInput.constraints.review_mode`：`single`（默认）| `multi_role`。
+
+- `single`：一遍全文诊断（既有行为，不接受未知值）。
+- `multi_role`：第一遍通用审稿 + 第二遍「方法/证据核查员」角色审稿，两遍各自遍历全文；诊断项按（引文，问题）去重合并，覆盖取并集；两轮平分剩余预算。
+- 成本语义：调用/tokens 约 2×；`multi_role` 在 20,000 字量级即消耗默认预算约 96%，更长文档会因预算不足转 `partial`。
+- 报告与 `snapshot_summary` 需带流程标记（warning「诊断流程=multi_role：已执行 2 轮」）。
+

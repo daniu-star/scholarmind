@@ -112,6 +112,7 @@ async def _run_arm(db, actor, sample: Dict[str, Any], corpus: Path, arm: Dict[st
     )
 
     slug = f"{sample['sample_id']}-{arm['arm']}"
+    review_mode = arm.get("review_mode")
     data = (corpus / sample["staged_file"]).read_bytes()
     assert hashlib.sha256(data).hexdigest() == sample["sha256"], f"{slug}: sha256 不一致"
 
@@ -144,16 +145,19 @@ async def _run_arm(db, actor, sample: Dict[str, Any], corpus: Path, arm: Dict[st
         or 0
     )
 
+    task_input: Dict[str, Any] = {
+        "schema_version": "1.0",
+        "project_id": project["id"],
+        "kind": "review",
+        "objective": "对全文做投稿前诊断：论证、方法、证据、结构与表达",
+        "input": {"document_version_id": version_id},
+    }
+    if review_mode:
+        task_input["constraints"] = {"review_mode": review_mode}
     accepted = await task_service.create_task(
         db,
         actor,
-        {
-            "schema_version": "1.0",
-            "project_id": project["id"],
-            "kind": "review",
-            "objective": "对全文做投稿前诊断：论证、方法、证据、结构与表达",
-            "input": {"document_version_id": version_id},
-        },
+        task_input,
         idempotency_key=f"budget-ab-{slug}-review",
     )
     await db.commit()
@@ -203,6 +207,7 @@ async def _run_arm(db, actor, sample: Dict[str, Any], corpus: Path, arm: Dict[st
     return {
         "arm": arm["arm"],
         "note": arm["note"],
+        "review_mode": review_mode or "single",
         "accepted_budget": accepted_budget,
         "status": str(task.status),
         "quality_verdict": (task.result_json or {}).get("quality_verdict")
@@ -259,9 +264,22 @@ async def _run(args: argparse.Namespace) -> int:
 
     from src.backend.utils.circuit_breaker import deepseek_circuit_breaker
 
+    arms = list(ARMS)
+    if args.modes:
+        modes = [item.strip() for item in args.modes.split(",") if item.strip()]
+        arms = [
+            {
+                "arm": mode,
+                "note": f"诊断流程={mode}（平台默认预算）",
+                "max_calls": 160,
+                "max_tokens": 100_000,
+                "review_mode": mode,
+            }
+            for mode in modes
+        ]
     rows: List[Dict[str, Any]] = []
     async with factory() as db:
-        for arm in ARMS:
+        for arm in arms:
             print(f"[arm] {arm['arm']} …", flush=True)
             deepseek_circuit_breaker.reset()
             actor = await _ensure_user(db, f"{sample['sample_id']}-{arm['arm']}")
@@ -372,6 +390,11 @@ def main() -> int:
     parser.add_argument("--db", default="tmp/budget-ab.db")
     parser.add_argument("--out", default="tmp/budget-ab.json")
     parser.add_argument("--md", default="docs/reports/R2_BUDGET_AB.md")
+    parser.add_argument(
+        "--modes",
+        default="",
+        help="按诊断流程对比（如 single,multi_role），每个流程一个臂，预算取平台默认",
+    )
     args = parser.parse_args()
     if not os.getenv("DEEPSEEK_API_KEY"):
         print("缺少 DEEPSEEK_API_KEY，无法做真实模型测量", file=sys.stderr)

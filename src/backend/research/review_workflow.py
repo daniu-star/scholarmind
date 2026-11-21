@@ -16,6 +16,7 @@
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from sqlalchemy import select
@@ -42,6 +43,8 @@ from .pipelines.base import (
     DEFAULT_MAX_CALLS,
     DEFAULT_MAX_TOKENS,
     DEFAULT_WINDOW_CODEPOINTS,
+    PIPELINE_VERSION,
+    REVIEW_PROMPT_VERSION,
     FindingDraft,
     ReviewBlock,
     ReviewOutcome,
@@ -94,6 +97,30 @@ def _accepted_budget(task: ResearchTask) -> Tuple[int, int]:
         resolved.max_tokens if resolved.max_tokens is not None else DEFAULT_MAX_TOKENS
     )
     return max(1, int(max_calls)), max(1, int(max_tokens))
+
+
+# 多角色诊断：pass 名称 → 追加给 objective 的审查焦点。
+# 目的不是堆模型调用，而是让第二遍带着明确的角色约束复核方法与证据，
+# 与第一遍的结果按（引文，问题）去重合并；两遍各自覆盖全文。
+_REVIEW_PASSES: Dict[str, Tuple[Tuple[str, str], ...]] = {
+    "single": (("general", ""),),
+    "multi_role": (
+        ("general", ""),
+        (
+            "method_evidence",
+            "｜本轮只从「研究方法与证据」角度审阅：抽样与样本量、变量测量与操作化、"
+            "效度与信度、因果推断与统计报告完整性、结论与证据的匹配度。"
+            "其它维度的问题可以不报，但不得为了凑数捏造问题。",
+        ),
+    ),
+}
+
+
+def _review_mode(task: ResearchTask) -> str:
+    """读取受理时冻结的诊断流程；未知值退回 single，不猜新行为。"""
+    mode = _as_dict(task.constraints_json).get("review_mode")
+    normalized = str(mode or "single").strip().lower()
+    return normalized if normalized in _REVIEW_PASSES else "single"
 
 
 def _mode_of(task: ResearchTask) -> str:
@@ -599,6 +626,8 @@ async def run_review(
         usage_state["calls"] = max(prior_calls, total_calls)
         usage_state["tokens"] = max(prior_tokens, total_tokens)
 
+    analyzed_accum: set = set(resumed)
+
     async def _on_progress(progress: Dict[str, Any]) -> None:
         _merge_drafts(
             draft
@@ -613,9 +642,14 @@ async def run_review(
             await _emit_usage(progress)
         except Exception:  # noqa: BLE001 - 记用量失败不能中断诊断
             warnings.append("用量事件写入失败（诊断继续，该窗口用量在预算口径中可能缺失）")
+        analyzed_accum.update(
+            int(item)
+            for item in (progress.get("analyzed_ordinals") or [])
+            if str(item).lstrip("-").isdigit()
+        )
         payload = {
             "document_version_id": version.id,
-            "analyzed_ordinals": sorted(set(progress.get("analyzed_ordinals") or []) & expected_set),
+            "analyzed_ordinals": sorted(analyzed_accum & expected_set),
             "cursor": int(progress.get("cursor") or 0),
             "model_calls": int(progress.get("model_calls") or 0),
             "tokens": int(progress.get("tokens") or 0),
@@ -639,24 +673,82 @@ async def run_review(
             tokens=used_tokens,
         )
     else:
-        pipeline = ReviewPipeline(
-            client,
-            max_calls=max(1, remaining_calls),
-            max_tokens=max(1, remaining_tokens),
+        pass_specs = _REVIEW_PASSES[_review_mode(task)]
+        base_objective = task.objective or "对全文做投稿前诊断"
+        pass_findings: List[FindingDraft] = []
+        pass_analyzed: set = set()
+        pass_warnings: List[str] = []
+        pass_unresolved: List[str] = []
+        pass_unassessed: List[str] = []
+        pass_truncated = False
+        spent_calls, spent_tokens = used_calls, used_tokens
+        pipeline_version = PIPELINE_VERSION
+        prompt_version = REVIEW_PROMPT_VERSION
+        executed_passes = 0
+        for index, (label, focus) in enumerate(pass_specs):
+            passes_left = len(pass_specs) - index
+            avail_calls = max(0, remaining_calls - (spent_calls - used_calls))
+            avail_tokens = max(0, remaining_tokens - (spent_tokens - used_tokens))
+            if index > 0 and (avail_calls <= 0 or avail_tokens <= 0):
+                warnings.append(
+                    f"多角色第 {index + 1} 轮（{label}）未执行：预算已耗尽"
+                )
+                break
+            if passes_left > 1:
+                share_calls = max(1, avail_calls // passes_left)
+                share_tokens = max(1, avail_tokens // passes_left)
+            else:
+                share_calls, share_tokens = max(1, avail_calls), max(1, avail_tokens)
+            # 预算是**累计上限**：BudgetTracker 用 request.model_calls/tokens 作为
+            # 起始用量，因此这里的 max_* 必须是「已用 + 本轮份额」，否则第二轮
+            # 一启动就被判为超预算（真实缺陷：p04 的第二遍只跑了 2 次调用）。
+            pipeline = ReviewPipeline(
+                client,
+                max_calls=spent_calls + share_calls,
+                max_tokens=spent_tokens + share_tokens,
+            )
+            # 续跑只对**第一轮**生效：检查点记录的是「已经以通用角色读过的块」，
+            # 第二轮是不同角色的独立复核，必须重新通读（否则 multi_role 的
+            # 第二遍会退化成空跑）。
+            first_pass = index == 0
+            request = ReviewRequest(
+                document_version_id=version.id,
+                blocks=tuple(review_blocks),
+                dimensions=tuple(DIMENSIONS),
+                objective=base_objective + focus,
+                mode=_mode_of(task),
+                max_window_codepoints=DEFAULT_WINDOW_CODEPOINTS,
+                analyzed_ordinals=tuple(resumed) if first_pass else (),
+                cursor=int(checkpoint.get("cursor") or 0) if first_pass else 0,
+                model_calls=spent_calls,
+                tokens=spent_tokens,
+            )
+            outcome = await pipeline.run(request, on_progress=_on_progress)
+            executed_passes += 1
+            spent_calls = max(spent_calls, int(outcome.calls or 0))
+            spent_tokens = max(spent_tokens, int(outcome.output_tokens or 0))
+            pass_findings.extend(outcome.findings)
+            pass_analyzed.update(int(item) for item in outcome.analyzed_ordinals)
+            pass_warnings.extend(outcome.warnings)
+            pass_unresolved.extend(outcome.unresolved_items)
+            pass_unassessed.extend(outcome.unassessed_objects)
+            pass_truncated = pass_truncated or bool(outcome.truncated)
+            pipeline_version = outcome.pipeline_version
+            prompt_version = outcome.prompt_version
+        if executed_passes > 1:
+            warnings.append(f"诊断流程=multi_role：已执行 {executed_passes} 轮（通用 + 方法/证据）")
+        outcome = SimpleNamespace(
+            findings=tuple(pass_findings),
+            analyzed_ordinals=tuple(sorted(pass_analyzed)),
+            unresolved_items=tuple(dict.fromkeys(pass_unresolved)),
+            unassessed_objects=tuple(dict.fromkeys(pass_unassessed)),
+            warnings=tuple(dict.fromkeys(pass_warnings)),
+            truncated=pass_truncated,
+            calls=spent_calls,
+            output_tokens=spent_tokens,
+            pipeline_version=pipeline_version,
+            prompt_version=prompt_version,
         )
-        request = ReviewRequest(
-            document_version_id=version.id,
-            blocks=tuple(review_blocks),
-            dimensions=tuple(DIMENSIONS),
-            objective=(task.objective or "对全文做投稿前诊断"),
-            mode=_mode_of(task),
-            max_window_codepoints=DEFAULT_WINDOW_CODEPOINTS,
-            analyzed_ordinals=tuple(resumed),
-            cursor=int(checkpoint.get("cursor") or 0),
-            model_calls=used_calls,
-            tokens=used_tokens,
-        )
-        outcome = await pipeline.run(request, on_progress=_on_progress)
 
     _merge_drafts(outcome.findings)
 
