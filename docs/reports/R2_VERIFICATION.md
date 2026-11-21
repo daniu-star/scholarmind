@@ -8,12 +8,12 @@
 
 ## 0. 结论
 
-**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 78 passed + 1 skipped、ruff 全绿、三套回归 527 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过、AT-056 的「短流程 vs 多角色流程」20000 字对照未做**（预算闸门的真实 A/B 已跑，见 §14），因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
+**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 78 passed + 1 skipped、ruff 全绿、三套回归 529 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过**；**AT-056 的「短流程 vs 多角色流程」20000 字对照已跑**（single 109 条 / multi_role 203 条，成本约 2×，见 §15），因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
 
 ### 0.1 放行条件
 
 1. **AT-050**：语料与真实模型评估已完成（14 篇、13 succeeded / 1 partial、覆盖率 97.00%、引文保真 95.44%）；**仍缺两位真人独立盲评** → 召回/误报/人工时间无数字（盲评工具 `tools/research_quality_eval.py` 已就绪）。
-2. **AT-056**：同一 20000 字论文、真实模型，跑短流程 vs 多角色流程，记录覆盖率、P95、调用与 token。
+2. ~~**AT-056**：同一 20000 字论文、真实模型，跑短流程 vs 多角色流程，记录覆盖率、P95、调用与 token。~~ **已闭环（2026-11-21）**：`constraints.review_mode` 已落地，p04（20,017 码点）single vs multi_role 真实 A/B 完成（109 vs 203 条、成本约 2×、覆盖均 100%，`R2_FLOW_AB.md`）；仍缺 P95 统计（单篇单次测量）。
 3. ~~**D1**：产品书面确认"图表数据仅支持文档正文中的 Markdown 管道表 / CSV 代码块"，或补 XLSX/JSON 表格导入入口。~~ **已闭环（2026-11-20）**：已支持 CSV/XLSX（`document_parser` 新增 `_parse_csv`/`_parse_xlsx`，多 sheet 按 `table_index` 选表），新增 `test_chart_data_files.py`（7 条）；JSON 仍不支持，见 §8。
 4. ~~**浏览器项**：装 Playwright 后 `npm run test:research:e2e` 默认模式必须 exit 0（当前 exit 3，不伪装）。~~ **已闭环（2026-11-20）**：`playwright@1.65.1` 已入 devDependencies，默认模式实测 exit 0（详见 §8）。
 5. **部署项**：生产环境演练 PG/Redis/Celery 恢复语义；`ENABLE_VERIFIED_CHARTS` 保持默认关闭。
@@ -109,7 +109,7 @@
 
 ## 6. 放行结论
 
-- **研究域自动化验收**：通过——R2 78 passed + 1 skipped、R0 290 passed、R1 160 passed（合计 528，实跑 527 passed + 1 skipped）、ruff 全绿、迁移可重入、构建唯一模块化入口、真实 Playwright 浏览器全链路 exit 0（含图表前端面板）、14 篇真实论文语料链路可复跑。
+- **研究域自动化验收**：通过——R2 78 passed + 1 skipped、R0 290 passed、R1 161 passed（合计 529，实跑 529 passed + 1 skipped）、ruff 全绿、迁移可重入、构建唯一模块化入口、真实 Playwright 浏览器全链路 exit 0（含图表前端面板）、14 篇真实论文语料链路可复跑。
 - **T21**：**机器可验证部分完成**（14 篇真实论文真实模型全跑通，13 succeeded / 1 partial、覆盖率 97.00%、引文保真 95.44%、纯编造 0.00%、locator 0 错位；`R2_CORPUS_EVAL.md`/`R2_EVAL_STATUS.md`），**人工盲评按用户指示越过 → 质量召回/误报仍属未测量**；**T22**：通过（含 D1/D5 偏差）；**T23**：有条件通过（协议与降级证据齐备，真实对照未跑）。
 - **对外表述基线**："研究域自动化验收通过、图表数值可核验、预算与评估工具诚实可用"；禁止："质量已验证""诊断准确率达标""桌面与移动端全适配"。
 - **2026-11-20 复核更新**：XLSX/CSV 已可直接出图（D1 闭环）；当时仅支持"全数值表"，分类轴 422 `CHART_NON_NUMERIC`。
@@ -244,7 +244,7 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 - 注入 provider：同一范围改走余弦，`retrieval_method="vector"`、`degraded=false`、`degraded_reason=null`，分数降序且落在 `[0,1]`。
 - provider 抛 `EmbeddingUnavailable("embedding_model_not_cached")`：诚实降级，`degraded_reason` 保留机器可读原因。
 - 真实本地模型（`BAAI/bge-small-zh-v1.5`，本机缓存）：能力 `READY`、`backend="sentence-transformers"`；编码向量归一化（模长 ≈ 1）且语义相近句子的余弦显著更高（>0.5）。
-- 三套回归：**527 passed, 1 skipped**（375.02 s）；`ruff check` 相关文件 All checks passed。
+- 三套回归：**529 passed, 1 skipped**（324.16 s，含 R1 新增 2 条 `test_review_roles.py`）；`ruff check` 相关文件 All checks passed。
 
 边界（不得夸大）：
 

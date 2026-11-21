@@ -85,7 +85,7 @@
 | 4 | `node scripts/research_e2e.mjs --serve-only --duration=25` | exit 0：`health=200`、无 token capabilities `401`、带 token `200`（18 项能力） |
 | 5 | `node scripts/research_e2e.mjs`（默认浏览器模式） | **exit 0**（Playwright 1.65.1；脚本 34.7–40 s；控制台错误 0；见 `R2_E2E_BROWSER.md`） |
 | 6 | `./.venv/Scripts/python.exe -m pytest src/backend/tests/test_research -q` | 290 passed |
-| 7 | `./.venv/Scripts/python.exe -m pytest src/backend/tests/test_research_r1 -q` | 160 passed |
+| 7 | `./.venv/Scripts/python.exe -m pytest src/backend/tests/test_research_r1 -q` | 161 passed |
 | 8 | `./.venv/Scripts/python.exe -m pytest src/backend/tests/test_research_r2 -q` | 见 §7（verifier 独立报告 `R2_VERIFICATION.md`） |
 | 9 | `./.venv/Scripts/python.exe scripts/research_migration_check.py` | 离线 333 行 SQL；upgrade→downgrade→upgrade 可重复；15 张 `research_*` 表 |
 | 10 | `node --check`（researchApi.js / ResearchWorkspace.js / components/research/*） | 全部通过 |
@@ -168,9 +168,9 @@
 ## 7. 测试与验证汇总
 
 - R0 研究域测试：290 passed（`src/backend/tests/test_research`）
-- R1 研究域测试：160 passed（`src/backend/tests/test_research_r1`）
+- R1 研究域测试：161 passed（`src/backend/tests/test_research_r1`，含 `test_review_roles.py` 2 条多角色用例）
 - R2 研究域测试：78 passed + 1 skipped（`src/backend/tests/test_research_r2`，14 文件；`test_basic_charts.py` 6 条、`test_review_locator.py` 4 条、`test_vector_retrieval.py` 9 条计入）
-- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **527 passed, 1 skipped**（收集 528，375.02 s）
+- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **529 passed, 1 skipped**（收集 530，324.16 s）
 - 逐条 AT 判定与放行条件见 `docs/reports/R2_VERIFICATION.md`（合并权威版：Lead 主编 + 独立 verifier 报告附录 `R2_VERIFICATION_VERIFIER.md`；独立性限制在 §0.2 已写明）
 - 既有回归：`src/backend/tests` 全量在本阶段未重跑（历史基线 182 passed；研究域改动只新增包与路由，未改既有服务行为；跑全量需 ~10 分钟且会触发 sentence-transformers 联网超时降级）
 - 迁移：`scripts/research_migration_check.py` 通过（离线 SQL + 升降级可重复）
@@ -326,7 +326,7 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 验证：
 
 - `pytest src/backend/tests/test_research_r2/test_vector_retrieval.py -q` → **9 passed**（默认词法标注、注入 provider 走向量、provider 失败降级带原因、能力三态、真实 bge-small 归一化与语义排序、HTTP 端点两条路径）。
-- 三套一次跑 → **527 passed, 1 skipped**；`ruff check` 相关文件 All checks passed。
+- 三套一次跑 → **529 passed, 1 skipped**；`ruff check` 相关文件 All checks passed。
 - 本机可用模型：`BAAI/bge-small-zh-v1.5`（HF 缓存已有；加载约 20 s/进程）。
 
 偏差与边界：
