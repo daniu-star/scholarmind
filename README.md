@@ -125,6 +125,10 @@ npm run dev
 | `LLM_PROXY_BASE_URL` | 可选：模型调用经本地上下文压缩代理（billion-context）转发，留空=直连。示例 `http://127.0.0.1:8790/bili/https://api.deepseek.com/v1`。启动与实测见 [docs/reports/BILLION_CONTEXT.md](docs/reports/BILLION_CONTEXT.md)；正常流量原样转发，不省 token | 空 |
 | `LLM_PROXY_SESSION_HEADER` | 代理会话头名，需与代理配置 `sessionHeader` 一致 | `x-acp-session` |
 | `LLM_PROXY_TIMEOUT_SECONDS` | 启用代理时的客户端超时（折叠历史会发侧请求，需更长） | `180` |
+| `RESEARCH_EMBEDDING_MODEL` | 研究域私有全文检索的本地 embedding 模型（sentence-transformers）。留空=纯词法检索（结果标注 `degraded=true`）。示例 `BAAI/bge-small-zh-v1.5`（需本机 Hugging Face 缓存） | 空 |
+| `RESEARCH_EMBEDDING_DEVICE` | embedding 设备（`cpu`/`cuda`） | `cpu` |
+| `RESEARCH_EMBEDDING_BATCH_SIZE` | embedding 批大小 | `32` |
+| `RESEARCH_EMBEDDING_ALLOW_DOWNLOAD` | 是否允许联网下载 embedding 模型；离线环境保持 `false`，模型缺失时检索诚实降级为词法 | `false` |
 
 | `PAYMENT_ENABLED` | 支付总开关。`false` 时仍可读取商品目录，但下单返回 503、回调拒绝处理；配置真实商户凭证后设为 `true` | `false` |
 | `PAYMENT_VERIFY_REQUIRED` | 支付回调是否强制验签。`true`（默认）时无签名或签名失败一律返回 `failure`；`false` 仅用于本地联调，生产环境必须为 `true` | `true` |

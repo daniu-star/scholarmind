@@ -211,11 +211,14 @@ async def test_vector_retrieval_never_hides_fallback(db, research_store):
     }
     if vector.status is not CapabilityStatus.READY:
         assert vector.reason.strip()
+        assert vector.detail.get("retrieval_fallback") == "lexical"
     else:
+        # READY 只允许出现在"已配置本地 embedding 模型"或"显式允许下载"时，
+        # 且必须公开是哪个后端，不能再用 chromadb 目录存在性冒充向量可用。
         assert vector.detail.get("module_ok") is True
-        assert vector.detail.get("chromadb") is True
         assert vector.detail.get("sentence_transformers") is True
-        assert vector.detail.get("chroma_dir_exists") is True
+        assert vector.detail.get("embedding_model_configured")
+        assert vector.detail.get("backend") == "sentence-transformers"
 
 
 # ── 管道独立性（AT-021） ────────────────────────────────

@@ -169,8 +169,8 @@
 
 - R0 研究域测试：290 passed（`src/backend/tests/test_research`）
 - R1 研究域测试：160 passed（`src/backend/tests/test_research_r1`）
-- R2 研究域测试：68 passed + 1 skipped（`src/backend/tests/test_research_r2`，13 文件；`test_basic_charts.py` 6 条与 `test_review_locator.py` 4 条计入）
-- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **518 passed, 1 skipped**（收集 519，331.25 s）
+- R2 研究域测试：78 passed + 1 skipped（`src/backend/tests/test_research_r2`，14 文件；`test_basic_charts.py` 6 条、`test_review_locator.py` 4 条、`test_vector_retrieval.py` 9 条计入）
+- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **527 passed, 1 skipped**（收集 528，375.02 s）
 - 逐条 AT 判定与放行条件见 `docs/reports/R2_VERIFICATION.md`（合并权威版：Lead 主编 + 独立 verifier 报告附录 `R2_VERIFICATION_VERIFIER.md`；独立性限制在 §0.2 已写明）
 - 既有回归：`src/backend/tests` 全量在本阶段未重跑（历史基线 182 passed；研究域改动只新增包与路由，未改既有服务行为；跑全量需 ~10 分钟且会触发 sentence-transformers 联网超时降级）
 - 迁移：`scripts/research_migration_check.py` 通过（离线 SQL + 升降级可重复）
@@ -310,3 +310,27 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 - 饼图/环形图未做；其余 12 种仍只接受全数值表。
 - 多单位系列共用一个 y 轴时小量级系列会被压扁，渲染器不擅自加次轴（属列映射选择）。
 - 分类标签过长只做 45° 旋转，未做自动换行/截断。
+
+## 12. 2026-11-21 更新：私有全文检索的向量后端（FR-05）
+
+背景：R1/R2 的已知偏差之一是「向量检索未接」——`retrieval_service` 只有注入点，没有真实 embedding 后端；`/capabilities` 之前用「chromadb 可导入 + 索引目录存在」就报 `READY`，属于能力夸大（FR-01 禁止）。
+
+本轮做成可开关的诚实能力：
+
+- 新增 `src/backend/research/embeddings.py`：`SentenceTransformerEmbeddingProvider`（惰性加载、默认 `local_files_only`、归一化向量）、`local_model_available()`（只读 HF 缓存）、`build_provider_from_settings()`；失败抛 `EmbeddingUnavailable(reason)`。
+- `retrieval_service` 增 `configure_from_settings()` / `_ensure_provider()`：未配置模型时保持词法；配置后首次检索自动装配；provider 异常一律降级并记录 `vector_backend_unavailable:<reason>`。
+- `app.py` lifespan 装配并打日志（`research retrieval backend`）；`capabilities._check_vector_retrieval()` 重写为「未配置=DEGRADED / 未缓存=DEGRADED / 本机缓存或允许下载=READY」，`detail` 公开后端与模型是否本地。
+- 新增只读端点 `POST /api/v1/research/documents/{document_id}/search`（`query`、可选 `version_id`、`limit` 1–20），响应含 `retrieval_method`/`degraded`/`degraded_reason`/`items`；授权先于检索，统一 404。
+- 配置：`RESEARCH_EMBEDDING_MODEL`（默认空）、`RESEARCH_EMBEDDING_DEVICE`、`RESEARCH_EMBEDDING_BATCH_SIZE`、`RESEARCH_EMBEDDING_ALLOW_DOWNLOAD`（默认 false），README 环境变量表已补。
+
+验证：
+
+- `pytest src/backend/tests/test_research_r2/test_vector_retrieval.py -q` → **9 passed**（默认词法标注、注入 provider 走向量、provider 失败降级带原因、能力三态、真实 bge-small 归一化与语义排序、HTTP 端点两条路径）。
+- 三套一次跑 → **527 passed, 1 skipped**；`ruff check` 相关文件 All checks passed。
+- 本机可用模型：`BAAI/bge-small-zh-v1.5`（HF 缓存已有；加载约 20 s/进程）。
+
+偏差与边界：
+
+- 默认仍是词法检索；启用向量需显式配置模型。
+- 检索为请求内实时编码，**没有持久化向量索引、未接 ChromaDB**；大文档首次检索有模型加载耗时。
+- 未做向量 + 词法融合排序；检索范围仅单个已授权版本文本。

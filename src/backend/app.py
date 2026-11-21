@@ -40,6 +40,29 @@ def create_app() -> FastAPI:
         # 但要留下明确日志，避免"任务永远排队"却没有任何提示。
         dispatcher = None
         if settings.RESEARCH_ENABLED:
+            # 研究域检索后端：只有显式配置模型才启用本地 embedding，
+            # 未配置/加载失败都保持词法检索并诚实标注（FR-05/FR-01）。
+            try:
+                from src.backend.research import retrieval_service
+
+                provider = retrieval_service.configure_from_settings()
+                if provider is None:
+                    logger.info(
+                        "research retrieval backend",
+                        backend="lexical",
+                        reason="RESEARCH_EMBEDDING_MODEL 未配置",
+                    )
+                else:
+                    logger.info(
+                        "research retrieval backend",
+                        backend="sentence-transformers",
+                        model=getattr(provider, "model_name", ""),
+                        device=getattr(provider, "device", ""),
+                    )
+            except Exception:
+                logger.warning(
+                    "research retrieval backend setup failed", exc_info=True
+                )
             try:
                 from src.backend.research.dispatcher import create_dispatcher
 

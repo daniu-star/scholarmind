@@ -8,7 +8,7 @@
 
 ## 0. 结论
 
-**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 68 passed + 1 skipped、ruff 全绿、三套回归 518 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过、AT-056 的 20000 字真实对照未做**，因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
+**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 78 passed + 1 skipped、ruff 全绿、三套回归 527 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过、AT-056 的 20000 字真实对照未做**，因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
 
 ### 0.1 放行条件
 
@@ -109,7 +109,7 @@
 
 ## 6. 放行结论
 
-- **研究域自动化验收**：通过——R2 68 passed + 1 skipped、R0 290 passed、R1 160 passed（合计 519，实跑 518 passed + 1 skipped）、ruff 全绿、迁移可重入、构建唯一模块化入口、真实 Playwright 浏览器全链路 exit 0（含图表前端面板）、14 篇真实论文语料链路可复跑。
+- **研究域自动化验收**：通过——R2 78 passed + 1 skipped、R0 290 passed、R1 160 passed（合计 528，实跑 527 passed + 1 skipped）、ruff 全绿、迁移可重入、构建唯一模块化入口、真实 Playwright 浏览器全链路 exit 0（含图表前端面板）、14 篇真实论文语料链路可复跑。
 - **T21**：**机器可验证部分完成**（14 篇真实论文真实模型全跑通，13 succeeded / 1 partial、覆盖率 97.00%、引文保真 95.44%、纯编造 0.00%、locator 0 错位；`R2_CORPUS_EVAL.md`/`R2_EVAL_STATUS.md`），**人工盲评按用户指示越过 → 质量召回/误报仍属未测量**；**T22**：通过（含 D1/D5 偏差）；**T23**：有条件通过（协议与降级证据齐备，真实对照未跑）。
 - **对外表述基线**："研究域自动化验收通过、图表数值可核验、预算与评估工具诚实可用"；禁止："质量已验证""诊断准确率达标""桌面与移动端全适配"。
 - **2026-11-20 复核更新**：XLSX/CSV 已可直接出图（D1 闭环）；当时仅支持"全数值表"，分类轴 422 `CHART_NON_NUMERIC`。
@@ -222,3 +222,32 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 - 测试：`src/backend/tests/test_research_r2/test_basic_charts.py` 6 条 + `test_charts_api.py` 的「不支持类型」改用 `radar`；R2 套件 **68 passed + 1 skipped**。
 - 浏览器：`node scripts/research_e2e.mjs --keep` → exit 0；bar 断言通过（`x_labels` 3 个、PNG 49,891 B）；图表面板显示「分类轴」标注与 14 种类型。
 - 仍存在的缺口：饼图未做；多单位共轴会压扁小量级系列；分类标签只做 45° 旋转，未自动换行。
+
+## 13. 附录：私有全文检索的向量后端（FR-05，2026-11-21）
+
+此前偏差是「向量检索未接」：`retrieval_service` 只支持调用方注入 provider，产品里没有任何真实 embedding 后端，`/capabilities` 还曾用「chromadb 依赖可导入 + 索引目录存在」冒充向量可用。
+
+本轮改动：
+
+| 层 | 落点 | 关键点 |
+| --- | --- | --- |
+| 后端 | `src/backend/research/embeddings.py`（新增） | `SentenceTransformerEmbeddingProvider`（惰性加载、`local_files_only`、归一化向量）、`local_model_available()`（只查 HF 缓存不联网）、`build_provider_from_settings()`；失败抛 `EmbeddingUnavailable(reason)` |
+| 装配 | `src/backend/research/retrieval_service.py` | `configure_from_settings()` + `_ensure_provider()`：未配置模型保持词法；首次检索自动装配一次；`EmbeddingUnavailable` 映射为 `vector_backend_unavailable:<reason>` |
+| 启动 | `src/backend/app.py` | lifespan 里按 settings 装配并记录 `research retrieval backend`（`lexical` / `sentence-transformers`），装配失败不阻断启动 |
+| 能力 | `src/backend/research/capabilities.py` | `retrieval.vector` 重写：未配置模型 = `DEGRADED`（理由写明「使用词法匹配」）、模型未缓存且未允许下载 = `DEGRADED`、只有本机缓存（或显式允许下载）= `READY`；`detail` 公开 `embedding_model_configured`/`embedding_model_local`/`backend` |
+| 接口 | `src/backend/routers/research.py` | 新增只读端点 `POST /api/v1/research/documents/{document_id}/search`（`query` 1–500、`version_id` 可选、`limit` 1–20）；响应含 `retrieval_method`/`degraded`/`degraded_reason`/`items`；未指定版本时用文档当前版本；无版本 422 `DOCUMENT_VERSION_MISSING` |
+| 配置 | `src/backend/config.py` + `README.md` | `RESEARCH_EMBEDDING_MODEL`（默认空）、`RESEARCH_EMBEDDING_DEVICE`、`RESEARCH_EMBEDDING_BATCH_SIZE`、`RESEARCH_EMBEDDING_ALLOW_DOWNLOAD`（默认 `false`） |
+
+验证（`src/backend/tests/test_research_r2/test_vector_retrieval.py`，9 条）：
+
+- 默认无模型：`POST /documents/{id}/search` 返回 `retrieval_method="lexical"`、`degraded=true`、`degraded_reason` 非空，每条命中一致；能力为 `DEGRADED` 且理由含「词法」。
+- 注入 provider：同一范围改走余弦，`retrieval_method="vector"`、`degraded=false`、`degraded_reason=null`，分数降序且落在 `[0,1]`。
+- provider 抛 `EmbeddingUnavailable("embedding_model_not_cached")`：诚实降级，`degraded_reason` 保留机器可读原因。
+- 真实本地模型（`BAAI/bge-small-zh-v1.5`，本机缓存）：能力 `READY`、`backend="sentence-transformers"`；编码向量归一化（模长 ≈ 1）且语义相近句子的余弦显著更高（>0.5）。
+- 三套回归：**527 passed, 1 skipped**（375.02 s）；`ruff check` 相关文件 All checks passed。
+
+边界（不得夸大）：
+
+- 默认仍是词法检索；只有显式配置模型才走向量，且不会联网下载（除非打开 `RESEARCH_EMBEDDING_ALLOW_DOWNLOAD`）。
+- 检索是**请求内实时编码**（无持久化向量索引，也未接 ChromaDB），大文档首次检索会有模型加载耗时（本机 bge-small 约 20 s/进程，之后复用）。
+- 未做混合排序（向量 + BM25 融合），也未做跨版本/跨文档检索；`search` 只在单个已授权版本内进行。

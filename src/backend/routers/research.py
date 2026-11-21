@@ -251,6 +251,20 @@ def _as_dict(value: Any) -> Any:
     return value
 
 
+def _version_id_from_document(document: Dict[str, Any]) -> Optional[str]:
+    """从文档详情里取当前版本 ID（``version.id`` 优先，其次顶层字段）。"""
+
+    version = document.get("version")
+    if isinstance(version, dict):
+        for key in ("version_id", "id"):
+            if isinstance(version.get(key), str):
+                return version[key]
+    for key in ("current_version_id", "version_id"):
+        if isinstance(document.get(key), str):
+            return document[key]
+    return None
+
+
 async def _commit(db: AsyncSession) -> None:
     """在返回响应前落库。
 
@@ -365,6 +379,16 @@ class RetryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_state_revision: int = Field(ge=1)
+
+
+class DocumentSearchRequest(BaseModel):
+    """私有全文检索请求（只读；范围限定在调用者自己的文档版本内）。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    query: str = Field(min_length=1, max_length=500)
+    version_id: Optional[str] = Field(default=None, max_length=128)
+    limit: int = Field(default=8, ge=1, le=20)
 
 
 class ApplyRequest(BaseModel):
@@ -643,6 +667,74 @@ async def list_document_blocks(
         version_id=version_id,
     )
     return _page(list(blocks or []), cursor=cursor, limit=limit)
+
+
+@router.post("/documents/{document_id}/search")
+async def search_document(
+    document_id: str,
+    payload: DocumentSearchRequest,
+    user_id: int = Depends(require_research_user),
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """在调用者自己的文档版本内检索（FR-05）。
+
+    授权先于检索：``document_service.get_document`` 统一 404，检索只在该版本文本
+    内进行。向量后端不可用/模型缺失时降级为词法，并在每条命中与响应头上如实
+    标注 ``retrieval_method`` / ``degraded`` / ``degraded_reason``，绝不伪装。
+    """
+
+    actor = _actor(user_id)
+    document = await _service_call(
+        "document_service", "get_document", db, actor, document_id
+    )
+    payload_doc = _as_dict(document) or {}
+    version_id = (
+        payload.version_id
+        or payload_doc.get("current_version_id")
+        or _version_id_from_document(payload_doc)
+    )
+    if not version_id:
+        raise invalid("DOCUMENT_VERSION_MISSING", "该文档没有可检索的正文版本。", None)
+    items = await _service_call(
+        "retrieval_service",
+        "search",
+        db,
+        actor,
+        version_id,
+        payload.query,
+        limit=payload.limit,
+    )
+    items = list(items or [])
+    methods = {
+        str(item.get("retrieval_method") or "").strip() for item in items
+    } - {""}
+    reasons = {
+        str(item.get("degraded_reason") or "").strip() for item in items
+    } - {""}
+    degraded = any(bool(item.get("degraded")) for item in items)
+    if len(methods) == 1:
+        method: Optional[str] = next(iter(methods))
+    elif methods:
+        method = "mixed"
+    else:
+        method = None
+    if not degraded:
+        reason_value: Optional[str] = None
+    elif len(reasons) == 1:
+        reason_value = next(iter(reasons))
+    elif reasons:
+        reason_value = sorted(reasons)[0]
+    else:
+        reason_value = None
+    return {
+        "document_id": document_id,
+        "version_id": version_id,
+        "query": payload.query,
+        "retrieval_method": method,
+        "degraded": degraded,
+        "degraded_reason": reason_value,
+        "items": items,
+    }
 
 
 # ── 来源 ────────────────────────────────────────────────────────────

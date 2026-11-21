@@ -107,6 +107,23 @@ async def create_chart(
 - 同样输入必须字节级可复现是**目标**；若 matplotlib 元数据导致字节不稳定，改为断言
   `data_digest`/`png_sha256` 稳定并在报告里说明差异来源（不得声称"完全确定"）。
 
+## 2.3 私有全文检索 API（FR-05，2026-11-21 增补）
+
+```text
+POST /api/v1/research/documents/{document_id}/search
+body: {"query": "…(1–500)", "version_id": "可选", "limit": 1–20（默认 8）}
+200: {document_id, version_id, query, retrieval_method: "vector"|"lexical"|"mixed"|null,
+      degraded: bool, degraded_reason: str|null,
+      items: [{ordinal, text, start, end, score, retrieval_method, degraded, degraded_reason}]}
+```
+
+- 授权先于检索：`document_service.get_document` 统一 404；未指定 `version_id` 时用当前版本；
+  无版本 → 422 `DOCUMENT_VERSION_MISSING`。
+- 后端选择：`RESEARCH_EMBEDDING_MODEL` 为空 → 词法（`degraded=true`）；配置后走余弦；
+  provider 失败/模型缺失 → 降级词法并在 `degraded_reason` 写机器可读原因
+  （`vector_backend_unavailable:<reason>`），绝不把词法冒充向量。
+- 只读、无副作用、不跨文档；结果条数受 `limit` 限制，排序按分数降序、同分按块序号。
+
 ## 3. 质量评估（T21 / FR-15/16 / AT-050）
 
 `tools/research_quality_eval.py`（纯标准库，Python 3.10+）：

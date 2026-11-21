@@ -31,6 +31,8 @@ from .ownership import require_version
 EmbeddingProvider = Callable[[Sequence[str]], Sequence[Sequence[float]]]
 
 _PROVIDER: Optional[EmbeddingProvider] = None
+# 是否已尝试按 settings 自动装配（只尝试一次，避免每次检索都重复加载失败）
+_AUTO_PROVIDER_TRIED = False
 
 _TERM_RE = re.compile(r"[0-9a-zA-Z_]+")
 _CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+")
@@ -43,14 +45,50 @@ _INDEX_BATCH = 500
 def configure_embedding_provider(provider: Optional[EmbeddingProvider]) -> None:
     """注入向量化实现；传 ``None`` 表示回到纯词法模式。"""
 
-    global _PROVIDER
+    global _PROVIDER, _AUTO_PROVIDER_TRIED
     if provider is not None and not callable(provider):
         raise TypeError("embedding provider 必须可调用")
     _PROVIDER = provider
+    _AUTO_PROVIDER_TRIED = True
 
 
 def reset_embedding_provider() -> None:
-    configure_embedding_provider(None)
+    """回到「未注入」状态；下次检索时会重新按 settings 装配。"""
+
+    global _PROVIDER, _AUTO_PROVIDER_TRIED
+    _PROVIDER = None
+    _AUTO_PROVIDER_TRIED = False
+
+
+def configure_from_settings() -> Optional[EmbeddingProvider]:
+    """按 ``RESEARCH_EMBEDDING_MODEL`` 装配本地 embedding provider。
+
+    * 未配置模型 → 返回 ``None``（保持词法检索，这是默认路径）。
+    * 配置了模型 → 装配惰性 provider（首次调用才加载模型；加载失败会抛
+      ``EmbeddingUnavailable``，由检索路径降级并记录原因）。
+    * 任何异常都不外抛：应用启动不因检索后端缺失而失败。
+    """
+
+    global _PROVIDER, _AUTO_PROVIDER_TRIED
+    _AUTO_PROVIDER_TRIED = True
+    try:
+        from .embeddings import build_provider_from_settings
+
+        provider = build_provider_from_settings()
+    except Exception:  # pragma: no cover - 装配失败退化为词法
+        _PROVIDER = None
+        return None
+    _PROVIDER = provider
+    return provider
+
+
+def _ensure_provider() -> Optional[EmbeddingProvider]:
+    """惰性自动装配：脚本/测试未显式注入时按 settings 尝试一次。"""
+
+    global _AUTO_PROVIDER_TRIED
+    if _PROVIDER is not None or _AUTO_PROVIDER_TRIED:
+        return _PROVIDER
+    return configure_from_settings()
 
 
 def embedding_available() -> bool:
@@ -243,12 +281,16 @@ def _vector_results(
 ) -> tuple[Optional[list[tuple[DocumentChunk, float]]], Optional[str]]:
     """返回 (结果, 降级原因)。结果 ``None`` 表示不可用，必须降级词法。"""
 
-    provider = _PROVIDER
+    provider = _ensure_provider()
     if provider is None:
         return None, "vector_backend_unavailable"
     try:
         vectors = provider([query] + [chunk.text for chunk in chunks])
     except Exception as exc:  # provider 任何异常都不得变成 500
+        reason = getattr(exc, "reason", None)
+        if isinstance(reason, str) and reason:
+            # embeddings.EmbeddingUnavailable：模型缺失/加载失败等可解释原因
+            return None, f"vector_backend_unavailable:{reason}"
         return None, f"vector_provider_failed:{type(exc).__name__}"
     try:
         vectors = [list(map(float, vector)) for vector in vectors]
@@ -344,6 +386,7 @@ async def search(
 
 __all__ = [
     "configure_embedding_provider",
+    "configure_from_settings",
     "embedding_available",
     "ensure_index",
     "iter_chunks",

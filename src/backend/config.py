@@ -144,6 +144,16 @@ class Settings(BaseSettings):
     # /api/v1/health」，E2E 因健康检查 90s 超时误判为环境缺失。
     # 生产默认 False；RAG 首次真实调用仍会懒加载。
     DISABLE_VECTOR_PREWARM: bool = False
+    # ── 研究域私有全文检索：可选的本地 embedding 后端（FR-05）──────────
+    # 留空 = 纯词法检索（默认，诚实标注 degraded=True）。填写本机已缓存的
+    # sentence-transformers 模型名（如 "BAAI/bge-small-zh-v1.5"）后，检索会在
+    # 同一授权范围内改用余弦相似度，并把 retrieval_method 标为 "vector"。
+    # 默认 local_files_only：不联网下载；模型缺失时降级词法并记录可解释原因。
+    RESEARCH_EMBEDDING_MODEL: Optional[str] = None
+    RESEARCH_EMBEDDING_DEVICE: str = "cpu"
+    RESEARCH_EMBEDDING_BATCH_SIZE: int = 32
+    # 仅在明确允许时联网下载模型；离线/受控环境保持 False。
+    RESEARCH_EMBEDDING_ALLOW_DOWNLOAD: bool = False
 
     # ── 上下文压缩代理（billion-context / ACP，可选）────────────────────
     # 留空 = 直连 DEEPSEEK_BASE_URL（默认，行为与历史版本一致）。

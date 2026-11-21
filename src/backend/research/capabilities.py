@@ -291,16 +291,26 @@ async def _check_docx_parser() -> CapabilityInfo:
 
 async def _check_vector_retrieval() -> CapabilityInfo:
     module_ok, module_err = _module_state("src.backend.research.retrieval_service")
-    chroma_ok, chroma_err = _spec_state("chromadb")
     embed_ok, embed_err = _spec_state("sentence_transformers")
-    chroma_dir = Path(getattr(settings, "CHROMA_DIR", "data/chroma"))
-    dir_ok = chroma_dir.is_dir()
+    try:
+        from .embeddings import local_model_available, normalize_model_name
+
+        model = normalize_model_name(
+            getattr(settings, "RESEARCH_EMBEDDING_MODEL", "")
+        )
+        model_local = local_model_available(model) if model else False
+    except Exception:  # pragma: no cover - 探测失败按未配置处理
+        model = ""
+        model_local = False
+    allow_download = bool(
+        getattr(settings, "RESEARCH_EMBEDDING_ALLOW_DOWNLOAD", False)
+    )
     detail = {
         "module_ok": module_ok,
-        "chromadb": chroma_ok,
         "sentence_transformers": embed_ok,
-        "chroma_dir_exists": dir_ok,
-        "embedding_model": getattr(settings, "RAG_EMBEDDING_MODEL", ""),
+        "embedding_model_configured": model or None,
+        "embedding_model_local": model_local,
+        "embedding_allow_download": allow_download,
     }
     if not module_ok:
         return _info(
@@ -310,28 +320,50 @@ async def _check_vector_retrieval() -> CapabilityInfo:
             granularity="私有文档检索",
             detail=detail,
         )
-    if not chroma_ok or not embed_ok:
+    if not model:
+        # 默认路径：没有配置模型时不要谎称"向量可用"
         return _info(
             "retrieval.vector",
             CapabilityStatus.DEGRADED,
-            reason=f"向量依赖缺失（{chroma_err or embed_err}）；检索降级为词法匹配。",
-            granularity="词法检索（vector 不可用）",
-            detail={**detail, "retrieval_fallback": "lexical"},
+            reason=(
+                "未配置 RESEARCH_EMBEDDING_MODEL；检索在同一授权范围内使用词法匹配，"
+                "结果标注 retrieval_method=lexical / degraded=true。"
+            ),
+            granularity="词法检索（未启用向量后端）",
+            detail={**detail, "retrieval_fallback": "lexical", "backend": "lexical"},
         )
-    if not dir_ok:
+    if not embed_ok:
         return _info(
             "retrieval.vector",
             CapabilityStatus.DEGRADED,
-            reason="向量索引目录尚未初始化；索引建立前检索降级为词法匹配。",
-            granularity="词法检索（索引未初始化）",
-            detail={**detail, "retrieval_fallback": "lexical"},
+            reason=(
+                f"已配置模型 {model}，但 sentence-transformers 不可用（{embed_err or '未安装'}）；"
+                "检索降级为词法匹配。"
+            ),
+            granularity="词法检索（vector 依赖缺失）",
+            detail={**detail, "retrieval_fallback": "lexical", "backend": "lexical"},
+        )
+    if not model_local and not allow_download:
+        return _info(
+            "retrieval.vector",
+            CapabilityStatus.DEGRADED,
+            reason=(
+                f"已配置模型 {model}，但本机没有该模型缓存且未允许下载；"
+                "检索会降级为词法匹配（不会联网拉模型）。"
+            ),
+            granularity="词法检索（模型未缓存）",
+            detail={**detail, "retrieval_fallback": "lexical", "backend": "lexical"},
         )
     return _info(
         "retrieval.vector",
         CapabilityStatus.READY,
-        reason="检索服务、chromadb、embedding 依赖均可导入，索引目录存在。",
-        granularity="向量 + 词法混合检索（仅用户私有文档）",
-        detail=detail,
+        reason=(
+            f"本地 embedding 模型 {model} 可用；检索在同一授权范围内按余弦相似度排序，"
+            "调用失败会诚实降级为词法并在结果里标注。" if model_local else
+            f"已允许下载 embedding 模型 {model}；首次检索时会加载（失败则降级词法并标注）。"
+        ),
+        granularity="向量（余弦）+ 同范围词法兜底",
+        detail={**detail, "backend": "sentence-transformers"},
     )
 
 
