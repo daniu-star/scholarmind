@@ -298,3 +298,14 @@ E2E_CHROMIUM_EXECUTABLE="/c/Users/13067/AppData/Local/ms-playwright/chromium-125
 2. **健康检查超时不可配置**：`waitForHealth` 原硬编码 90 s。修复：支持 `E2E_HEALTH_TIMEOUT_MS`（默认 180 s），并在超时错误里附带后端日志尾部。
 
 > 说明：这两处都不改变产品行为，只影响"能不能稳定跑验收"。修之前同一脚本连续两次 exit 2（ENV-MISSING），修之后 exit 0。
+
+## 13. 附录三（Lead，2026-11-21 20:0x）：`--a11y` 窄屏 / 键盘 / 双账号
+
+- 命令：`node scripts/research_e2e.mjs --a11y --keep` → **exit 0（PASS）**，主浏览器链路 + 三段附加断言全部通过；截图 `tmp/e2e-evidence/a11y-01-narrow-research.png`、`a11y-02-keyboard-create.png`、`a11y-03-isolation.png`。
+- 窄屏 390×844：`scrollWidth=409`、`innerWidth=409`（无横向溢出）；项目列表、工作区标题可见；图表卡片在无文档选中时不渲染。
+- 键盘：仅用 `Tab`/`Enter`，80 次内命中「新建项目」→ Enter 把焦点送入 `.rw-create-form .rw-input` → 键入标题并回车 → 项目出现在列表。
+- 双账号：同浏览器新 context 注册账号 B；B 的项目列表不含 A 的项目；B 直接请求 A 的项目 ID 得到 404 `NOT_FOUND`。
+- 判定细化（避免环境噪音掩盖真实失败）：
+  1. 控制台错误改为按 `requestfailed` 的 URL 归因：jsdelivr 外链在离线环境必然失败且控制台文本无 URL；只有出现本项目源（web 或 `/api/v1/`）的连接级失败才判失败。
+  2. a11y 流程只把「非外链归因的 pageerror」计为失败（CodeMirror 未定义由外链失败连带产生）。
+- 未覆盖：真机（iOS Safari / Android Chrome）、读屏软件、横屏/平板断点、触控手势。

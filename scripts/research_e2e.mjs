@@ -111,11 +111,12 @@ function assert(condition, message, details) {
 }
 
 function parseArgs(argv) {
-  const opts = { mode: 'browser', keep: false, duration: 0, help: false };
+  const opts = { mode: 'browser', keep: false, duration: 0, help: false, a11y: false };
   for (const arg of argv) {
     if (arg === '--serve-only') opts.mode = 'serve-only';
     else if (arg === '--api-only') opts.mode = 'api-only';
     else if (arg === '--keep') opts.keep = true;
+    else if (arg === '--a11y') opts.a11y = true;
     else if (arg === '--help' || arg === '-h') opts.help = true;
     else if (arg.startsWith('--duration=')) {
       const value = Number(arg.slice('--duration='.length));
@@ -137,6 +138,7 @@ function printHelp() {
   node scripts/research_e2e.mjs --serve-only    # 只起隔离后端 + 静态服务并自检
   node scripts/research_e2e.mjs --serve-only --duration=30
   node scripts/research_e2e.mjs --keep          # 保留临时目录
+  node scripts/research_e2e.mjs --a11y          # 追加 390px 窄屏 / 键盘可达 / 双账号隔离验收
 
 前提：
   - npm run build:frontend 已生成 dist/（模块化产物，非原型 HTML）
@@ -883,11 +885,20 @@ async function runBrowserFlow(playwright, webBase, apiContext, dirs) {
     locale: 'zh-CN',
   });
   const consoleErrors = [];
+  const streamResets = [];
+  const failedRequests = [];
   const page = await context.newPage();
   page.on('console', (msg) => {
     if (msg.type() === 'error') consoleErrors.push(`console: ${msg.text()}`);
   });
   page.on('pageerror', (err) => consoleErrors.push(`pageerror: ${err.message}`));
+  page.on('requestfailed', (request) => {
+    const failure = request.failure()?.errorText || '';
+    failedRequests.push(`${failure} ${request.method()} ${request.url()}`);
+    if (request.url().includes('/events') && /RESET|ABORTED/i.test(failure)) {
+      streamResets.push(`${failure} ${request.url()}`);
+    }
+  });
 
   const screenshots = [];
   const takeShot = async (name) => {
@@ -1114,10 +1125,42 @@ async function runBrowserFlow(playwright, webBase, apiContext, dirs) {
       `图表前端：${tablePill.trim()}，图片 ${natural.w}x${natural.h}，校验信息含 重开校验通过/PNG 摘要/值域（${chartShot}）`
     );
 
-    logStage('浏览器：检查控制台错误（仅记录，外链 CDN 离线失败不算失败）');
+    logStage('浏览器：检查控制台错误（外链 CDN 离线 / SSE 终态断流不算失败）');
     const externalErrors = consoleErrors.filter((item) => /jsdelivr|favicon/i.test(item));
-    const realErrors = consoleErrors.filter((item) => !/jsdelivr|favicon/i.test(item));
-    if (consoleErrors.length) logDetail(`控制台错误 ${consoleErrors.length} 条（外部资源 ${externalErrors.length} 条）`);
+    const withoutExternal = consoleErrors.filter((item) => !/jsdelivr|favicon/i.test(item));
+    // SSE 在任务终态后由前端 abort（任务已经结束，服务端连接被关闭），Chrome 会把这类关闭记为
+    // net::ERR_CONNECTION_RESET。只有确实存在 /events 连接级失败时才把它归为预期噪音。
+    const sseResetErrors = streamResets.length
+      ? withoutExternal.filter((item) => /net::ERR_CONNECTION_RESET/.test(item))
+      : [];
+    // CodeMirror 等外链资源来自 jsdelivr：离线环境下 Chrome 只报「Failed to load resource: net::…」，
+    // 控制台文本不含 URL。这里用 requestfailed 的 URL 判断：只要没有任何本项目源（web/后端）的
+    // 请求失败，就不把这类无 URL 的资源加载错误算作功能缺陷（并把外链清单打印出来供核对）。
+    const internalFailures = failedRequests.filter((item) => {
+      return item.includes(webBase) || item.includes('/api/v1/');
+    });
+    const externalFailures = failedRequests.filter((item) => !internalFailures.includes(item));
+    const resourceErrors = withoutExternal.filter(
+      (item) => /Failed to load resource/.test(item) && !sseResetErrors.includes(item)
+    );
+    const externalResourceErrors = internalFailures.length === 0 ? resourceErrors : [];
+    const realErrors = withoutExternal.filter(
+      (item) => !sseResetErrors.includes(item) && !externalResourceErrors.includes(item)
+    );
+    if (consoleErrors.length) {
+      logDetail(
+        `控制台错误 ${consoleErrors.length} 条（外链文本命中 ${externalErrors.length} 条，外链请求失败归因 ${externalResourceErrors.length} 条，SSE 终态断流 ${sseResetErrors.length} 条）`
+      );
+    }
+    if (externalResourceErrors.length) {
+      const hosts = [...new Set(externalFailures.map((item) => (item.match(/https?:\/\/[^/]+/) || [''])[0]))].filter(Boolean);
+      logDetail(`外链资源失败 ${externalFailures.length} 条（主机：${hosts.join('、') || '未知'}），非本项目源，不计失败`);
+    }
+    if (sseResetErrors.length) logDetail(`SSE 连接级失败 ${streamResets.length} 条（任务终态后断开，非功能缺陷）`);
+    if (failedRequests.length) {
+      logDetail(`连接级失败 ${failedRequests.length} 条：`);
+      for (const item of failedRequests.slice(0, 12)) console.log(`[e2e]       ! ${item}`);
+    }
     assert(realErrors.length === 0, `页面控制台错误：${realErrors.slice(0, 5).join(' | ')}`);
 
     return { downloadBytes: bytes.length, consoleErrors: realErrors.length, title, headerText, screenshots };
@@ -1145,6 +1188,177 @@ async function runBrowserFlow(playwright, webBase, apiContext, dirs) {
 }
 
 // ── 主流程 ───────────────────────────────────────────────────────────
+
+async function loginViaUi(page, webBase, email) {
+  await page.goto(`${webBase}/#auth`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.locator('#authTitle').waitFor({ timeout: 20000 });
+  await dismissOnboarding(page);
+  await page.locator('input[placeholder="您的邮箱地址"]').fill(email);
+  const password = await openPasswordAuth(page);
+  await password.fill(PASSWORD);
+  const user = await submitAuthAndWaitForToken(page, '登录');
+  assert(user?.id != null, `登录后 sm_user 缺少 id：${JSON.stringify(user)}`);
+  return user;
+}
+
+async function runA11yFlow(playwright, webBase, apiContext, dirs) {
+  logStage('无障碍/响应式：启动 Chromium（390px 窄屏 + 键盘 + 双账号隔离）');
+  const launched = await launchChromium(playwright);
+  const browser = launched.browser;
+  const screenshots = [];
+  const consoleErrors = [];
+  const attach = (page) => {
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(`console: ${msg.text()}`);
+    });
+    page.on('pageerror', (err) => consoleErrors.push(`pageerror: ${err.message}`));
+  };
+  const shot = async (page, name) => {
+    const file = await capture(page, name);
+    screenshots.push(file);
+    return file;
+  };
+
+  try {
+    // ── A. 390×844 窄屏：无横向溢出、关键区块可见 ──────────────────
+    logStage('窄屏 390×844：断言无横向溢出且关键区块可见');
+    const narrow = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      isMobile: true,
+      hasTouch: true,
+      locale: 'zh-CN',
+    });
+    const phone = await narrow.newPage();
+    attach(phone);
+    await loginViaUi(phone, webBase, apiContext.email);
+    await phone.goto(`${webBase}/#research`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await phone.waitForSelector('h1.rw-title', { timeout: 25000 });
+    const metrics = await phone.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth,
+    }));
+    assert(
+      metrics.scrollWidth <= metrics.innerWidth + 2,
+      `窄屏出现横向溢出：scrollWidth=${metrics.scrollWidth} > innerWidth=${metrics.innerWidth}`
+    );
+    const projectsSection = phone.locator('section[aria-label="研究项目列表"]');
+    await projectsSection.waitFor({ timeout: 20000 });
+    const narrowProjectText = (await projectsSection.textContent()) || '';
+    assert(narrowProjectText.includes(apiContext.project.title), '窄屏项目列表未显示已有项目');
+    const chartBox = await phone.locator('section.rw-chart-panel').first().boundingBox();
+    if (chartBox) {
+      assert(chartBox.width <= metrics.innerWidth + 2, `窄屏图表卡片超出视口：${chartBox.width} > ${metrics.innerWidth}`);
+    }
+    logDetail(
+      `窄屏：scrollWidth=${metrics.scrollWidth} / innerWidth=${metrics.innerWidth}，图表卡片宽度=${
+        chartBox ? Math.round(chartBox.width) : '未渲染'
+      }`
+    );
+    await shot(phone, 'a11y-01-narrow-research');
+    await narrow.close();
+
+    // ── B. 键盘可达：Tab 到「新建项目」→ Enter 聚焦输入 → 输入 Enter 创建 ──
+    logStage('键盘可达：Tab 到达「新建项目」并用键盘创建项目');
+    const desk = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'zh-CN' });
+    const keyboardPage = await desk.newPage();
+    attach(keyboardPage);
+    await loginViaUi(keyboardPage, webBase, apiContext.email);
+    await keyboardPage.goto(`${webBase}/#research`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await keyboardPage.waitForSelector('h1.rw-title', { timeout: 25000 });
+    await keyboardPage.locator('section[aria-label="研究项目列表"]').waitFor({ timeout: 20000 });
+
+    let reachedNewProject = false;
+    for (let i = 0; i < 80; i += 1) {
+      await keyboardPage.keyboard.press('Tab');
+      const label = await keyboardPage.evaluate(() => {
+        const el = document.activeElement;
+        if (!el) return '';
+        return `${el.getAttribute('aria-label') || ''} ${el.getAttribute('title') || ''} ${el.textContent || ''}`.trim();
+      });
+      if (label.includes('新建项目')) {
+        reachedNewProject = true;
+        break;
+      }
+    }
+    assert(reachedNewProject, '键盘 Tab 80 次未能到达「新建项目」按钮（焦点顺序不可达）');
+
+    await keyboardPage.keyboard.press('Enter');
+    const focusedClass = await keyboardPage.evaluate(() => document.activeElement?.className || '');
+    assert(
+      typeof focusedClass === 'string' && focusedClass.includes('rw-input'),
+      `按 Enter 后焦点未落到新建项目输入框：${focusedClass}`
+    );
+
+    const keyboardTitle = `键盘创建项目-${Date.now().toString().slice(-6)}`;
+    await keyboardPage.keyboard.type(keyboardTitle);
+    await keyboardPage.keyboard.press('Enter');
+    await waitUntil(
+      async () =>
+        ((await keyboardPage.locator('section[aria-label="研究项目列表"]').textContent()) || '').includes(keyboardTitle),
+      { label: '键盘创建项目出现在列表', timeout: 45000 }
+    );
+    logDetail(`键盘：Tab 命中「新建项目」→ Enter 聚焦输入 → 输入并回车创建「${keyboardTitle}」`);
+    await shot(keyboardPage, 'a11y-02-keyboard-create');
+    await desk.close();
+
+    // ── C. 双账号隔离：账号 B 看不到账号 A 的项目，直连 A 的项目得 404 ──
+    logStage('双账号隔离：新注册账号看不到他人项目，且直连他人项目 404');
+    const second = await browser.newContext({ viewport: { width: 1440, height: 1000 }, locale: 'zh-CN' });
+    const secondPage = await second.newPage();
+    attach(secondPage);
+    const secondEmail = `isolation-${Date.now()}-${Math.random().toString(16).slice(2, 6)}@example.com`;
+    await secondPage.goto(`${webBase}/#auth`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await secondPage.locator('#authTitle').waitFor({ timeout: 20000 });
+    await dismissOnboarding(secondPage);
+    await secondPage.locator('.auth-switch-link').first().click();
+    await waitUntil(async () => (await secondPage.locator('#authTitle').textContent()).includes('注册'), {
+      label: '切换到注册模式',
+      timeout: 10000,
+    });
+    await secondPage.locator('input[placeholder="您的邮箱地址"]').fill(secondEmail);
+    const secondPassword = await openPasswordAuth(secondPage);
+    await secondPassword.fill(PASSWORD);
+    const secondNickname = secondPage.locator('input[placeholder="昵称（可选）"]');
+    if (await secondNickname.isVisible()) await secondNickname.fill('e2e-isolation');
+    await submitAuthAndWaitForToken(secondPage, '注册');
+
+    await secondPage.goto(`${webBase}/#research`, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await secondPage.waitForSelector('h1.rw-title', { timeout: 25000 });
+    const secondProjects = secondPage.locator('section[aria-label="研究项目列表"]');
+    await secondProjects.waitFor({ timeout: 20000 });
+    const secondText = (await secondProjects.textContent()) || '';
+    assert(!secondText.includes(apiContext.project.title), '账号 B 的项目列表泄漏了账号 A 的项目');
+    assert(!secondText.includes('键盘创建项目-'), '账号 B 的项目列表泄漏了账号 A 键盘创建的项目');
+
+    const probe = await secondPage.evaluate(async (projectId) => {
+      const token = localStorage.getItem('sm_token');
+      const response = await fetch(`/api/v1/research/projects/${projectId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      return { status: response.status, body: (await response.text()).slice(0, 200) };
+    }, apiContext.project.id);
+    assert(probe.status === 404, `账号 B 直连账号 A 的项目应 404，实际 ${probe.status}：${probe.body}`);
+    logDetail(`双账号：B 列表不含 A 的项目，直连 A 项目 HTTP ${probe.status}（统一 NOT_FOUND）`);
+    await shot(secondPage, 'a11y-03-isolation');
+    await second.close();
+
+    // 外链 CDN（jsdelivr 的 CodeMirror）在离线环境必然失败，且会连带 CodeMirror 未定义的 pageerror。
+    // 这里只把「非外链归因」的 pageerror 视为失败；资源加载错误按条数记录，供人工核对。
+    const pageErrors = consoleErrors.filter((item) => item.startsWith('pageerror:'));
+    const unexpectedPageErrors = pageErrors.filter((item) => !/CodeMirror/.test(item));
+    const resourceErrors = consoleErrors.filter((item) => item.includes('Failed to load resource'));
+    assert(
+      unexpectedPageErrors.length === 0,
+      `无障碍/响应式流程出现未预期 pageerror：${unexpectedPageErrors.slice(0, 3).join(' | ')}`
+    );
+    logDetail(
+      `无障碍/响应式：截图 ${screenshots.length} 张，资源加载错误 ${resourceErrors.length} 条（外链 CDN 离线），非外链 pageerror ${unexpectedPageErrors.length} 条`
+    );
+    return { screenshots, consoleErrors: unexpectedPageErrors.length };
+  } finally {
+    await browser.close();
+  }
+}
 
 function killTree(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return;
@@ -1333,12 +1547,23 @@ async function main() {
     logStage('执行浏览器验收（真实 UI 注册/登出/登录 → #research → 断言 → 导出下载）');
     const browserResult = await runBrowserFlow(await loadPlaywright(), web.base, apiContext, dirs);
 
+    let a11yResult = null;
+    if (opts.a11y) {
+      a11yResult = await runA11yFlow(await loadPlaywright(), web.base, apiContext, dirs);
+    }
+
     logStage('全部断言通过');
     logDetail(`API：findings=${apiContext.findingsCount}，导出 ${apiContext.exportBytes} B`);
     logDetail(
       `图表：${apiContext.chart.capability === 'enabled' ? `201 / ${apiContext.chart.bytes} B PNG（${apiContext.chart.path}）` : '503 CHART_CAPABILITY_DISABLED（显式关闭）'}`
     );
     logDetail(`浏览器：下载 ${browserResult.downloadBytes} B，控制台错误 ${browserResult.consoleErrors} 条`);
+    if (a11yResult) {
+      logDetail(
+        `无障碍/响应式：截图 ${a11yResult.screenshots.length} 张，非外链 pageerror ${a11yResult.consoleErrors} 条`
+      );
+      for (const file of a11yResult.screenshots) console.log(`[e2e]       ${file}`);
+    }
     logDetail(`截图证据（${browserResult.screenshots.length} 张）：`);
     for (const file of browserResult.screenshots) console.log(`[e2e]       ${file}`);
     logDetail(`总耗时 ${((Date.now() - startedAt) / 1000).toFixed(1)} s`);

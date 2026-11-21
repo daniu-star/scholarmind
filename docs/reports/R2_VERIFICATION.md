@@ -51,14 +51,14 @@
 | AT-044 迁移/归属 | partial | 迁移可重入与回退已验证；多 owner 共用 session、旧会话缓存未复现 |
 | AT-045 V2 导出/DOCX | partial | 绑已存版本、DOCX 重开段落数校验、未知样式 422、导出幂等均有测试；"浏览器另有未保存 V3"组合未测 |
 | AT-046 冷启动/日志目录 | not_covered | 无远端 CI 冷启动记录；路径与日志目录未专项演练 |
-| AT-047 浏览器 1440/390、键盘 | partial | 1440px 全链路已用真实 Playwright 跑通（含真实 UI 注册/登出/登录、图表前端面板）；390px 窄屏与键盘可达性仍未验证 |
+| AT-047 浏览器 1440/390、键盘 | **partial（已扩到 390px + 键盘）** | 1440px 全链路与 390×844 窄屏、键盘可达（Tab 至「新建项目」→ Enter 聚焦输入 → 键盘创建项目）均在真实 Chromium 中跑通，见 §11；仍未覆盖真实 iOS Safari/Android 设备与读屏软件 |
 | AT-048 构建产物/唯一模块化 | partial | `dist` 模块入口存在且构建断言通过；但后端 `GET /` 仍 307 到原型页（D6），"root 只交付模块化产物"无法从应用入口自证 |
 | AT-049 安全/日志负例 | partial | 代码执行默认关闭、来源 URL 阻断 file/私网/回环有测试；日志泄露面未专项扫描 |
 | AT-050 ≥10 授权论文 + 2 位真人 | **partial** | 14 篇真实论文 + 真实模型全跑通（13 succeeded / 1 partial、覆盖率 97.00%、1,974 条诊断、引文保真 95.44%、纯编造 0.00%）；**缺两位真人盲评** → 召回/误报/时间无数字；工具硬约束（<10→exit 2、model 评审→exit 2、缺评分→exit 3）已被测试锁定 |
 | AT-051 retry/预算不清零 | partial | 受理预算落库、retry 不膨胀、越界降级已测；并发重试/预留释放未测。D2 曾使生产路径 export 得 160 调用，已修 |
 | AT-052 隔离/指标聚合 | not_covered | 矩阵语义为"切换项目/用户、检索降级、指标聚合、埋点去重"；R2 只回归未新增证据 |
-| AT-053 同浏览器双账号 | not_covered | 未做 A 退出/B 登录与 refresh≠access 用例 |
-| AT-054 删除撤权/迟到 worker | not_covered | 未测删除后索引清理、迟到 worker 与事件重放泄露 |
+| AT-053 同浏览器双账号 | **partial** | 已做双账号隔离：新注册账号 B 在 UI 中看不到账号 A 的项目，B 直连 A 的项目 ID 得统一 404（`NOT_FOUND`），见 §11.3；refresh≠access 的 token 混用仍由 R1 用例覆盖、未在浏览器里做 |
+| AT-054 删除撤权/迟到 worker | **partial** | 新增 `test_research_r2/test_deletion_revocation.py` 5 条：删除后读路径全 404 且不泄露文件名、已删版本建任务 404、版本与分块级联清理、非 owner 删除前后均 404、租约 `LEASE_HELD`、终态任务 `TASK_NOT_CLAIMABLE` 且迟到执行器不写事件；未覆盖事件重放泄露（需 Redis 生产环境） |
 | AT-055 R2 图表数据一致性 | partial | 摘要可独立复算、值域与表数据一致、PNG sha256/宽高互证、同输入字节一致、越权 404、失败不落 Artifact；缺口：输入格式收窄（D1）、单位校验未显式（D5 已补策略字段） |
 | AT-056 R2 预算/20000 字对照 | partial | 越界→`partial`+`BUDGET_EXCEEDED` 且成果保留、未知费用 `None`/报表"未知"、事件按 sequence 去重；缺口：真实 20000 字对照未跑 |
 
@@ -101,7 +101,7 @@
 | --- | --- | --- |
 | AT-050 真人盲评 | 真实模型评估已完成；**无真人评审**（用户指示越过） | 无召回率/误报率/人工时间真实数字（覆盖率/引文保真/重复率已有） |
 | AT-056 20000 字对照 | 禁网、禁真实模型 | 无覆盖率/P95/真实消耗 |
-| AT-047/048/053 浏览器与 a11y | Playwright 已装并跑通桌面 1440px；窄屏/键盘/双账号仍未验 | 移动端与 a11y 不能宣称通过 |
+| AT-047/048/053 浏览器与 a11y | 已跑通桌面 1440px + 390px 窄屏 + 键盘 + 双账号隔离；未覆盖真机与读屏软件 | 不能宣称完整移动端/无障碍通过；AT-048 的 `GET /` 307 仍未改 |
 | AT-052/054 | 属 R1 范围，R2 未新增 | 依赖 R1 证据，本次仅回归未破坏 |
 | 图表 12 种渲染器 | 只抽测 gradient_area 全链路 + 纯函数覆盖类型表 | 其余 11 种未逐一冒烟 |
 | 图表单位校验 | 实现无显式单位字段 | AT-055"单位"项未验证 |
@@ -198,4 +198,16 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 
 - `node scripts/research_e2e.mjs --keep` → **exit 0（PASS）**，139.3 s，控制台错误 0；含图表前端面板（识别 2 张表 → 生成 1351×963 → 校验信息）。
 - 期间修掉两个环境级缺陷：`DISABLE_VECTOR_PREWARM`（预热线程饿死事件循环 → health 长时间不可达）与 `E2E_HEALTH_TIMEOUT_MS`（健康检查超时改为可配置，默认 180 s）。
-- 因此 §2 中 AT-047 的"真实 Playwright 桌面已跑通"进一步固定为：**整脚本 exit 0、含图表前端**；窄屏/键盘/双账号仍未覆盖。
+- 因此 §2 中 AT-047 的"真实 Playwright 桌面已跑通"进一步固定为：**整脚本 exit 0、含图表前端**。
+
+## 11. 附录：零成本验收第二轮（窄屏 / 键盘 / 双账号 / 删除撤权，2026-11-21 20:0x）
+
+- 命令：`node scripts/research_e2e.mjs --a11y --keep` → **exit 0（PASS）**，新增三段真实浏览器断言（截图在 `tmp/e2e-evidence/a11y-01..03-*.png`）。
+- 11.1 窄屏 390×844（`isMobile: true, hasTouch: true`）：`document.documentElement.scrollWidth = 409`、`window.innerWidth = 409` → **无横向溢出**；项目列表与工作区标题可见；图表卡片在窄屏下未渲染（无文档选中，属正常空态），布局卡片宽度均未超视口。
+- 11.2 键盘可达：不注入脚本，仅用 `keyboard.press('Tab')` 从文档起点正向遍历（最多 80 次），命中文本/aria-label 含「新建项目」的按钮 → `Enter` 后 `document.activeElement.className` 含 `rw-input`（焦点落到新建项目输入框）→ `keyboard.type('键盘创建项目-XXXXXX')` + `Enter` → 该项目真实出现在项目列表。
+- 11.3 双账号隔离：同一浏览器新 context 注册账号 B，进入 `#research` 后项目列表**不含**账号 A 的项目（含 A 用键盘创建的项目）；页面内 `fetch('/api/v1/research/projects/{A 的 id}')` 返回 **404**（统一 `NOT_FOUND`，不泄露存在性）。
+- 11.4 删除撤权（AT-054）：`test_research_r2/test_deletion_revocation.py` 5 passed；R2 目录收集 **63 条**（62 passed + 1 skipped）。
+- 11.5 E2E 脚本的两处判定细化（都为「不让环境噪音掩盖真实失败」）：
+  1. 控制台错误分类：CodeMirror 等 jsdelivr 外链资源在离线环境必然失败，控制台文本不含 URL；脚本改用 `requestfailed` 的 URL 判定——**只有出现本项目源（web/`/api/v1/`）连接级失败时才失败**，否则把无 URL 的资源加载错误归因为外链并在日志打印外链主机。
+  2. a11y 流程只把「非外链归因的 pageerror」计为失败（CodeMirror 未定义由外链失败连带产生），资源加载错误按条数记录供核对。
+- 复跑数字：`pytest src/backend/tests/test_research_r2 -q` → **62 passed, 1 skipped（收集 63）**；`ruff check src/backend/tests/test_research_r2` → All checks passed；`node --check scripts/research_e2e.mjs` 通过。
