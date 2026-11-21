@@ -53,6 +53,9 @@ def select_columns(table: TableData, *, x_column: str, y_columns: Sequence[str])
   纯 CSV 块。`require_version(db, actor, document_version_id)` 先授权，失败 404。
   上传 `.csv` / `.xlsx` 数据文件时，`document_parser` 已把它们转成 Markdown 管道表写入
   版本正文（CSV 单表；XLSX 每 sheet 一表，最多前 5 个 sheet），图表侧无需专门分支。
+- 写入路径的 fencing 校验（PRD FR-11）：租约被接管后，旧执行器再写事件或迁移状态会得到
+  `STALE_ATTEMPT`(409)，`details` 含 `fencing_token` 与 `current_fencing_token`。`execute_task`
+  会在执行期自动绑定 token；自定义集成方需在调用 `append_event`/`transition` 时传 `fencing_token=`。
 - 错误码（全部 `ResearchAPIError`）：`CHART_NO_TABLE`(422)、`CHART_TABLE_INVALID`(422)、
   `CHART_UNKNOWN_COLUMN`(422)、`CHART_NON_NUMERIC`(422, details 给列名与首个坏值)、
   `CHART_EMPTY_DATA`(422)、`CHART_TOO_MANY_ROWS`(413, 用 `settings.RESEARCH_CHART_MAX_ROWS`)。

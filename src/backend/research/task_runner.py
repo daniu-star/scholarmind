@@ -316,30 +316,36 @@ async def execute_task(
         logger.warning("任务 %s 抢占异常，跳过", task.id, exc_info=True)
         return
 
+    # 把本次领取的 fencing token 绑到上下文：租约被接管后，本次执行的任何
+    # 事件/状态写入都会被 repository 以 STALE_ATTEMPT 拒绝（PRD FR-11）。
+    lease_handle = repository.set_lease_scope(getattr(attempt, "fencing_token", None))
     try:
-        await _execute_claimed(
-            db,
-            task,
-            holder=holder,
-            client=client,
-            attempt=attempt,
-            repository=repository,
-            billing=billing,
-        )
-    except ResearchAPIError as exc:
-        await _finalize_exception(
-            db, task, attempt, exc, repository=repository, billing=billing
-        )
-    except Exception as exc:  # noqa: BLE001 - 收敛为 failed，不向调度器抛
-        logger.exception("任务 %s 执行异常", task.id)
-        await _finalize_exception(
-            db,
-            task,
-            attempt,
-            internal(f"任务执行异常：{type(exc).__name__}"),
-            repository=repository,
-            billing=billing,
-        )
+        try:
+            await _execute_claimed(
+                db,
+                task,
+                holder=holder,
+                client=client,
+                attempt=attempt,
+                repository=repository,
+                billing=billing,
+            )
+        except ResearchAPIError as exc:
+            await _finalize_exception(
+                db, task, attempt, exc, repository=repository, billing=billing
+            )
+        except Exception as exc:  # noqa: BLE001 - 收敛为 failed，不向调度器抛
+            logger.exception("任务 %s 执行异常", task.id)
+            await _finalize_exception(
+                db,
+                task,
+                attempt,
+                internal(f"任务执行异常：{type(exc).__name__}"),
+                repository=repository,
+                billing=billing,
+            )
+    finally:
+        repository.reset_lease_scope(lease_handle)
 
 
 # ── 主流程 ────────────────────────────────────────────────────

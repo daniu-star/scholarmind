@@ -54,10 +54,17 @@ def _active(value: datetime | None, now: datetime) -> bool:
 
 
 def _extend_30_days(value: datetime | None, now: datetime) -> datetime:
+    """在现有到期时间上加 30 天，返回 **naive UTC**。
+
+    列类型是 ``TIMESTAMP WITHOUT TIME ZONE``（PRD §6：UTC naive）。
+    真实 PostgreSQL + asyncpg 下写入 aware datetime 会直接报
+    ``DataError: can't subtract offset-naive and offset-aware datetimes``
+    （2026-11-21 恢复演练实测；SQLite 不校验所以过去没暴露）。
+    """
     base = as_utc(value)
     if base is None or base < now:
         base = now
-    return base + timedelta(days=30)
+    return (base + timedelta(days=30)).replace(tzinfo=None)
 
 
 class EntitlementService:
@@ -278,7 +285,16 @@ class EntitlementService:
                 EntitlementGrant.source_ref == source_ref
             )
         )
-        if existing.scalar_one_or_none() is not None:
+        existing_grant = existing.scalar_one_or_none()
+        if existing_grant is not None:
+            # 幂等：同一笔支付回调重复投递 → 返回当前快照。
+            # 但若该 source_ref 已属于**另一个用户**，静默返回会让调用方以为已开通、
+            # 实际什么都没发；这种情况必须显式失败（2026-11-21 PG 恢复演练实测踩到）。
+            if int(existing_grant.user_id) != int(user_id):
+                raise ValueError(
+                    f"source_ref {source_ref!r} 已属于用户 "
+                    f"{existing_grant.user_id}，不能用于用户 {user_id}"
+                )
             return await EntitlementService.get_snapshot(db, user_id)
 
         quota = await EntitlementService.ensure_quota(db, user_id)

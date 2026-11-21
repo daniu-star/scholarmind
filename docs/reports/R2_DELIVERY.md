@@ -359,3 +359,17 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 | 测量中修复的缺陷 | 第二轮预算上限应为累计值；修复后 multi_role 正确跑满两遍（回归测试 2 条） |
 
 结论：流程增益**可测量且成本明确（约 2×）**；默认仍 `single`，`multi_role` 作为显式选项。
+
+
+## 15. 2026-11-21 更新：真实 PostgreSQL 恢复演练（含 3 个真实缺陷修复）
+
+| 项目 | 结果 |
+| --- | --- |
+| 环境 | PostgreSQL 16.4 便携版，端口 55433，`lease_seconds=8`（非 SQLite） |
+| 脚本 / 报告 | `scripts/research_recovery_drill.py` / `docs/reports/R2_RECOVERY_DRILL.md` |
+| 检查项 | **8/8 PASS**：schema 15 表 + 4 唯一约束、started 事件、崩溃接管（attempt 1→2、token 1→2）、事件序号 `[1..7]` 单调、终态事件 1 条、Artifact 1 条、迟到写入被拒、重复投递 exactly-once、immediate 重启一致 |
+| 缺陷 R2-A13（已修） | fencing token 未在写入路径校验：旧 attempt 能在租约转移后写事件/改状态；改为 `STALE_ATTEMPT` 冲突 + `set_lease_scope` 上下文绑定 |
+| 缺陷 R2-A14（已修） | `entitlement_service._extend_30_days` 返回 tz-aware datetime，PG 写入报 `DataError`（SQLite 不报） |
+| 缺陷 R2-A15（已修） | `grant_product` 的 `source_ref` 属于他人时静默 no-op；改为抛 `ValueError` |
+| 回归 | `529 passed, 1 skipped in 371.35s`；`ruff` 全绿 |
+| 未覆盖 | Redis 断连重连、Celery broker 重投、多机竞争（本机无 Redis/无 Docker/无 broker，如实声明） |

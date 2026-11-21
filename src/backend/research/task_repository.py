@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+from contextvars import ContextVar
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -38,6 +39,51 @@ from .models import ResearchTask, TaskAttempt, TaskEvent
 
 #: 新 attempt 默认租约（PRD §9「任务累计运行期限 1200 秒」）。
 DEFAULT_LEASE_SECONDS = 1200
+
+#: 当前执行器持有的 fencing token（PRD FR-11：租约转移后旧执行器不得再写）。
+_LEASE_TOKEN: ContextVar[Optional[int]] = ContextVar("research_lease_token", default=None)
+
+
+def set_lease_scope(fencing_token: Optional[int]) -> Any:
+    """把 fencing token 绑定到当前执行上下文（由 ``task_runner`` 执行期调用）。"""
+    return _LEASE_TOKEN.set(fencing_token)
+
+
+def reset_lease_scope(handle: Any) -> None:
+    """恢复上一个上下文 token，必须与 :func:`set_lease_scope` 成对使用。"""
+    _LEASE_TOKEN.reset(handle)
+
+
+async def _current_fencing_token(db: AsyncSession, task_id: str) -> Optional[int]:
+    """该任务当前最大 attempt 的 fencing token（没有 attempt 时返回 None）。"""
+    value = await db.scalar(
+        select(func.max(TaskAttempt.fencing_token)).where(TaskAttempt.task_id == task_id)
+    )
+    return int(value) if value is not None else None
+
+
+async def _enforce_fence(
+    db: AsyncSession, task_id: str, fencing_token: Optional[int]
+) -> None:
+    """拒绝「租约已被接管」的旧执行器写入（PRD FR-11 fencing）。
+
+    ``fencing_token`` 缺省时回退到 :func:`set_lease_scope` 绑定的上下文 token；
+    两者都没有（例如 API 层的 cancel/retry 这类无租约写入）时不校验——那时
+    写入者并不是某一个 attempt，允许按状态机规则迁移。
+    """
+    effective = fencing_token if fencing_token is not None else _LEASE_TOKEN.get()
+    if effective is None:
+        return
+    current = await _current_fencing_token(db, task_id)
+    if current is None:
+        return  # 任务没有任何 attempt：不构成「租约转移」
+    if int(effective) == current:
+        return
+    raise conflict(
+        "STALE_ATTEMPT",
+        "执行权已转移，本次写入被拒绝。",
+        {"fencing_token": int(effective), "current_fencing_token": current},
+    )
 #: 事件序号并发冲突的重试次数（含首次尝试共 2 次写入）。
 EVENT_SEQUENCE_RETRIES = 2
 
@@ -205,8 +251,10 @@ async def append_event(
     event_type: str,
     *,
     payload: Optional[Dict[str, Any]] = None,
+    fencing_token: Optional[int] = None,
 ) -> TaskEvent:
     """追加事件；``(task_id, sequence)`` 唯一，冲突时重算序号重试一次。"""
+    await _enforce_fence(db, task.id, fencing_token)
     try:
         event_type_value = EventType(str(event_type)).value
     except ValueError as exc:
@@ -261,8 +309,10 @@ async def transition(
     coverage: Optional[Any] = None,
     quality_verdict: Optional[Any] = None,
     snapshot_summary: Optional[Dict[str, Any]] = None,
+    fencing_token: Optional[int] = None,
 ) -> ResearchTask:
     """唯一的状态迁移入口：校验 ALLOWED_TRANSITIONS，递增 state_revision。"""
+    await _enforce_fence(db, task.id, fencing_token)
     try:
         target = status if isinstance(status, TaskStatus) else TaskStatus(str(status))
     except ValueError as exc:
@@ -399,8 +449,10 @@ async def close_attempt(
     status: str,
     *,
     error: Optional[Dict[str, Any]] = None,
+    fencing_token: Optional[int] = None,
 ) -> None:
     """结束一次 attempt；不删除行（审计与 fencing 需要保留）。"""
+    await _enforce_fence(db, attempt.task_id, fencing_token)
     attempt.status = str(status)[:24]
     if error is not None:
         attempt.error_json = _jsonable(error, field="error")
@@ -434,4 +486,6 @@ __all__ = [
     "open_attempt",
     "close_attempt",
     "list_events",
+    "set_lease_scope",
+    "reset_lease_scope",
 ]

@@ -269,3 +269,17 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 - 维度变化：p14 的 `method` 从 0 条变成 13 条；p04 的 `method` 16→53、`evidence` 23→42。属可复现的行为差异，不等于质量提升（无真人标注）。
 - 预算边界：p04 的 multi_role 用掉默认预算 95.8%；更长文档（p10 单遍已 98,824 tokens）两遍必然转 `partial`。因此默认 `single`，`multi_role` 仅作显式可选项。
 - 测量中发现并修复：第二轮预算上限误用「份额」而非「已用+份额」，导致第二遍只跑 2 次调用却报 succeeded；修复后 40 调用 / 95,840 tokens / 覆盖 100%。回归用例 `src/backend/tests/test_research_r1/test_review_roles.py`（2 条）。
+
+
+## 16. 附录：真实 PostgreSQL 恢复演练（2026-11-21）
+
+- 环境：**PostgreSQL 16.4**（官方 Windows 便携版二进制，端口 55433，`lease_seconds=8`），非 SQLite、非替身。
+- 脚本：`scripts/research_recovery_drill.py`；报告：`docs/reports/R2_RECOVERY_DRILL.md`。
+- 结论：**PASS（8/8）**——迁移与 schema（15 张 research_* 表 + 4 个唯一约束、server 16.4）、领取即写 started、崩溃后租约过期被 attempt 2 接管、事件序号 `[1..7]` 单调且终态事件 1 条、Artifact 1 条、迟到写入被拒、重复投递 exactly-once、`stop -m immediate` 重启后状态一致。
+- 演练中发现 3 个真实缺陷：
+  1. `src/backend/services/entitlement_service.py` 的 `_extend_30_days` 返回 tz-aware datetime → asyncpg 写 `TIMESTAMP WITHOUT TIME ZONE` 报 `DataError`（SQLite 不校验，R0–R2 全程未暴露）；已改为 UTC naive。
+  2. `EntitlementService.grant_product` 的 `source_ref` 若已属于另一用户会**静默 no-op**；已改为抛 `ValueError`。
+  3. **R2-A13（FR-11）**：fencing token 只落库、未在写入路径校验——租约转移后旧 attempt 仍能 `append_event` 与 `transition`；已修复（`task_repository` 新增 `set_lease_scope`/`_enforce_fence`，`append_event`/`transition`/`close_attempt` 校验 token，冲突码 `STALE_ATTEMPT`；`task_runner.execute_task` 执行期绑定 token）。
+- 回归：三套 `529 passed, 1 skipped in 371.35s`（R0 290 / R1 161 / R2 78），`ruff` 全绿。
+- 未覆盖（如实声明）：Redis 真实断连重连（本机无 redis-server、Docker 引擎不可用）、Celery worker 被杀后 broker 重投（无 broker，研究域走进程内 dispatcher）、多机竞争。
+- 残留风险：崩溃 attempt 行保留 `running`（按设计，回收靠 `lease_expires_at`）；从未达终态的任务可能残留 `reserved` 计费行（无独立 reaper）。
