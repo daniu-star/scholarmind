@@ -177,16 +177,19 @@ async def test_unknown_column_and_bad_type(client_a, charts_enabled):
     )
     assert_error(unknown, 422, "CHART_UNKNOWN_COLUMN")
 
+    # bar/line 自本版起是受支持的类型（分类 x 轴），这里用真正不存在的类型名探测 422。
     bad_type = await client_a.post(
         "/api/v1/research/charts",
         json={
-            "chart_type": "bar",
+            "chart_type": "radar",
             "x_column": "年份",
             "y_columns": ["论文数"],
             **base,
         },
     )
-    assert_error(bad_type, 422, "CHART_UNSUPPORTED_TYPE")
+    error = assert_error(bad_type, 422, "CHART_UNSUPPORTED_TYPE")
+    assert "bar" in error["details"]["supported"]
+    assert "line" in error["details"]["supported"]
 
 
 @pytest.mark.asyncio

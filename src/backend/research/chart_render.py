@@ -27,12 +27,14 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402  (必须在 use("Agg") 之后导入)
+from matplotlib import font_manager  # noqa: E402
 
 from ..services.chart_service import CHART_FUNCTIONS  # noqa: E402
-from .chart_data_source import TableData  # noqa: E402
+from .chart_data_source import SeriesTable, TableData  # noqa: E402
 from .errors import invalid  # noqa: E402
 
 __all__ = [
+    "BASIC_CHART_TYPES",
     "CHART_DPI",
     "CHART_HEIGHT",
     "CHART_WIDTH",
@@ -40,8 +42,12 @@ __all__ = [
     "RenderedChart",
     "build_payload",
     "canonical_csv",
+    "canonical_series_csv",
     "data_digest",
     "render_chart_png",
+    "render_series_png",
+    "series_digest",
+    "series_value_ranges",
     "value_ranges",
 ]
 
@@ -56,6 +62,33 @@ _MIN_Y_COLUMNS = {"contour": 2, "heatmap_dendro": 2}
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _MIN_PNG_BYTES = 256
 _RENDER_LOCK = threading.Lock()
+
+#: 首选 CJK 字体（Windows 默认有雅黑/黑体；Linux 容器可装 Noto）
+_CJK_FONT_CANDIDATES = (
+    "Microsoft YaHei",
+    "SimHei",
+    "Noto Sans CJK SC",
+    "Source Han Sans SC",
+    "WenQuanYi Zen Hei",
+    "PingFang SC",
+)
+
+
+def _configure_fonts() -> str | None:
+    """让中文标题/标签真正能被渲染出来，而不是变成方框（首次调用生效）。
+
+    返回选中的字体名（无可用 CJK 字体时返回 ``None``，此时 matplotlib 告警
+    ``Glyph missing`` 属已知环境限制，中文标签会显示为方框）。
+    """
+    try:
+        available = {font.name for font in font_manager.fontManager.ttflist}
+    except Exception:  # pragma: no cover - 字体库异常不应影响出图
+        return None
+    chosen = next((name for name in _CJK_FONT_CANDIDATES if name in available), None)
+    if chosen:
+        plt.rcParams["font.sans-serif"] = [chosen, "DejaVu Sans"]
+    plt.rcParams["axes.unicode_minus"] = False
+    return chosen
 
 
 @dataclass(frozen=True)
@@ -237,6 +270,7 @@ def render_chart_png(
     y_label: str,
 ) -> RenderedChart:
     """调用真实图表函数渲染 PNG；任何异常原样上抛（服务层转 500）。"""
+    _configure_fonts()
     function = CHART_FUNCTIONS.get(chart_type)
     if function is None:
         raise invalid(
@@ -260,6 +294,160 @@ def render_chart_png(
                 dpi=CHART_DPI,
                 **dict(payload.options),
             )
+            figure.savefig(
+                buffer,
+                format="png",
+                dpi=CHART_DPI,
+                bbox_inches="tight",
+                facecolor="#FFFFFF",
+            )
+            png = buffer.getvalue()
+        finally:
+            for number in plt.get_fignums():
+                if number not in existing:
+                    plt.close(number)
+            if figure is not None:
+                plt.close(figure)
+            buffer.close()
+
+    width, height = _verify_png(png)
+    return RenderedChart(png=png, width=width, height=height)
+
+
+# ── 基础图表（bar / line）：分类 x 轴 ─────────────────────
+
+#: 分类轴基础图表的类型集合（与 ``chart_service.BASIC_CHART_TYPES`` 保持一致）
+BASIC_CHART_TYPES = frozenset({"bar", "line"})
+
+#: 灰阶学术配色与标记，按系列循环；不引入彩色，保证打印/灰度阅读可分辨
+_SERIES_COLORS = ("#2F2F2F", "#5C5C5C", "#8A8A8A", "#B5B5B5")
+_SERIES_HATCHES = ("", "//", "..", "xx")
+_SERIES_MARKERS = ("o", "s", "^", "D")
+
+
+def canonical_series_csv(series: "SeriesTable") -> str:
+    """分类表的规范化 CSV：分类标签 + ``repr(float)``（``data_digest`` 的唯一输入）。"""
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow([series.x_name, *series.y_columns])
+    for label, row in zip(series.x_labels, series.rows):
+        writer.writerow([label, *(repr(float(value)) for value in row)])
+    return buffer.getvalue()
+
+
+def series_digest(series: "SeriesTable") -> str:
+    """分类表规范化 CSV 的 sha256；标签参与摘要，改标签即换摘要。"""
+    return hashlib.sha256(canonical_series_csv(series).encode("utf-8")).hexdigest()
+
+
+def series_value_ranges(series: "SeriesTable") -> dict[str, dict[str, float]]:
+    """逐 y 列 min/max；分类轴没有数值域，不出现在结果里（不伪造 0/1 编码）。"""
+    result: dict[str, dict[str, float]] = {}
+    for position, name in enumerate(series.y_columns):
+        values = [row[position] for row in series.rows]
+        result[name] = {"min": float(min(values)), "max": float(max(values))}
+    return result
+
+
+def _new_axes(*, title: str, x_label: str, y_label: str):
+    """白底黑框、内向刻度的学术风格画布（与 12 种图表保持一致的观感）。"""
+    _configure_fonts()
+    figure, axes = plt.subplots(
+        figsize=(CHART_WIDTH / CHART_DPI, CHART_HEIGHT / CHART_DPI),
+        dpi=CHART_DPI,
+    )
+    figure.patch.set_facecolor("#FFFFFF")
+    axes.set_facecolor("#FFFFFF")
+    # 中文标题较长时按 24 字换行，避免整行顶到画布边缘被裁切。
+    wrapped = "\n".join(
+        title[index : index + 24] for index in range(0, len(title), 24)
+    ) or title
+    axes.set_title(wrapped, fontsize=13, fontweight="bold", pad=12)
+    axes.set_xlabel(x_label, fontsize=12, labelpad=10)
+    axes.set_ylabel(y_label, fontsize=12, labelpad=10)
+    axes.tick_params(axis="both", direction="in", length=4, labelsize=10)
+    for spine in axes.spines.values():
+        spine.set_edgecolor("#1F1F1F")
+        spine.set_linewidth(1.2)
+    return figure, axes
+
+
+def _style_x_axis(axes, labels: Tuple[str, ...]) -> None:
+    """分类刻度：超过 8 类就旋转 45°，避免标签互相覆盖。"""
+    axes.set_xticks(range(len(labels)))
+    rotation = 45 if len(labels) > 8 else 0
+    axes.set_xticklabels(labels, rotation=rotation, ha="right" if rotation else "center")
+
+
+def _bar_figure(series: "SeriesTable", *, title: str, x_label: str, y_label: str):
+    figure, axes = _new_axes(title=title, x_label=x_label, y_label=y_label)
+    count = len(series.y_columns)
+    # 组内留 10% 间隙，避免相邻柱完全贴合被误读成一组。
+    slot = 0.8 / max(count, 1)
+    width = slot * 0.9
+    for position, name in enumerate(series.y_columns):
+        offsets = [index + (position - (count - 1) / 2) * slot for index in range(len(series.x_labels))]
+        axes.bar(
+            offsets,
+            [row[position] for row in series.rows],
+            width=width,
+            label=name,
+            color=_SERIES_COLORS[position % len(_SERIES_COLORS)],
+            hatch=_SERIES_HATCHES[position % len(_SERIES_HATCHES)],
+            edgecolor="#1F1F1F",
+            linewidth=0.8,
+        )
+    _style_x_axis(axes, series.x_labels)
+    if count > 1:
+        axes.legend(frameon=False, fontsize=10)
+    return figure
+
+
+def _line_figure(series: "SeriesTable", *, title: str, x_label: str, y_label: str):
+    figure, axes = _new_axes(title=title, x_label=x_label, y_label=y_label)
+    for position, name in enumerate(series.y_columns):
+        axes.plot(
+            range(len(series.x_labels)),
+            [row[position] for row in series.rows],
+            label=name,
+            color=_SERIES_COLORS[position % len(_SERIES_COLORS)],
+            linestyle=("--" if position % 2 else "-"),
+            marker=_SERIES_MARKERS[position % len(_SERIES_MARKERS)],
+            markersize=5,
+            linewidth=1.8,
+        )
+    _style_x_axis(axes, series.x_labels)
+    if len(series.y_columns) > 1:
+        axes.legend(frameon=False, fontsize=10)
+    return figure
+
+
+_SERIES_RENDERERS = {"bar": _bar_figure, "line": _line_figure}
+
+
+def render_series_png(
+    chart_type: str,
+    series: "SeriesTable",
+    *,
+    title: str,
+    x_label: str,
+    y_label: str,
+) -> RenderedChart:
+    """渲染分类轴基础图表；异常原样上抛（服务层转 500），绝不回退占位图。"""
+    renderer = _SERIES_RENDERERS.get(chart_type)
+    if renderer is None:
+        raise invalid(
+            "CHART_UNSUPPORTED_TYPE",
+            f"不支持的图表类型：{chart_type}",
+            {"supported": sorted(BASIC_CHART_TYPES)},
+        )
+
+    buffer = io.BytesIO()
+    with _RENDER_LOCK:
+        existing = set(plt.get_fignums())
+        figure = None
+        try:
+            figure = renderer(series, title=title, x_label=x_label, y_label=y_label)
             figure.savefig(
                 buffer,
                 format="png",

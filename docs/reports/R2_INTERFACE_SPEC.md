@@ -58,10 +58,35 @@ def select_columns(table: TableData, *, x_column: str, y_columns: Sequence[str])
   `CHART_EMPTY_DATA`(422)、`CHART_TOO_MANY_ROWS`(413, 用 `settings.RESEARCH_CHART_MAX_ROWS`)。
 - 不猜类型、不插值、不丢行：某行某列不是数值 → 整个请求 422（给出列/行号），不做静默跳过。
 
+### 2.1b 分类轴（R2.1 增补，`bar` / `line`）
+
+```python
+@dataclass(frozen=True)
+class SeriesTable:
+    x_name: str                       # 第一列表头（分类标签列）
+    x_labels: tuple[str, ...]         # 原样保留的分类标签（去首尾空白，不转数值、不排序）
+    y_columns: tuple[str, ...]        # 数值列名（按出现顺序）
+    rows: tuple[tuple[float, ...], ...]  # 只含 y 列，与 y_columns 等宽
+    table_index: int
+    source_text_hash: str
+
+async def load_series_table(
+    db: AsyncSession, actor: Actor, *, document_version_id: str, table_index: int = 0
+) -> SeriesTable: ...
+def select_series(
+    table: SeriesTable, *, x_column: str, y_columns: Sequence[str]
+) -> SeriesTable: ...
+```
+
+- 只有 `bar` / `line` 走分类轴分支；其余 12 种仍要求全数值表（含 x 列），分类表 → 422 `CHART_NON_NUMERIC`。
+- x 列必须是第一列（`x_column` 只接受第一列表头），否则 422 `CHART_TABLE_INVALID`（message 含「第一列」）。
+- 空标签、y 列非数值、y 列全空 → 422 `CHART_NON_NUMERIC`（`details.column` 指明列名）。
+- 分类标签**不进入** `value_ranges`、不参与数值计算；`data_digest` 用 `series_digest`（标签参与摘要）。
+
 ### 2.2 `research/chart_service.py`
 
 ```python
-CHART_TYPES: frozenset[str]           # 复用 services.chart_service.CHART_FUNCTIONS 的 12 个键
+CHART_TYPES: frozenset[str]           # 12 个灰阶类型（CHART_FUNCTIONS）+ "bar"/"line" 分类轴，共 14 个
 def chart_capability() -> dict        # {"enabled": bool, "reason": str}
 async def create_chart(
     db, actor, *, project_id: str, document_version_id: str, chart_type: str,

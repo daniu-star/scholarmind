@@ -1519,12 +1519,27 @@ function _parseTables(blocks) {
     });
   });
   return tables.map((table, index) => {
-    const numeric =
+    const numericColumns = table.header.map((_, columnIndex) =>
       table.rows.length > 0 &&
-      table.rows.every((row) =>
-        row.every((cell) => cell === '' || Number.isFinite(Number(cell)))
-      );
-    return { index, columns: table.header, numeric, rows: table.rows.length };
+      table.rows.every((row) => {
+        const cell = row[columnIndex];
+        return cell === '' || Number.isFinite(Number(cell));
+      })
+    );
+    const numeric = numericColumns.every(Boolean);
+    // bar/line 允许第一列是分类文本，但至少要有一个数值列可作 y 轴。
+    const chartable =
+      table.rows.length > 0 &&
+      table.header.length >= 2 &&
+      numericColumns.slice(1).some(Boolean);
+    return {
+      index,
+      columns: table.header,
+      numeric,
+      chartable,
+      numericColumns,
+      rows: table.rows.length,
+    };
   });
 }
 
@@ -1542,7 +1557,9 @@ function applyChartTable(table) {
   const columns = table.columns || [];
   if (columns.length) {
     const x = columns[0];
-    const y = columns.slice(1, 3).join(',');
+    // 优先把数值列填进 y 轴：分类表的第一列往往是文本标签，直接送后端会 422。
+    const numericY = columns.slice(1).filter((_, offset) => table.numericColumns?.[offset + 1]);
+    const y = (numericY.length ? numericY : columns.slice(1)).slice(0, 2).join(',');
     s.chart.values.xColumn = x;
     s.chart.values.yColumns = y;
   }
@@ -1575,7 +1592,11 @@ async function ensureChartTable(force = false) {
     const { tables, options } = _tableStats(items);
     s.chart.tableOptions = options;
     s.chart.tableCount = tables;
-    const preferred = options.find((item) => item.numeric) || options[0] || null;
+    const preferred =
+      options.find((item) => item.numeric) ||
+      options.find((item) => item.chartable) ||
+      options[0] ||
+      null;
     if (preferred) {
       applyChartTable(preferred);
     } else {

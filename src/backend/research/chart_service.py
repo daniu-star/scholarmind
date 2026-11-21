@@ -23,14 +23,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import settings
 from ..services.chart_service import CHART_FUNCTIONS, CHART_NAMES
 from . import artifact_service
-from .chart_data_source import TableData, load_table, select_columns
+from .chart_data_source import (
+    SeriesTable,
+    TableData,
+    load_series_table,
+    load_table,
+    select_columns,
+    select_series,
+)
 from .chart_render import (
+    BASIC_CHART_TYPES,
     CHART_DPI,
     CHART_HEIGHT,
     CHART_WIDTH,
     build_payload,
     data_digest,
     render_chart_png,
+    render_series_png,
+    series_digest,
+    series_value_ranges,
     value_ranges,
 )
 from .contracts import Actor
@@ -38,10 +49,13 @@ from .errors import ResearchAPIError, invalid, not_found, unavailable
 from .models import Artifact, Document
 from .ownership import require_project, require_task, require_version
 
-__all__ = ["CHART_TYPES", "chart_capability", "create_chart"]
+__all__ = ["BASIC_CHART_TYPES", "CHART_TYPES", "chart_capability", "create_chart"]
 
-#: 与 ``services.chart_service.CHART_FUNCTIONS`` 完全一致的 12 种图表类型
-CHART_TYPES = frozenset(CHART_FUNCTIONS)
+#: 12 种灰阶学术图 + 2 种支持分类 x 轴的基础图（bar/line）
+CHART_TYPES = frozenset(CHART_FUNCTIONS) | frozenset(BASIC_CHART_TYPES)
+
+#: 基础图的展示名（``CHART_NAMES`` 里没有这两个键）
+BASIC_CHART_NAMES = {"bar": "分类柱状图", "line": "分类折线图"}
 
 #: 与路由层 ChartRequest.title 的上限保持一致
 _MAX_TITLE_LENGTH = 200
@@ -153,58 +167,114 @@ async def create_chart(
         document_version_id=version.id,
     )
 
-    table: TableData = await load_table(
-        db,
-        actor,
-        document_version_id=version.id,
-        table_index=table_index,
-    )
-    selected = select_columns(table, x_column=x_name, y_columns=y_names)
-    payload = build_payload(normalized_type, selected)
+    chart_label = CHART_NAMES.get(normalized_type) or BASIC_CHART_NAMES.get(normalized_type, normalized_type)
+    basic = normalized_type in BASIC_CHART_TYPES
+    extra_validation: dict = {}
 
-    chart_label = CHART_NAMES.get(normalized_type, normalized_type)
-    stacked = "、".join(payload.plotted_y_columns)
-    title_text = (title or "").strip() or f"{chart_label}：{selected.columns[0]} 对 {stacked}"
-    title_text = title_text[:_MAX_TITLE_LENGTH]
-
-    try:
-        rendered = await asyncio.to_thread(
-            render_chart_png,
-            normalized_type,
-            payload,
-            title=title_text,
-            x_label=selected.columns[0],
-            y_label=stacked,
+    if basic:
+        series: SeriesTable = await load_series_table(
+            db,
+            actor,
+            document_version_id=version.id,
+            table_index=table_index,
         )
-    except ResearchAPIError:
-        raise
-    except Exception as exc:  # 真实渲染器的任何异常都不允许变成占位图
-        raise ResearchAPIError(
-            "CHART_RENDER_FAILED",
-            500,
-            "图表渲染失败，未生成任何成果文件。",
-            {
-                "chart_type": normalized_type,
-                "reason": f"{type(exc).__name__}: {exc}"[:300],
-            },
-            retryable=True,
-        ) from exc
+        selected_series = select_series(series, x_column=x_name, y_columns=y_names)
+        x_label = selected_series.x_name
+        stacked = "、".join(selected_series.y_columns)
+        title_text = (title or "").strip() or f"{chart_label}：{x_label} 对 {stacked}"
+        title_text = title_text[:_MAX_TITLE_LENGTH]
+        try:
+            rendered = await asyncio.to_thread(
+                render_series_png,
+                normalized_type,
+                selected_series,
+                title=title_text,
+                x_label=x_label,
+                y_label=stacked,
+            )
+        except ResearchAPIError:
+            raise
+        except Exception as exc:  # 真实渲染器的任何异常都不允许变成占位图
+            raise ResearchAPIError(
+                "CHART_RENDER_FAILED",
+                500,
+                "图表渲染失败，未生成任何成果文件。",
+                {"chart_type": normalized_type, "reason": f"{type(exc).__name__}: {exc}"[:300]},
+                retryable=True,
+            ) from exc
+        digest = series_digest(selected_series)
+        source_text_hash = selected_series.source_text_hash
+        table_index_used = selected_series.table_index
+        row_count = len(selected_series.x_labels)
+        column_count = len(selected_series.y_columns) + 1
+        x_column_used = selected_series.x_name
+        y_columns_used = list(selected_series.y_columns)
+        plotted_y = list(selected_series.y_columns)
+        ranges = series_value_ranges(selected_series)
+        cleaning_note = "x 列为分类标签（原样保留），y 列必须全数值；不插值、不丢弃行，非数值直接 422"
+        extra_validation = {
+            "x_mode": "categorical",
+            "x_labels": list(selected_series.x_labels)[:200],
+            "x_label_count": len(selected_series.x_labels),
+        }
+        renderer_entry = "src.backend.research.chart_render.render_series_png"
+    else:
+        table: TableData = await load_table(
+            db,
+            actor,
+            document_version_id=version.id,
+            table_index=table_index,
+        )
+        selected = select_columns(table, x_column=x_name, y_columns=y_names)
+        payload = build_payload(normalized_type, selected)
+        stacked = "、".join(payload.plotted_y_columns)
+        title_text = (title or "").strip() or f"{chart_label}：{selected.columns[0]} 对 {stacked}"
+        title_text = title_text[:_MAX_TITLE_LENGTH]
+        try:
+            rendered = await asyncio.to_thread(
+                render_chart_png,
+                normalized_type,
+                payload,
+                title=title_text,
+                x_label=selected.columns[0],
+                y_label=stacked,
+            )
+        except ResearchAPIError:
+            raise
+        except Exception as exc:  # 真实渲染器的任何异常都不允许变成占位图
+            raise ResearchAPIError(
+                "CHART_RENDER_FAILED",
+                500,
+                "图表渲染失败，未生成任何成果文件。",
+                {"chart_type": normalized_type, "reason": f"{type(exc).__name__}: {exc}"[:300]},
+                retryable=True,
+            ) from exc
+        digest = data_digest(selected)
+        source_text_hash = table.source_text_hash
+        table_index_used = selected.table_index
+        row_count = len(selected.rows)
+        column_count = len(selected.columns)
+        x_column_used = selected.columns[0]
+        y_columns_used = list(selected.columns[1:])
+        plotted_y = list(payload.plotted_y_columns)
+        ranges = value_ranges(selected)
+        cleaning_note = "只接受全数值列；不插值、不丢弃行，非数值直接 422"
+        renderer_entry = "src.backend.research.chart_render.render_chart_png"
 
-    digest = data_digest(selected)
     validation = {
         "chart_type": normalized_type,
         "chart_title": title_text,
         "encoding": "base64",
         "source_document_version_id": version.id,
         "source_document_id": version.document_id,
-        "source_content_hash": version.content_hash or table.source_text_hash,
-        "table_index": selected.table_index,
-        "row_count": len(selected.rows),
-        "column_count": len(selected.columns),
-        "x_column": selected.columns[0],
-        "y_columns": list(selected.columns[1:]),
-        "plotted_y_columns": list(payload.plotted_y_columns),
-        "value_ranges": value_ranges(selected),
+        "source_content_hash": version.content_hash or source_text_hash,
+        "table_index": table_index_used,
+        "row_count": row_count,
+        "column_count": column_count,
+        "x_column": x_column_used,
+        "y_columns": y_columns_used,
+        "plotted_y_columns": plotted_y,
+        "value_ranges": ranges,
         "data_digest": digest,
         "data_digest_scope": "selected_table",
         # FR-13：清洗/缺失值策略必须显式留痕，哪怕策略就是"不清洗、非数值即拒绝"。
@@ -212,19 +282,20 @@ async def create_chart(
             "steps": [],
             "missing_value_policy": "reject",
             "filtered_rows": 0,
-            "note": "只接受全数值列；不插值、不丢弃行，非数值直接 422",
+            "note": cleaning_note,
         },
         "render_verified": True,
         "png_sha256": rendered.png_sha256,
         "png_width": rendered.width,
         "png_height": rendered.height,
         "renderer": {
-            "entry": "src.backend.research.chart_render.render_chart_png",
+            "entry": renderer_entry,
             "chart_type": normalized_type,
             "width": CHART_WIDTH,
             "height": CHART_HEIGHT,
             "dpi": CHART_DPI,
         },
+        **extra_validation,
     }
 
     body = base64.b64encode(rendered.png).decode("ascii")

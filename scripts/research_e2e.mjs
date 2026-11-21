@@ -699,6 +699,65 @@ async function runApiChain(backendBase, dirs) {
     };
   }
 
+  // 基础图表（bar）走分类 x 轴：表 0 的第一列是文本变量名，y 列是数值。
+  // 这条断言证明“分类轴不被伪造成数值编码”，也证明 T22 的基础图表可用。
+  let barChart = { capability: 'skipped' };
+  if (chart.capability === 'enabled') {
+    logStage('API：分类轴柱状图（bar）与 x_labels 校验');
+    const barResponse = await callApi(backendBase, '/api/v1/research/charts', {
+      method: 'POST',
+      token,
+      headers: { 'idempotency-key': `bar-${runId}-${Math.random().toString(16).slice(2, 8)}` },
+      json: {
+        project_id: project.id,
+        document_version_id: uploaded.version.id,
+        chart_type: 'bar',
+        x_column: '变量',
+        y_columns: ['均值'],
+        title: 'e2e 分类变量均值',
+        table_index: 0,
+      },
+    });
+    const barBody = expectOk(barResponse, '生成分类列柱状图');
+    assert(barResponse.status === 201, `分类柱状图应 201，实际 ${barResponse.status}`);
+    const barValidation = barBody.validation || {};
+    assert(barValidation.chart_type === 'bar', `图表类型不是 bar：${barValidation.chart_type}`);
+    assert(
+      barValidation.x_mode === 'categorical',
+      `分类轴未标记 x_mode=categorical：${barValidation.x_mode}`
+    );
+    assert(
+      Array.isArray(barValidation.x_labels) && barValidation.x_labels.length === 3,
+      `分类标签数量异常：${JSON.stringify(barValidation.x_labels)}`
+    );
+    assert(
+      !Object.prototype.hasOwnProperty.call(barValidation.value_ranges || {}, '变量'),
+      '分类列不应出现在数值值域里（否则等于把文本编码成数值）'
+    );
+    const barUrl = barBody.download_url || `/api/v1/research/artifacts/${barBody.id}/download`;
+    const barDownload = await fetch(`${backendBase}${barUrl}`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(60000),
+    });
+    assert(barDownload.status === 200, `下载分类柱状图失败（HTTP ${barDownload.status}）`);
+    const barPng = Buffer.from(await barDownload.arrayBuffer());
+    const barMagic = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    assert(barPng.subarray(0, 8).equals(barMagic), '分类柱状图下载不是 PNG');
+    const barPath = path.join(dirs.root, 'api-chart-bar.png');
+    fs.writeFileSync(barPath, barPng);
+    logDetail(
+      `分类柱状图 ${barBody.id}：${barBody.filename}，${barPng.length} B，x_labels=${barValidation.x_labels.join('/')}`
+    );
+    barChart = {
+      capability: 'enabled',
+      status: 201,
+      id: barBody.id,
+      bytes: barPng.length,
+      xLabels: barValidation.x_labels,
+      path: barPath,
+    };
+  }
+
   return {
     email,
     userId,
@@ -715,6 +774,7 @@ async function runApiChain(backendBase, dirs) {
     exportResult: exported,
     exportBytes: downloaded.length,
     chart,
+    barChart,
   };
 }
 

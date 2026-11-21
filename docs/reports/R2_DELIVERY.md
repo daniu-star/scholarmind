@@ -48,7 +48,7 @@
 | --- | --- | --- |
 | 表格读取 | `src/backend/research/chart_data_source.py` | `TableData`、`load_table`（先 `require_version` 授权）、`select_columns`（显式列映射）；解析 Markdown 管道表与 CSV 块 |
 | 渲染与验证 | `src/backend/research/chart_render.py` | `build_payload`/`canonical_csv`/`data_digest`/`value_ranges`/`render_chart_png`；全局渲染锁、PNG 签名与 IHDR 校验、**无占位图回退** |
-| 服务 | `src/backend/research/chart_service.py` | `CHART_TYPES`（12 种）、`chart_capability()`、`create_chart(...) -> Artifact`；直接调 `CHART_FUNCTIONS[chart_type]`，绝不走 `services.chart_service.generate_chart` |
+| 服务 | `src/backend/research/chart_service.py` | `CHART_TYPES`（14 种：12 种灰阶 + `bar`/`line` 分类轴）、`chart_capability()`、`create_chart(...) -> Artifact`；直接调 `CHART_FUNCTIONS[chart_type]`，绝不走 `services.chart_service.generate_chart` |
 | 路由 | `src/backend/routers/research.py` | `POST /api/v1/research/charts`（201）；`ChartRequest` 严格校验（`extra="forbid"`，y 列 1–8，title ≤ 200） |
 | 能力门禁 | `src/backend/config.py` + `capabilities.py` | `ENABLE_VERIFIED_CHARTS`（默认 False）；未开启时 `/capabilities` 报 `chart_generation=disabled` 并给出原因，`create_chart` 返回 503 |
 | 上游缺陷修复 | `src/backend/services/chart_functions/_basic.py` | `violin_chart` 的 `boxprops` 在 matplotlib 3.10 下抛 `AttributeError: Line2D.set() got an unexpected keyword argument 'facecolor'`；改为 `patch_artist=True` + 显式 boxprops |
@@ -121,7 +121,7 @@
 | --- | --- | --- | --- |
 | R2-A4 | Playwright MCP 浏览器对 `/api/v1/research/*` 返回 `{"error":{"code":"UNAUTHORIZED","message":"登录已过期"}}`（无 `X-Request-ID`、非研究域信封），而同一 URL/token 用 curl 与 Chrome DevTools 浏览器均为 200 | 验收工具链问题，非后端缺陷 | 已改用 Chrome DevTools MCP 完成验收；后续用 Playwright 时需先排查该 MCP 的请求拦截 |
 | R2-A5 | `POST /exports` 的 `include_report` 默认值为 `false`（routers/research.py），而页面勾选"附带诊断报告"默认勾选并显式传 `true` | 仅影响直接调用 API 的客户端 | 已在路由注释说明；如需 API 默认附带，需产品决策 |
-| R2-A6 | 图表类型只有 12 种灰阶型（ribbon/violin/parallel/…），没有柱状/折线等基础型 | 与 PRD T22"真实数据图表"不冲突，但与用户预期有差距 | R2.1 增补基础图表类型，或在前端明确列出 12 种类型 |
+| R2-A6 | 图表类型只有 12 种灰阶型（ribbon/violin/parallel/…），没有柱状/折线等基础型 | 与 PRD T22"真实数据图表"不冲突，但与用户预期有差距 | **已修（R2.1）**：新增 `bar`/`line` 并支持分类 x 轴，见 §11 |
 
 独立验收（verifier）发现的缺陷处置（详见 `R2_VERIFICATION.md` §4）：
 
@@ -139,8 +139,8 @@
 | # | 偏差 | 原因 | 处置 |
 | --- | --- | --- | --- |
 | D-R2-1 | 质量验收未完成（真实模型额度阻断 + 人工盲评按用户指示越过） | DeepSeek 账户 402 `Insufficient Balance`；无真人标注 | 语料与工具链已就位（`R2_CORPUS_EVAL.md`）；充值/换 key 后一条命令复跑；若对外宣称质量仍需补两位真人盲评 |
-| D-R2-2 | 图表仅支持全数值表（含 x 列），分类轴 422 | 现有 12 种图表函数以数值轴为核心，分类轴需改造 `chart_render` 与图表函数签名 | 已用 `details.hint` 明确告知；列 R2.1 待办 |
-| D-R2-3 | 只开放 12 种高级图表类型，无柱/折线/饼图 | 复用既有 `services/chart_functions`，不新增绘图实现以免伪造验证 | 列 R2.1 待办 |
+| D-R2-2 | 图表仅支持全数值表（含 x 列），分类轴 422 | 现有 12 种图表函数以数值轴为核心，分类轴需改造 `chart_render` 与图表函数签名 | **已修一半（R2.1）**：`bar`/`line` 支持分类轴；其余 12 种仍要求全数值表（`details.hint` 明确告知） |
+| D-R2-3 | 只开放 12 种高级图表类型，无柱/折线/饼图 | 复用既有 `services/chart_functions`，不新增绘图实现以免伪造验证 | **已修柱/折线（R2.1）**：`bar`/`line` 在 `research/chart_render.py` 内实现并有数值断言；饼图未做 |
 | D-R2-4 | 预算报表中的真实费用恒为"未知" | 模型计费信息未接入（PRD 要求"费用未知不得显示 0"） | 按 PRD 要求如实显示"未知" |
 | D-R2-5 | 生产恢复语义（PG/Redis/Celery）未验证 | 本机环境不具备 | R2 只验证 SQLite + outbox + dispatcher 替身 |
 | D-R2-6 | ~~E2E 默认浏览器模式未在本机跑通（exit 3）~~ **已闭环** | 已安装 `playwright@1.65.1` + chromium，默认模式 exit 0 | 证据见 `R2_E2E_BROWSER.md`；窄屏/键盘/双账号仍属未覆盖 |
@@ -169,8 +169,8 @@
 
 - R0 研究域测试：290 passed（`src/backend/tests/test_research`）
 - R1 研究域测试：160 passed（`src/backend/tests/test_research_r1`）
-- R2 研究域测试：58 passed（`src/backend/tests/test_research_r2`，12 文件，新增 `test_review_locator.py` 4 条；D1 与图表/预算/评估用例计入）
-- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **507 passed, 1 skipped**（收集 508，318.66 s）
+- R2 研究域测试：68 passed + 1 skipped（`src/backend/tests/test_research_r2`，13 文件；`test_basic_charts.py` 6 条与 `test_review_locator.py` 4 条计入）
+- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **518 passed, 1 skipped**（收集 519，331.25 s）
 - 逐条 AT 判定与放行条件见 `docs/reports/R2_VERIFICATION.md`（合并权威版：Lead 主编 + 独立 verifier 报告附录 `R2_VERIFICATION_VERIFIER.md`；独立性限制在 §0.2 已写明）
 - 既有回归：`src/backend/tests` 全量在本阶段未重跑（历史基线 182 passed；研究域改动只新增包与路由，未改既有服务行为；跑全量需 ~10 分钟且会触发 sentence-transformers 联网超时降级）
 - 迁移：`scripts/research_migration_check.py` 通过（离线 SQL + 升降级可重复）
@@ -238,7 +238,7 @@
 
 本轮新增/修改文件（增量）：
 
-- 新增 `src/frontend/src/components/research/ChartPanel.js`（12 种图表类型、表格选择、列映射、结果校验信息）
+- 新增 `src/frontend/src/components/research/ChartPanel.js`（14 种图表类型含 `bar`/`line`、表格选择含「分类轴」标注、列映射、结果校验信息）
 - 修改 `src/frontend/src/pages/ResearchWorkspace.js`（图表状态/取表/生成/blob 展示；多表自动选全数值表）
 - 修改 `src/frontend/src/services/researchApi.js`（`createChart`、`fetchArtifactBlob`）
 - 修改 `scripts/research_e2e.mjs`（新增第 [28] 步图表前端断言与截图）
@@ -284,3 +284,29 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 - 可以说：**「14 篇真实论文全链路已实测；诊断可定位到原文、无重复灌水、无编造引文；partial 的边界已量化」**。
 - 不能说：「诊断质量达标/准确率 X%」——没有真人盲评，召回率与误报率仍为「未测量」。
 - 若要对宣称质量，按 `R2_EVAL_SPEC.md` 补两位真人盲评（`tools/research_quality_eval.py` 已就绪，硬约束已测试锁定）。
+
+## 11. 2026-11-21 更新：基础图表与分类轴（R2.1）
+
+背景：R2-A6 / D-R2-2 / D-R2-3 指出「只有 12 种灰阶类型、分类轴直接 422」。本轮补齐 `bar`（分类柱状图）与 `line`（分类折线图）。
+
+| 层 | 落点 | 关键点 |
+| --- | --- | --- |
+| 数据源 | `src/backend/research/chart_data_source.py` | 新增 `SeriesTable`、`load_series_table()`、`select_series()`；第一列允许文本标签，y 列必须有限数值；x 必须是第一列（否则 422「第一列」）；分类标签不进入 `value_ranges` |
+| 渲染 | `src/backend/research/chart_render.py` | `BASIC_CHART_TYPES={"bar","line"}`、`canonical_series_csv`、`series_digest`、`series_value_ranges`、`render_series_png`；新增 `_configure_fonts()` 修中文方框（候选 Microsoft YaHei/SimHei/Noto Sans CJK SC…），>8 类旋转 45°，柱间留 10% 间隙 |
+| 服务 | `src/backend/research/chart_service.py` | `CHART_TYPES` 14 种；`create_chart` 对基础图走分类轴分支，validation 增 `x_mode="categorical"`、`x_labels`（截断 200）、`x_label_count`；失败仍 500 `CHART_RENDER_FAILED` 且不落 Artifact |
+| 前端 | `ChartPanel.js`、`ResearchWorkspace.js` | 类型下拉前两项为 `bar`/`line`；表下拉把非全数值但可作分类轴的表标为「· 分类轴」；默认表优先 numeric → chartable；y 列默认取数值列 |
+| 测试 | `test_research_r2/test_basic_charts.py`（6 条）+ `test_charts_api.py` 修正 | bar/line 201 与 `x_labels`/`value_ranges` 正确、ribbon 遇分类表仍 422 且不落产物、空标签/非数值/非第一列 422、纯函数确定性；`bar` 不再是「不支持类型」，改用 `radar` 断言 |
+| E2E | `scripts/research_e2e.mjs` | 新增 bar API 断言（分类表 0、x=`变量`、y=`均值`）：201、`x_mode=categorical`、`x_labels` 3 个、`value_ranges` 不含分类列、PNG 魔数；保存 `api-chart-bar.png` |
+
+验证结果：
+
+- `pytest src/backend/tests/test_research_r2 -q` → **68 passed, 1 skipped**（43.38 s，收集 69）。
+- 三套一次跑 → **518 passed, 1 skipped**（331.25 s）。
+- `node scripts/research_e2e.mjs --keep` → **exit 0（PASS）**；分类柱状图 `art_8e247894665840fb88051f016b4696dd`（`bar-b60fbb36.png`，49,891 B，`x_labels=样本量/编码一致性/复核覆盖率`）；面板显示「表 1（变量 / 均值 / 标准差） · 分类轴」与 14 种类型。
+- `npm run build:frontend` → ✓，入口 `/assets/index-8INOxzfu.js`；`node --check` 三个前端文件通过；必需标签隐藏提示保持 `aria-label` 语义。
+
+仍然存在的偏差（不夸大）：
+
+- 饼图/环形图未做；其余 12 种仍只接受全数值表。
+- 多单位系列共用一个 y 轴时小量级系列会被压扁，渲染器不擅自加次轴（属列映射选择）。
+- 分类标签过长只做 45° 旋转，未做自动换行/截断。

@@ -8,7 +8,7 @@
 
 ## 0. 结论
 
-**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 58 passed、ruff 全绿、三套回归 507 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过、AT-056 的 20000 字真实对照未做**，因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
+**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 68 passed + 1 skipped、ruff 全绿、三套回归 518 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过、AT-056 的 20000 字真实对照未做**，因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
 
 ### 0.1 放行条件
 
@@ -17,7 +17,7 @@
 3. ~~**D1**：产品书面确认"图表数据仅支持文档正文中的 Markdown 管道表 / CSV 代码块"，或补 XLSX/JSON 表格导入入口。~~ **已闭环（2026-11-20）**：已支持 CSV/XLSX（`document_parser` 新增 `_parse_csv`/`_parse_xlsx`，多 sheet 按 `table_index` 选表），新增 `test_chart_data_files.py`（7 条）；JSON 仍不支持，见 §8。
 4. ~~**浏览器项**：装 Playwright 后 `npm run test:research:e2e` 默认模式必须 exit 0（当前 exit 3，不伪装）。~~ **已闭环（2026-11-20）**：`playwright@1.65.1` 已入 devDependencies，默认模式实测 exit 0（详见 §8）。
 5. **部署项**：生产环境演练 PG/Redis/Celery 恢复语义；`ENABLE_VERIFIED_CHARTS` 保持默认关闭。
-6. 发布说明必须写明：仅 12 种图表类型、仅全数值表、预算费用显示"未知"、图表能力默认关闭。
+6. 发布说明必须写明：14 种图表类型（12 灰阶 + `bar`/`line` 分类轴），除 `bar`/`line` 外仅接受全数值表、预算费用显示"未知"、图表能力默认关闭。
 
 ### 0.2 两份报告的关系（如实说明）
 
@@ -103,16 +103,17 @@
 | AT-056 20000 字对照 | 禁网、禁真实模型 | 无覆盖率/P95/真实消耗 |
 | AT-047/048/053 浏览器与 a11y | 已跑通桌面 1440px + 390px 窄屏 + 键盘 + 双账号隔离；未覆盖真机与读屏软件 | 不能宣称完整移动端/无障碍通过；AT-048 的 `GET /` 307 仍未改 |
 | AT-052/054 | 属 R1 范围，R2 未新增 | 依赖 R1 证据，本次仅回归未破坏 |
-| 图表 12 种渲染器 | 只抽测 gradient_area 全链路 + 纯函数覆盖类型表 | 其余 11 种未逐一冒烟 |
+| 图表 14 种渲染器 | 抽测 gradient_area 全链路、`bar`/`line` 六条契约用例 + 纯函数覆盖类型表 | 其余 11 种未逐一冒烟 |
 | 图表单位校验 | 实现无显式单位字段 | AT-055"单位"项未验证 |
 | SQLite≠PG/Redis/Celery | 本机环境不具备 | 生产恢复语义未验证 |
 
 ## 6. 放行结论
 
-- **研究域自动化验收**：通过——R2 58 passed、R0 290 passed、R1 160 passed（合计 508，实跑 507 passed + 1 skipped）、ruff 全绿、迁移可重入、构建唯一模块化入口、真实 Playwright 浏览器全链路 exit 0（含图表前端面板）、14 篇真实论文语料链路可复跑。
+- **研究域自动化验收**：通过——R2 68 passed + 1 skipped、R0 290 passed、R1 160 passed（合计 519，实跑 518 passed + 1 skipped）、ruff 全绿、迁移可重入、构建唯一模块化入口、真实 Playwright 浏览器全链路 exit 0（含图表前端面板）、14 篇真实论文语料链路可复跑。
 - **T21**：**机器可验证部分完成**（14 篇真实论文真实模型全跑通，13 succeeded / 1 partial、覆盖率 97.00%、引文保真 95.44%、纯编造 0.00%、locator 0 错位；`R2_CORPUS_EVAL.md`/`R2_EVAL_STATUS.md`），**人工盲评按用户指示越过 → 质量召回/误报仍属未测量**；**T22**：通过（含 D1/D5 偏差）；**T23**：有条件通过（协议与降级证据齐备，真实对照未跑）。
 - **对外表述基线**："研究域自动化验收通过、图表数值可核验、预算与评估工具诚实可用"；禁止："质量已验证""诊断准确率达标""桌面与移动端全适配"。
-- **2026-11-20 复核更新**：XLSX/CSV 已可直接出图（D1 闭环），但仅支持"全数值表"，分类轴仍 422 `CHART_NON_NUMERIC`。
+- **2026-11-20 复核更新**：XLSX/CSV 已可直接出图（D1 闭环）；当时仅支持"全数值表"，分类轴 422 `CHART_NON_NUMERIC`。
+- **2026-11-21 复核更新（R2.1）**：新增 `bar`/`line` 分类轴图表（14 种类型），分类表对这两种类型可出图且 `x_mode=categorical`、分类标签不进 `value_ranges`；其余 12 种仍要求全数值表，误差范围与偏差见 §12。
 
 ## 7. 附录：真实语料补充（2026-11-20）
 
@@ -211,3 +212,13 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
   1. 控制台错误分类：CodeMirror 等 jsdelivr 外链资源在离线环境必然失败，控制台文本不含 URL；脚本改用 `requestfailed` 的 URL 判定——**只有出现本项目源（web/`/api/v1/`）连接级失败时才失败**，否则把无 URL 的资源加载错误归因为外链并在日志打印外链主机。
   2. a11y 流程只把「非外链归因的 pageerror」计为失败（CodeMirror 未定义由外链失败连带产生），资源加载错误按条数记录供核对。
 - 复跑数字：`pytest src/backend/tests/test_research_r2 -q` → **62 passed, 1 skipped（收集 63）**；`ruff check src/backend/tests/test_research_r2` → All checks passed；`node --check scripts/research_e2e.mjs` 通过。
+
+## 12. 附录：基础图表与分类轴（R2.1，2026-11-21）
+
+- 能力面：`CHART_TYPES` 由 12 种扩到 14 种（`bar`/`line`）。`bar`/`line` 的 x 轴为分类标签（第一列，原样保留），y 列必须有限数值；`x_column` 不是第一列 → 422 `CHART_TABLE_INVALID`。
+- 数值保真：`x_labels` 单独返回（截断 200），**不进入** `value_ranges`；`data_digest` 由 `canonical_series_csv` 计算（标签参与摘要，改标签即变摘要）；PNG 仍走 `_verify_png`（签名 + IHDR），失败不落 Artifact。
+- 中文可读性：`chart_render._configure_fonts()` 选 Microsoft YaHei / SimHei / Noto Sans CJK SC / Source Han Sans SC / WenQuanYi Zen Hei / PingFang SC，并设 `axes.unicode_minus=False`；实测生成的 PNG 中文标签正常、无方框（`describe_image` 复核）。
+- 失败语义未变：能力关闭 503 `CHART_CAPABILITY_DISABLED`；分类表配 ribbon 等仍 422 `CHART_NON_NUMERIC`（`details.hint` 提示改用 `bar`/`line`）；渲染异常 500 `CHART_RENDER_FAILED`（`retryable=true`）且不落 Artifact。
+- 测试：`src/backend/tests/test_research_r2/test_basic_charts.py` 6 条 + `test_charts_api.py` 的「不支持类型」改用 `radar`；R2 套件 **68 passed + 1 skipped**。
+- 浏览器：`node scripts/research_e2e.mjs --keep` → exit 0；bar 断言通过（`x_labels` 3 个、PNG 49,891 B）；图表面板显示「分类轴」标注与 14 种类型。
+- 仍存在的缺口：饼图未做；多单位共轴会压扁小量级系列；分类标签只做 45° 旋转，未自动换行。

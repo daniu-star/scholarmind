@@ -27,7 +27,7 @@ from .contracts import Actor, text_hash
 from .errors import ResearchAPIError, invalid
 from .ownership import require_version
 
-__all__ = ["TableData", "load_table", "select_columns"]
+__all__ = ["SeriesTable", "TableData", "load_series_table", "load_table", "select_columns", "select_series"]
 
 #: 三反引号 / 三波浪线围栏（允许最多 3 个前导空格与 info string）
 _FENCE_RE = re.compile(r"^[ \t]{0,3}(?P<fence>`{3,}|~{3,})[ \t]*(?P<info>[^`~]*)$")
@@ -58,6 +58,34 @@ class TableData:
                 "CHART_UNKNOWN_COLUMN",
                 f"未知列：{name}",
                 {"unknown": [name], "available": list(self.columns)},
+            ) from None
+
+
+@dataclass(frozen=True)
+class SeriesTable:
+    """一张 x 轴为分类文本、y 轴为数值的表（``bar`` / ``line`` 用）。
+
+    ``x_labels`` 与 ``rows`` 等长；``rows`` 只含 y 列数值，顺序与 ``y_columns`` 一致。
+    分类标签原样保留（不截断、不改写），保证图例与审计可回溯到原文。
+    """
+
+    x_name: str
+    x_labels: Tuple[str, ...]
+    y_columns: Tuple[str, ...]
+    rows: Tuple[Tuple[float, ...], ...]
+    table_index: int
+    source_text_hash: str
+
+    def column_index(self, name: str) -> int:
+        if name == self.x_name:
+            return 0
+        try:
+            return self.y_columns.index(name) + 1
+        except ValueError:
+            raise invalid(
+                "CHART_UNKNOWN_COLUMN",
+                f"未知列：{name}",
+                {"unknown": [name], "available": [self.x_name, *self.y_columns]},
             ) from None
 
 
@@ -315,17 +343,17 @@ def _extract_candidates(text: str) -> list[_Candidate]:
 # ── 对外接口 ─────────────────────────────────────────────
 
 
-async def load_table(
+async def _resolve_candidate(
     db: AsyncSession,
     actor: Actor,
     *,
     document_version_id: str,
-    table_index: int = 0,
-) -> TableData:
-    """读取授权文档版本中的第 ``table_index`` 张数值表（T22）。
+    table_index: int,
+):
+    """授权后取出第 ``table_index`` 张候选表并做结构/行数校验。
 
-    任何结构问题、越界、超行数、非数值都会抛 ``ResearchAPIError``；
-    跨用户/不存在的版本由 :func:`require_version` 直接 404，不泄露存在性。
+    :func:`load_table`（全数值表）与 :func:`load_series_table`（分类 x 轴）
+    共用这段逻辑，保证两种载入方式的错误码、行数上限与越权语义完全一致。
     """
     version = await require_version(db, actor, document_version_id)
     text = version.text or ""
@@ -376,6 +404,25 @@ async def load_table(
             f"表格有 {len(candidate.rows)} 行，超过上限 {max_rows} 行；不支持静默丢行或抽样。",
             details={"table_index": index, "row_count": len(candidate.rows), "max_rows": max_rows},
         )
+    return version, candidate, index
+
+
+async def load_table(
+    db: AsyncSession,
+    actor: Actor,
+    *,
+    document_version_id: str,
+    table_index: int = 0,
+) -> TableData:
+    """读取授权文档版本中的第 ``table_index`` 张数值表（T22）。
+
+    任何结构问题、越界、超行数、非数值都会抛 ``ResearchAPIError``；
+    跨用户/不存在的版本由 :func:`require_version` 直接 404，不泄露存在性。
+    """
+    version, candidate, index = await _resolve_candidate(
+        db, actor, document_version_id=document_version_id, table_index=table_index
+    )
+    text = version.text or ""
 
     converted: list[Tuple[float, ...]] = []
     for offset, raw_row in enumerate(candidate.rows):
@@ -404,6 +451,76 @@ async def load_table(
     return TableData(
         columns=candidate.columns,
         rows=tuple(converted),
+        table_index=index,
+        source_text_hash=version.content_hash or text_hash(text),
+    )
+
+
+async def load_series_table(
+    db: AsyncSession,
+    actor: Actor,
+    *,
+    document_version_id: str,
+    table_index: int = 0,
+) -> SeriesTable:
+    """读取第 ``table_index`` 张表，允许**第一列是分类文本**（``bar`` / ``line`` 用）。
+
+    与 :func:`load_table` 的唯一区别是 x 列不要求数值；其余结构校验、行数上限、
+    越权语义完全一致，y 列仍必须逐格是有限数值——不插值、不丢行，也不把文本
+    悄悄转成序号（那样会伪造数值轴）。
+    """
+    version, candidate, index = await _resolve_candidate(
+        db, actor, document_version_id=document_version_id, table_index=table_index
+    )
+    text = version.text or ""
+    if len(candidate.columns) < 2:
+        raise invalid(
+            "CHART_TABLE_INVALID",
+            f"表格只有 {len(candidate.columns)} 列，至少需要 1 个分类 x 列与 1 个数值 y 列。",
+            {"table_index": index, "columns": list(candidate.columns)},
+        )
+
+    labels: list[str] = []
+    rows: list[Tuple[float, ...]] = []
+    for offset, raw_row in enumerate(candidate.rows):
+        label = (raw_row[0] or "").strip()
+        if not label:
+            raise invalid(
+                "CHART_NON_NUMERIC",
+                f"第 {offset + 1} 行的分类标签（「{candidate.columns[0]}」列）为空，无法作图。",
+                {
+                    "table_index": index,
+                    "column": candidate.columns[0],
+                    "row": offset + 1,
+                    "hint": "分类轴必须有明确标签；空标签会伪造出一条无名类别。",
+                },
+            )
+        values: list[float] = []
+        for column_index in range(1, len(raw_row)):
+            raw = raw_row[column_index]
+            value = _parse_number(raw)
+            if value is None:
+                column = candidate.columns[column_index]
+                raise invalid(
+                    "CHART_NON_NUMERIC",
+                    f"第 {offset + 1} 行「{column}」列的值 {raw!r} 不是有限数值。",
+                    {
+                        "table_index": index,
+                        "column": column,
+                        "row": offset + 1,
+                        "value": raw,
+                        "hint": "基础图表要求 y 列全部是有限数值；分类信息请只放在第一列。",
+                    },
+                )
+            values.append(value)
+        labels.append(label)
+        rows.append(tuple(values))
+
+    return SeriesTable(
+        x_name=candidate.columns[0],
+        x_labels=tuple(labels),
+        y_columns=tuple(candidate.columns[1:]),
+        rows=tuple(rows),
         table_index=index,
         source_text_hash=version.content_hash or text_hash(text),
     )
@@ -463,6 +580,56 @@ def select_columns(
     rows = tuple(tuple(row[position] for position in indexes) for row in table.rows)
     return TableData(
         columns=(x_name, *plotted),
+        rows=rows,
+        table_index=table.table_index,
+        source_text_hash=table.source_text_hash,
+    )
+
+
+def select_series(
+    table: SeriesTable,
+    *,
+    x_column: str,
+    y_columns: Sequence[str],
+) -> SeriesTable:
+    """按显式列映射裁剪分类表：x 必须是第一列，y 去重且必须存在。"""
+    x_name = (x_column or "").strip()
+    available = [table.x_name, *table.y_columns]
+    requested = [str(name).strip() for name in (y_columns or ()) if str(name).strip()]
+
+    if x_name != table.x_name:
+        raise invalid(
+            "CHART_TABLE_INVALID",
+            f"基础图表（bar/line）的 x 列必须是表格第一列「{table.x_name}」，收到「{x_name}」。",
+            {"x_column": x_name, "available": available},
+        )
+
+    unknown = [name for name in requested if name not in available]
+    if unknown:
+        raise invalid(
+            "CHART_UNKNOWN_COLUMN",
+            f"未知列：{'、'.join(unknown)}",
+            {"unknown": unknown, "available": available},
+        )
+
+    plotted: list[str] = []
+    for name in requested:
+        if name == table.x_name or name in plotted:
+            continue
+        plotted.append(name)
+    if not plotted:
+        raise invalid(
+            "CHART_TABLE_INVALID",
+            "至少需要一个数值 y 列才能定义图表的纵轴。",
+            {"x_column": x_name, "available": available},
+        )
+
+    indexes = [table.y_columns.index(name) for name in plotted]
+    rows = tuple(tuple(row[position] for position in indexes) for row in table.rows)
+    return SeriesTable(
+        x_name=table.x_name,
+        x_labels=table.x_labels,
+        y_columns=tuple(plotted),
         rows=rows,
         table_index=table.table_index,
         source_text_hash=table.source_text_hash,

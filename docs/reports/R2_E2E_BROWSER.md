@@ -309,3 +309,23 @@ E2E_CHROMIUM_EXECUTABLE="/c/Users/13067/AppData/Local/ms-playwright/chromium-125
   1. 控制台错误改为按 `requestfailed` 的 URL 归因：jsdelivr 外链在离线环境必然失败且控制台文本无 URL；只有出现本项目源（web 或 `/api/v1/`）的连接级失败才判失败。
   2. a11y 流程只把「非外链归因的 pageerror」计为失败（CodeMirror 未定义由外链失败连带产生）。
 - 未覆盖：真机（iOS Safari / Android Chrome）、读屏软件、横屏/平板断点、触控手势。
+
+## 14. 附录四（Lead，2026-11-21）：基础图表与分类轴 E2E
+
+命令：`node scripts/research_e2e.mjs --keep`（默认真实浏览器模式，隔离后端 + E2E 夹具文档）
+
+本轮新增断言（API 段，紧跟 `scatter_density` 之后）：
+
+| 项 | 断言 | 实测 |
+| --- | --- | --- |
+| 分类柱状图 | `POST /research/charts`：`chart_type=bar`、`x_column=变量`、`y_columns=[均值]`、`table_index=0` → 201 | `art_8e247894665840fb88051f016b4696dd` |
+| x 轴语义 | `validation.chart_type == "bar"`、`x_mode == "categorical"` | 通过 |
+| 分类标签 | `x_labels` 长度 3、内容为表 0 第一列 | `样本量/编码一致性/复核覆盖率` |
+| 数值保真 | `value_ranges` 不含分类列 `变量` | 通过 |
+| 产物 | 下载 PNG 魔数通过并保存 `api-chart-bar.png` | 49,891 B |
+
+浏览器 UI 段同时验证图表面板：表下拉把「表 1（变量 / 均值 / 标准差）」标为「· 分类轴」，类型下拉含「分类柱状图（支持文本 x 轴）」「分类折线图（支持文本 x 轴）」。
+
+结果：**exit 0（PASS）**，脚本耗时约 2 分 20 秒（含浏览器全链路 + 分类轴断言）；日志 `tmp/e2e-bar.log`。
+
+未覆盖：`line` 的浏览器 UI 断言（仅 API 覆盖）、饼图（未实现）、多单位共轴显示效果。

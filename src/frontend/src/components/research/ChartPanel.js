@@ -16,9 +16,11 @@ import {
   shortId,
 } from './shared.js';
 
-// 与后端 src/backend/services/chart_service.py 的 CHART_NAMES 保持一致；
-// 后端只注册这 12 种灰阶学术风格图表（不含 bar/line/pie 等基础类型）。
+// 与后端 src/backend/research/chart_service.py 的 CHART_TYPES 保持一致：
+// 12 种灰阶学术图 + bar/line 两种支持分类 x 轴的基础图。
 export const CHART_TYPE_OPTIONS = [
+  ['bar', '分类柱状图（支持文本 x 轴）'],
+  ['line', '分类折线图（支持文本 x 轴）'],
   ['gradient_area', '梯度面积图'],
   ['ribbon', '缎带图'],
   ['violin', '小提琴图'],
@@ -149,7 +151,7 @@ export function ChartPanel({
   if (tables.length > 1) {
     const tableOptions = tables.map((item) => [
       String(item.index),
-      `表 ${item.index + 1}（${item.columns.join(' / ').slice(0, 40)}）${item.numeric ? '' : ' · 非全数值'}`,
+      `表 ${item.index + 1}（${item.columns.join(' / ').slice(0, 40)}）${item.numeric ? '' : item.chartable ? ' · 分类轴' : ' · 非全数值'}`,
     ]);
     grid.appendChild(
       labeledField(
@@ -158,7 +160,7 @@ export function ChartPanel({
           disabled: Boolean(disabledReason),
           onChange: (tableIndex) => onChange({ tableIndex: Number(tableIndex) }),
         }),
-        '只对全数值表出图；分类表会被后端拒绝'
+        'bar/line 可用分类轴（第一列为文本标签）；其余 12 种要求全数值表'
       )
     );
   }
@@ -170,7 +172,7 @@ export function ChartPanel({
         disabled: Boolean(disabledReason),
         onChange: (chartType) => onChange({ chartType }),
       }),
-      '后端只提供 PRD 认定的 12 种灰阶学术风格图表'
+      '12 种灰阶学术图 + bar/line；分类轴仅 bar/line 支持'
     )
   );
 
