@@ -93,3 +93,6 @@ AI产品.docx
 pytest-of-*/
 bili-probe-*
 torchinductor_*/
+
+# 真实 PostgreSQL 恢复演练的数据目录（脚本用 subst 盘符 + ASCII 路径，默认落在仓库根）
+/pgdrill/
