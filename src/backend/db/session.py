@@ -124,6 +124,8 @@ async def init_db(engine: AsyncEngine) -> None:
         User, UserQuota, Order, EntitlementGrant, VerificationCode,
         AdminAuditLog, AgentExecutionLog, LoginAttempt,
     )
+    # 研究领域表（PRD v1.0 §6）：显式导入，create_all 才能看到其 metadata。
+    from ..research import models as _research_models  # noqa: F401
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

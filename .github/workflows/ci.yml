@@ -79,8 +79,44 @@ jobs:
       - run: bandit -r src/backend/ -f json -o bandit_report.json || true
       - run: safety check --full-report || true
 
+  research-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install Python dependencies
+        run: pip install -r src/backend/requirements.txt pytest pytest-asyncio ruff
+      - name: Lint research domain (must be clean, no autofix)
+        run: ruff check src/backend/research src/backend/routers/research.py src/backend/middleware/request_size_limit.py
+      - name: R0 research acceptance suite
+        run: pytest src/backend/tests/test_research -q
+        env:
+          JWT_SECRET_KEY: ci-test-secret-key-for-scholarmind-min-32-chars
+          RATE_LIMIT_ENABLED: "false"
+          ENVIRONMENT: test
+      - name: R1 research acceptance suite
+        run: pytest src/backend/tests/test_research_r1 -q
+        env:
+          JWT_SECRET_KEY: ci-test-secret-key-for-scholarmind-min-32-chars
+          RATE_LIMIT_ENABLED: "false"
+          ENVIRONMENT: test
+      - name: Frontend research module syntax
+        run: |
+          node --check src/frontend/src/services/researchApi.js
+          node --check src/frontend/src/pages/ResearchWorkspace.js
+          node --check src/frontend/src/app/router.js
+      - name: Frontend build (single release artifact)
+        run: npm ci && npm run build:frontend
+
   build:
-    needs: [lint, type-check, test, frontend-build]
+    needs: [lint, type-check, test, frontend-build, research-gate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

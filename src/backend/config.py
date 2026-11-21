@@ -75,12 +75,87 @@ class Settings(BaseSettings):
 
     UPLOAD_DIR: str = "data/uploads"
     SKILLS_DIR: str = "data/skills"
+    # External skill roots are read-only sources. They are registered at runtime
+    # and are only injected into a chat when explicitly selected.
+    SKILL_SOURCE_DIRS: list[str] = [
+        "C:/Users/13067/.trae-cn/skills",
+    ]
     CHARTS_DIR: str = "data/charts"
     CONVERSATIONS_DIR: str = "data/conversations"
 
     MAX_FILES_PER_SESSION: int = 15
     MIN_FILES_PER_SESSION: int = 1
     MAX_FILE_SIZE_MB: int = 20
+
+    # ── 研究模块（PRD v1.0 R0，FR-03/FR-04/§9）────────────────────────
+    # 这些值是产品契约，改动必须同步 docs/prd 与验收矩阵。
+    RESEARCH_ENABLED: bool = True
+    # 单文件 20MiB（FR-03）；整段 multipart 留 2MiB 表单开销余量。
+    RESEARCH_MAX_FILE_MB: int = 20
+    RESEARCH_MAX_MULTIPART_BYTES: int = 22 * 1024 * 1024
+    # R1 容量：每项目 50 文件、每用户 1GiB。
+    RESEARCH_MAX_FILES_PER_PROJECT: int = 50
+    RESEARCH_MAX_USER_STORAGE_BYTES: int = 1024 * 1024 * 1024
+    # 解析与分析上限（FR-04/FR-05）。
+    RESEARCH_MAX_PAGES: int = 200
+    RESEARCH_MAX_CODEPOINTS: int = 200_000
+    # 预算（§9）：每用户并发 1、系统总并发 3、排队 300s、任务 1200s。
+    RESEARCH_MAX_CONCURRENT_PER_USER: int = 1
+    RESEARCH_MAX_CONCURRENT_SYSTEM: int = 3
+    RESEARCH_QUEUE_TIMEOUT_SECONDS: int = 300
+    RESEARCH_TASK_TIMEOUT_SECONDS: int = 1200
+    # 单任务调用预算：诊断 160 次、修改 128 次、100000 tokens。
+    RESEARCH_REVIEW_MAX_MODEL_CALLS: int = 160
+    RESEARCH_REVISION_MAX_MODEL_CALLS: int = 128
+    RESEARCH_MAX_TOKENS_PER_TASK: int = 100_000
+    # 事件流：客户端落后超过该条数则 410 EVENT_HISTORY_EXPIRED。
+    RESEARCH_EVENT_HISTORY_LIMIT: int = 5_000
+    # 幂等键强制（PRD §8.2：POST /tasks、/resume、/retry、/apply、/exports
+    # 要求 Idempotency-Key）。关闭仅用于兼容旧调用方，不进入正式发布。
+    RESEARCH_REQUIRE_IDEMPOTENCY_KEY: bool = True
+    # 事件流（SSE）：单次连接最长保持时间与轮询间隔。曾因未在此声明，
+    # routers/research.py 只能 getattr 兜底 60s，导致排队中的任务事件流要等
+    # 60 秒才吐出第一帧（R0_VERIFICATION.md 偏差 ②）。
+    RESEARCH_SSE_MAX_SECONDS: float = 60.0
+    RESEARCH_SSE_POLL_SECONDS: float = 0.5
+    # 研究域模型默认开启"关闭思维链"。原因（2026-11-20 实测）：deepseek-v4-flash
+    # 的推理 token 与正文输出共享 max_tokens；审稿提示词下推理会把 2048
+    # 全部吃光，finish_reason=length 且 content 为空，被诚实地判为
+    # MODEL_OUTPUT_EMPTY。结构化 JSON 诊断不需要长思维链，关闭后输出稳定。
+    # 置 False 可恢复默认行为（仍会在空内容时按 finish_reason 诊断一次）。
+    RESEARCH_DISABLE_MODEL_THINKING: bool = True
+    # 单次模型调用的正文输出上限。曾硬编码 2048：密集窗口的诊断 JSON 会被
+    # 截断（Expecting ',' delimiter），流水线按契约判为不可解析（2026-11-20
+    # 真实语料实测）。8192 给结构化输出留出余量；若仍 finish_reason=length，
+    # runtime 会自动关闭思维链并把上限翻倍重试（最多两次），再失败才降级。
+    RESEARCH_MODEL_MAX_OUTPUT_TOKENS: int = 8192
+    # ── R2（T22/T21）：图表独立开放与评估替身 ────────────────────────
+    # 只有"数据数值、单位与显示范围"确定性校验全部通过后才允许打开；
+    # 关闭时 /capabilities 必须如实报 disabled，图表入口拒绝而不是降级成示例数据。
+    ENABLE_VERIFIED_CHARTS: bool = False
+    # 图表数据上限，避免把整篇 200 页论文当表格渲染。
+    RESEARCH_CHART_MAX_ROWS: int = 5_000
+    # 浏览器 E2E / 本地演算用的确定性替身模型。默认关闭；生产环境强制忽略，
+    # 且任何用它跑出的结果都不得当作"真实模型质量"结论（T21 要求真人盲评）。
+    RESEARCH_MODEL_STUB: bool = False
+    # 关闭 ChromaDB/向量服务后台预热。测试与浏览器 E2E 必须置 True：
+    # 预热线程会 import torch/sentence-transformers（首次数分钟且持有 GIL），
+    # 在这台机器上曾把事件循环饿到「startup complete 后 7 分钟才响应
+    # /api/v1/health」，E2E 因健康检查 90s 超时误判为环境缺失。
+    # 生产默认 False；RAG 首次真实调用仍会懒加载。
+    DISABLE_VECTOR_PREWARM: bool = False
+
+    # ── 上下文压缩代理（billion-context / ACP，可选）────────────────────
+    # 留空 = 直连 DEEPSEEK_BASE_URL（默认，行为与历史版本一致）。
+    # 填写后所有模型调用改走本地压缩代理，例如：
+    #   LLM_PROXY_BASE_URL=http://127.0.0.1:8790/bili/https://api.deepseek.com/v1
+    # 代理按会话（session header）折叠历史，降低长对话的输入 token。
+    # 启动方式见 scripts/start_bili_proxy.py 与 docs/reports/BILLION_CONTEXT.md。
+    LLM_PROXY_BASE_URL: Optional[str] = None
+    # 会话标识头：同值的请求共享压缩状态（billion-context 默认 x-acp-session）。
+    LLM_PROXY_SESSION_HEADER: str = "x-acp-session"
+    # 压缩会触发代理内部的“侧请求”（总结旧历史），耗时明显长于直连。
+    LLM_PROXY_TIMEOUT_SECONDS: float = 180.0
 
     ALLOWED_EXTENSIONS: set = {"csv", "xlsx", "json", "pdf", "docx", "md", "txt", "r", "py", "ipynb", "tex", "bib"}
 

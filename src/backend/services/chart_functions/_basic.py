@@ -93,9 +93,12 @@ def violin_chart(data, title: str, x_label: str, y_label: str, **kwargs) -> Figu
         ax.boxplot(
             [vals], positions=[pos], widths=0.15,
             showfliers=False, showcaps=False,
+            patch_artist=True,
             medianprops=dict(color="#000000", linewidth=2),
             whiskerprops=dict(color="#000000", linewidth=1.5),
-            boxprops=dict(color="#000000", linewidth=1.5, facecolor="none"),
+            # patch_artist=True 后 boxprops 才作用在 Patch 上；不设置该参数时
+            # matplotlib 3.10 会用 Line2D 绘制箱体，facecolor 直接抛 AttributeError。
+            boxprops=dict(facecolor="white", edgecolor="#000000", linewidth=1.5),
         )
 
     ax.set_xticks(range(1, len(groups) + 1))

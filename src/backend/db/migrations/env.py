@@ -25,6 +25,8 @@ from src.backend.models.orm import (  # noqa: F401, E402
     User, UserQuota, Order, EntitlementGrant, VerificationCode,
     AdminAuditLog, AgentExecutionLog, LoginAttempt,
 )
+# 研究领域模型（PRD v1.0 §6），否则 autogenerate 看不到 research_* 表。
+from src.backend.research import models as _research_models  # noqa: F401, E402
 
 # Alembic Config 对象
 config = context.config

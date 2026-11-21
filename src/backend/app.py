@@ -10,7 +10,7 @@ from pathlib import Path
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -36,8 +36,29 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         await startup(app)
-        yield
-        await shutdown(app)
+        # 研究任务派发器：outbox 提交后才执行（PRD FR-11）。启动失败不阻断主应用，
+        # 但要留下明确日志，避免"任务永远排队"却没有任何提示。
+        dispatcher = None
+        if settings.RESEARCH_ENABLED:
+            try:
+                from src.backend.research.dispatcher import create_dispatcher
+
+                session_factory = getattr(app.state, "db_session_factory", None)
+                if session_factory is not None:
+                    dispatcher = create_dispatcher(session_factory)
+                    await dispatcher.start()
+                    app.state.research_dispatcher = dispatcher
+            except Exception:
+                logger.error("research dispatcher failed to start", exc_info=True)
+        try:
+            yield
+        finally:
+            if dispatcher is not None:
+                try:
+                    await dispatcher.stop()
+                except Exception:
+                    logger.warning("research dispatcher stop failed", exc_info=True)
+            await shutdown(app)
 
     # ── 创建应用 ──────────────────────────────────────────────
     app = FastAPI(
@@ -45,8 +66,10 @@ def create_app() -> FastAPI:
         description="基于 RAG + Langgraph + 6层企业架构的智能学术研究助手",
         version=settings.VERSION,
         lifespan=lifespan,
-        # I4: 全局请求体大小限制 10MB（防止恶意大 payload 耗尽内存）
-        request_body_max_size=10 * 1024 * 1024,
+        # NOTE: 不要传 request_body_max_size —— FastAPI 0.136.3 的 __init__ 没有该参数，
+        # 传进去会被静默忽略（曾经因此让 22MiB 上限形同虚设）。
+        # 研究域请求体上限改由 RequestSizeLimitMiddleware 真实执行（见下方中间件注册），
+        # 单文件 20MiB 由 document_service 流式校验，两者互补（FR-03）。
     )
     app.debug = settings.DEBUG
 
@@ -110,6 +133,18 @@ def create_app() -> FastAPI:
 
     cors_origins = settings.get_cors_origins()
     cors_credentials = settings.get_cors_allow_credentials()
+
+    # FR-03：研究域请求体上限（22MiB = 20MiB 单文件 + multipart 余量）。
+    # FastAPI 本身没有 request_body_max_size，必须在 ASGI 层真实执行；
+    # 只覆盖 /api/v1/research，避免改变既有端点的行为。
+    from src.backend.middleware.request_size_limit import RequestSizeLimitMiddleware
+
+    app.add_middleware(
+        RequestSizeLimitMiddleware,
+        max_bytes=settings.RESEARCH_MAX_MULTIPART_BYTES,
+        path_prefixes=("/api/v1/research",),
+    )
+
     # P2 修复: HTTP 响应压缩 (JSON/Text)，减少传输体积 60-85%
     app.add_middleware(GZipMiddleware, minimum_size=1024)
 
@@ -202,7 +237,7 @@ def create_app() -> FastAPI:
     # ── 路由注册 ──────────────────────────────────────────────
     # P2-T2 死路由清理时误删了 upload 路由，但前端仍在调用 /api/v1/upload，
     # 导致 404 被前端统一报为"后端未启动"。现已恢复（routers/upload.py）。
-    from src.backend.routers import knowledge, agent, ws, paper_pipeline, paper_review, code_execution, auth, payment, export, writing, upload
+    from src.backend.routers import knowledge, agent, ws, paper_pipeline, paper_review, code_execution, auth, payment, export, writing, upload, skills, browser_agent
     from src.backend.core.metrics import get_metrics, set_app_info
 
     app.include_router(knowledge.router, prefix="/api/v1")
@@ -225,6 +260,30 @@ def create_app() -> FastAPI:
     app.include_router(export.router, prefix="/api/v1")
     app.include_router(writing.router, prefix="/api/v1")
     app.include_router(upload.router, prefix="/api/v1")
+    app.include_router(skills.router, prefix="/api/v1")
+    app.include_router(browser_agent.router, prefix="/api/v1")
+
+    # ── 研究模块（PRD v1.0 R0）────────────────────────────────
+    # 统一任务入口 /api/v1/research/*，能力状态、归属隔离与错误结构都由该路由负责。
+    if settings.RESEARCH_ENABLED:
+        try:
+            from src.backend.research.errors import ResearchAPIError
+            from src.backend.routers import research as research_router
+
+            @app.exception_handler(ResearchAPIError)
+            async def _research_error_handler(request: Request, exc: ResearchAPIError):
+                """把领域错误转换为统一 {"error": {...}} 结构，保留状态码语义。"""
+                request_id = getattr(request.state, "request_id", None)
+                return JSONResponse(
+                    status_code=exc.status_code,
+                    content=exc.to_payload(request_id=request_id),
+                )
+
+            app.include_router(research_router.router, prefix="/api/v1")
+            logger.info("research module enabled=true")
+        except Exception as exc:  # 研究模块不可用时不得拖垮主应用
+            logger.error(f"research module failed to load: {exc}")
+
 
     # ── Prometheus 监控指标端点 ──────────────────────────────
     @app.get("/metrics")

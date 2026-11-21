@@ -42,7 +42,7 @@ def upgrade() -> None:
         op.create_table(
             "admin_audit_logs",
             sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-            sa.Column("admin_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False, index=True),
+            sa.Column("admin_id", sa.Integer(), sa.ForeignKey("users.id", name="fk_admin_audit_logs_admin_users"), nullable=False, index=True),
             sa.Column("action", sa.String(64), nullable=False),
             sa.Column("target_type", sa.String(32), nullable=True),
             sa.Column("target_id", sa.String(64), nullable=True),
@@ -59,7 +59,7 @@ def upgrade() -> None:
         op.create_table(
             "agent_execution_logs",
             sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-            sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=False, index=True),
+            sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", name="fk_agent_execution_logs_user_users"), nullable=False, index=True),
             sa.Column("agent_id", sa.String(32), nullable=False),
             sa.Column("session_id", sa.String(64), nullable=False),
             sa.Column("request_id", sa.String(64), nullable=True),
@@ -117,7 +117,7 @@ def upgrade() -> None:
     # ── 7. chart_records 表增加 user_id 字段 ──
     if "chart_records" in _tables() and "user_id" not in _columns("chart_records"):
         with op.batch_alter_table("chart_records") as batch_op:
-            batch_op.add_column(sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id"), nullable=True, index=True))
+            batch_op.add_column(sa.Column("user_id", sa.Integer(), sa.ForeignKey("users.id", name="fk_chart_records_user_users"), nullable=True, index=True))
 
 
 def downgrade() -> None:

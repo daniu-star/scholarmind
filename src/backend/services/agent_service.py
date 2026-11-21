@@ -240,6 +240,9 @@ class AgentService(IAgentService):
                 temperature=agent_cfg["temperature"],
                 max_tokens=agent_cfg["max_tokens"],
                 model=llm_model,
+                # 压缩代理按会话折叠历史：同 session 的多轮必须共享同一个键，
+                # 否则每轮都被当成新会话，代理无从判断哪些消息可以折叠。
+                session_key=f"chat:{user_id}:{session_id}",
             )
             reply = response.content
             latency_ms = int((time.monotonic() - llm_start) * 1000)
@@ -391,6 +394,8 @@ class AgentService(IAgentService):
                 max_tokens=agent_cfg["max_tokens"],
                 model=llm_model,
                 stream=True,
+                # 与 chat() 用同一个会话键，保证同一会话的流式/非流式共享压缩状态。
+                session_key=f"chat:{user_id}:{session_id}",
             ):
                 # P0 修复: 防御性类型检查，避免 yield dict 时 TypeError
                 if isinstance(token, str):
@@ -588,7 +593,8 @@ class AgentService(IAgentService):
         # 技能规则（带缓存，减少 DB 查询）
         # Task 27: 调用合并后的 _load_skills_for_agent（缓存由 @cache_result 装饰器实现）
         skills_rules_text = ""
-        skills_list = await self._load_skills_for_agent(agent_id)
+        selected_skill_ids = (context or {}).get("selected_skill_ids", [])
+        skills_list = await self._load_skills_for_agent(agent_id, selected_skill_ids)
         if skills_list:
             skills_parts = []
             for skill in skills_list:
@@ -668,7 +674,7 @@ class AgentService(IAgentService):
         )
 
     @cache_result(ttl=300)
-    async def _load_skills_for_agent(self, agent_id: str) -> list[dict]:
+    async def _load_skills_for_agent(self, agent_id: str, selected_skill_ids: Optional[list[str]] = None) -> list[dict]:
         """Load enabled skills associated with the given agent_id
 
         Task 27: 合并原 `_load_skills_for_agent_cached` 与 `_load_skills_for_agent`，
@@ -679,11 +685,12 @@ class AgentService(IAgentService):
         """
         all_skills = await self.skills_service.list_all()
         matched = []
+        selected = set(selected_skill_ids or [])
         for skill in all_skills:
             if not skill.get("enabled", False):
                 continue
             agents = skill.get("agents", [])
-            if agent_id in agents:
+            if skill.get("id") in selected or agent_id in agents:
                 matched.append(skill)
         return matched
 

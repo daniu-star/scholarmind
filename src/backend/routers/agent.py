@@ -78,13 +78,18 @@ async def chat_with_agent(
         # 免费用户请求 pro 模型 → 403
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
-    reservation = await _reserve_chat(db, user_id, request.agent_id, request.context)
+    context = dict(request.context or {})
+    # FR-12 / 问题 08：仅在显式提供 skill_ids 时覆盖既有选择；
+    # 未提供（None）沿用上下文，显式 [] 表示明确不使用 Skill。
+    if request.skill_ids is not None:
+        context["selected_skill_ids"] = list(request.skill_ids)
+    reservation = await _reserve_chat(db, user_id, request.agent_id, context)
     try:
         result = await service.chat(
             message=request.message,
             agent_id=request.agent_id,
             session_id=request.session_id,
-            context=request.context,
+            context=context,
             user_id=user_id,
             model=model,
         )
@@ -142,7 +147,11 @@ async def stream_chat_with_agent(
         ) from e
 
     try:
-        reservation = await _reserve_chat(db, user_id, request.agent_id, request.context)
+        context = dict(request.context or {})
+        # FR-12 / 问题 08：同上，显式提供才覆盖，避免清空用户已选的 Skill。
+        if request.skill_ids is not None:
+            context["selected_skill_ids"] = list(request.skill_ids)
+        reservation = await _reserve_chat(db, user_id, request.agent_id, context)
     except HTTPException:
         raise
     except Exception as e:
@@ -161,7 +170,7 @@ async def stream_chat_with_agent(
                 message=request.message,
                 agent_id=request.agent_id,
                 session_id=request.session_id,
-                context=request.context,
+                context=context,
                 user_id=user_id,
                 model=model,
             ):

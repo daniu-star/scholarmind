@@ -114,6 +114,19 @@ class CircuitBreaker:
             # 正常状态下重置计数器
             self._failure_count = 0
 
+    def reset(self) -> None:
+        """强制回到关闭状态（运维/离线批处理用，线上请求路径不应调用）。
+
+        典型场景：批量评估脚本在长时间运行中遇到一次网络抖动，熔断器打开后
+        后续论文全部被拒；批处理工具可显式复位后继续，而不是把“网络抖动”
+        记成“模型不可用”。线上接口不暴露该入口。
+        """
+        self._state = CircuitState.CLOSED
+        self._failure_count = 0
+        self._half_open_count = 0
+        self._last_failure_time = 0
+        logger.info("Circuit breaker reset", service=self.name)
+
     def allow_request(self) -> bool:
         """检查是否允许请求通过"""
         self._transition_state()

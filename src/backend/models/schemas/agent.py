@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ChatRequest(BaseModel):
@@ -33,6 +33,24 @@ class ChatRequest(BaseModel):
     context: Optional[dict[str, Any]] = Field(
         default=None, description="上下文信息（discipline/research_type/readiness/guidance_step/guidance_data）"
     )
+    # FR-12：``None`` 表示“本次未提供”，与显式 ``[]``（明确不使用 Skill）不同。
+    # 未提供时不得覆盖既有 context 中的 selected_skill_ids（问题 08）。
+    skill_ids: Optional[list[str]] = Field(
+        default=None,
+        max_length=8,
+        description="显式选择的 Skill ID；不传表示沿用上下文，[] 表示明确不使用 Skill",
+    )
+
+    @field_validator("skill_ids")
+    @classmethod
+    def _validate_skill_ids(cls, value: Optional[list[str]]) -> Optional[list[str]]:
+        if value is None:
+            return None
+        if len(set(value)) != len(value):
+            raise ValueError("skill_ids 不能重复")
+        if any(not isinstance(item, str) or not item.strip() for item in value):
+            raise ValueError("skill_ids 必须是非空字符串")
+        return value
     # P0 Task 4.1：mode 枚举替代 model 字符串。
     #   - None：使用套餐默认模型（免费→Flash，Pro→Pro）
     #   - "flash"：任意套餐可用 Flash 模型

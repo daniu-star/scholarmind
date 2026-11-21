@@ -52,6 +52,32 @@ _RETRYABLE_EXCEPTIONS = (
 )
 
 
+def proxy_base_url() -> Optional[str]:
+    """返回启用的上下文压缩代理 base URL；未配置返回 ``None``。
+
+    代理（billion-context / ACP）接在模型上游之前，按会话折叠历史消息，
+    以降低长对话的输入 token。留空即保持历史行为（直连 DeepSeek）。
+    """
+    configured = getattr(settings, "LLM_PROXY_BASE_URL", None)
+    value = str(configured or "").strip()
+    return value or None
+
+
+def proxy_session_headers(session_key: Optional[str]) -> Optional[dict]:
+    """按会话键构造代理请求头；未启用代理或没有会话键时返回 ``None``。
+
+    同一个 ``session_key`` 的请求共享压缩状态：会话越连续，代理越能识别
+    可折叠的历史区间。``session_key`` 由调用方给出（聊天用会话 ID，研究
+    任务用任务 ID），不得跨用户复用。
+    """
+    if not proxy_base_url() or not session_key:
+        return None
+    header = str(
+        getattr(settings, "LLM_PROXY_SESSION_HEADER", "x-acp-session") or "x-acp-session"
+    )
+    return {header: str(session_key)}
+
+
 class LLMResponse:
     """LLM 响应包装"""
 
@@ -95,12 +121,22 @@ class LLMClient:
         return cls._instance
 
     def _get_client(self) -> AsyncOpenAI:
-        """懒加载 AsyncOpenAI 客户端"""
+        """懒加载 AsyncOpenAI 客户端（可指向本地上下文压缩代理）"""
         if self._client is None:
+            proxy_url = proxy_base_url()
+            base_url = proxy_url or settings.DEEPSEEK_BASE_URL
+            timeout_seconds = self._timeout
+            if proxy_url:
+                # 压缩会触发代理内部的“侧请求”（总结旧历史），单次调用明显变慢。
+                timeout_seconds = max(
+                    timeout_seconds,
+                    float(getattr(settings, "LLM_PROXY_TIMEOUT_SECONDS", 180.0)),
+                )
+                logger.info("llm_proxy_enabled", base_url=proxy_url)
             self._client = AsyncOpenAI(
                 api_key=settings.DEEPSEEK_API_KEY or "dummy-key",
-                base_url=settings.DEEPSEEK_BASE_URL,
-                timeout=httpx.Timeout(self._timeout, connect=10.0),
+                base_url=base_url,
+                timeout=httpx.Timeout(timeout_seconds, connect=10.0),
                 max_retries=0,  # 由 tenacity 接管重试
             )
         return self._client
@@ -128,10 +164,17 @@ class LLMClient:
         max_tokens: int = 2048,
         response_format: Optional[dict] = None,
         model: Optional[str] = None,
+        extra_body: Optional[dict] = None,
+        session_key: Optional[str] = None,
     ) -> LLMResponse:
         """同步对话（非流式）
 
-        自动应用：超时、重试、熔断器
+        自动应用：超时、重试、熔断器。
+
+        ``extra_body`` 透传到 OpenAI 兼容 SDK（例如
+        ``{"thinking": {"type": "disabled"}}`` 关闭推理模型思维链）。
+
+        ``session_key`` 仅在启用压缩代理时生效：同键请求共享压缩状态。
         """
         if not settings.DEEPSEEK_API_KEY:
             raise RuntimeError("DEEPSEEK_API_KEY 未配置，无法调用 LLM")
@@ -156,6 +199,11 @@ class LLMClient:
             }
             if response_format is not None:
                 kwargs["response_format"] = response_format
+            if extra_body:
+                kwargs["extra_body"] = dict(extra_body)
+            session_headers = proxy_session_headers(session_key)
+            if session_headers:
+                kwargs["extra_headers"] = session_headers
             return await client.chat.completions.create(**kwargs)
 
         try:
@@ -180,11 +228,14 @@ class LLMClient:
         temperature: float = 0.7,
         max_tokens: int = 2048,
         model: Optional[str] = None,
+        session_key: Optional[str] = None,
     ) -> AsyncIterator[str]:
         """流式对话，逐 chunk 产出文本
 
         注意：流式不应用 tenacity 重试（流一旦开始无法回放），
-        但仍受熔断器保护。流式中断由调用方处理（如 AgentService.stream_chat）
+        但仍受熔断器保护。流式中断由调用方处理（如 AgentService.stream_chat）。
+
+        ``session_key`` 仅在启用压缩代理时生效：同键请求共享压缩状态。
         """
         if not settings.DEEPSEEK_API_KEY:
             raise RuntimeError("DEEPSEEK_API_KEY 未配置，无法调用 LLM")
@@ -194,16 +245,20 @@ class LLMClient:
 
         client = self._get_client()
         try:
-            stream = await client.chat.completions.create(
-                model=model or self._model,
-                messages=[
+            create_kwargs = {
+                "model": model or self._model,
+                "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
                 ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-            )
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "stream": True,
+            }
+            session_headers = proxy_session_headers(session_key)
+            if session_headers:
+                create_kwargs["extra_headers"] = session_headers
+            stream = await client.chat.completions.create(**create_kwargs)
             finish_reason = None
             async for chunk in stream:
                 if chunk.choices:
@@ -233,11 +288,15 @@ class LLMClient:
         response_format: Optional[dict] = None,
         model: Optional[str] = None,
         stream: bool = False,
+        session_key: Optional[str] = None,
     ):
         """多轮对话（支持完整消息列表）
 
         当 stream=True 时返回异步生成器（async for 直接迭代）；
         当 stream=False 时返回 coroutine（需 await 获取 LLMResponse）。
+
+        ``session_key`` 仅在启用压缩代理时生效：多轮会话应传同一个键
+        （聊天用会话 ID），否则代理会把每轮都当成新会话，无法折叠历史。
         """
         if not settings.DEEPSEEK_API_KEY:
             raise RuntimeError("DEEPSEEK_API_KEY 未配置")
@@ -253,6 +312,9 @@ class LLMClient:
         }
         if response_format is not None:
             kwargs["response_format"] = response_format
+        session_headers = proxy_session_headers(session_key)
+        if session_headers:
+            kwargs["extra_headers"] = session_headers
 
         if stream:
             return self._chat_messages_stream(client, **kwargs)

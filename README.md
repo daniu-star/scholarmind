@@ -115,12 +115,17 @@ npm run dev
 | `DEEPSEEK_MODEL_FLASH` | Flash 模型名（前端 toggle 切换，免费/Pro 默认走此模型） | `deepseek-v4-flash` |
 | `DEEPSEEK_MODEL_PRO` | Pro 模型名（Pro 用户 toggle 切换） | `deepseek-v4-pro` |
 | `SKILLS_DIR` | 技能目录路径 | `data/skills` |
+| `SKILL_SOURCE_DIRS` | 只读外部 Skill 根目录列表，递归读取 `SKILL.md` | `C:/Users/13067/.trae-cn/skills` |
 | `DATABASE_URL` | 数据库连接 | `sqlite+aiosqlite:///data/scholarmind_orm.db` |
 | `REDIS_URL` | Redis 连接 | `redis://localhost:6379/0` |
 | `PASSWORD_MIN_LENGTH` | 密码最小长度 | `8` |
 | `DEBUG` | 调试模式 | `true` |
 | `CODE_EXECUTION_ENABLED` | 代码执行入口总开关（P0 安全）。`false` 时 `/api/v1/code-execution/*` 路由完全不注册（返回 404）；`true` 时注册但强制 `require_admin` 鉴权 + 审计日志。**生产环境默认关闭**，仅在受控内部环境且确需在线代码沙箱时显式设为 `true`。`/pip-install` 端点已永久移除，任何环境都不可用 | `false` |
 | `JWT_SECRET_KEY` | JWT 签名密钥，生产环境至少 32 字符 | - |
+| `LLM_PROXY_BASE_URL` | 可选：模型调用经本地上下文压缩代理（billion-context）转发，留空=直连。示例 `http://127.0.0.1:8790/bili/https://api.deepseek.com/v1`。启动与实测见 [docs/reports/BILLION_CONTEXT.md](docs/reports/BILLION_CONTEXT.md)；正常流量原样转发，不省 token | 空 |
+| `LLM_PROXY_SESSION_HEADER` | 代理会话头名，需与代理配置 `sessionHeader` 一致 | `x-acp-session` |
+| `LLM_PROXY_TIMEOUT_SECONDS` | 启用代理时的客户端超时（折叠历史会发侧请求，需更长） | `180` |
+
 | `PAYMENT_ENABLED` | 支付总开关。`false` 时仍可读取商品目录，但下单返回 503、回调拒绝处理；配置真实商户凭证后设为 `true` | `false` |
 | `PAYMENT_VERIFY_REQUIRED` | 支付回调是否强制验签。`true`（默认）时无签名或签名失败一律返回 `failure`；`false` 仅用于本地联调，生产环境必须为 `true` | `true` |
 | `ALIPAY_APP_ID` / `ALIPAY_PRIVATE_KEY` / `ALIPAY_PUBLIC_KEY` | 支付宝应用 ID、应用私钥和支付宝公钥；PEM 可直接填写或使用绝对文件路径 | - |
@@ -130,6 +135,17 @@ npm run dev
 | `WECHAT_PAY_APIV3_KEY` | 微信 API v3 密钥，用于回调报文 AES-GCM 解密 | - |
 | `WECHAT_PAY_PLATFORM_PUBLIC_KEY` | 微信支付平台公钥（也可配置 `WECHAT_PAY_PLATFORM_CERT`） | - |
 | `ADMIN_USERNAMES` | 管理员用户名白名单（逗号分隔），用于 `require_admin` 依赖判定代码执行等高危端点的访问权限 | `admin` |
+
+## 外部 Skills 与 Browser Agent
+
+应用启动后会递归注册 `C:/Users/13067/.trae-cn/skills` 下的全部 Skill 定义。外部 Skill 以只读方式加载，不会复制或修改该目录；只有在 Web 对话中显式选择后，才会注入该 Skill 的 `SKILL.md` 内容。
+
+- `GET /api/v1/skills`：登录后获取可用 Skill 清单
+- `GET /api/v1/skills/{skill_id}`：登录后获取某个 Skill 的完整规则
+- `/api/v1/agent/chat`、`/api/v1/agent/stream` 支持 `skill_ids` 字段，前端已提供按需选择器
+- `POST /api/v1/browser-agent/command`：登录后通过安全白名单调用本机 `agent-browser` CLI；不支持任意 Shell、`eval` 或路径穿越
+
+Browser Agent CLI 路径可通过 `AGENT_BROWSER_BIN` 覆盖。浏览器会话按 ScholarMind 会话 ID 隔离，下载、截图和 PDF 输出应使用相对路径。
 
 ## 架构决策
 

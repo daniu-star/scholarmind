@@ -88,3 +88,8 @@ AI产品.docx
 
 .vercel
 .env*
+
+# ========== Test / probe artifacts ==========
+pytest-of-*/
+bili-probe-*
+torchinductor_*/

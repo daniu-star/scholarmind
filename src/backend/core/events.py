@@ -199,8 +199,14 @@ async def startup(app: FastAPI) -> None:
         except Exception as e:
             logger.warning(f"VectorService prewarm failed: {e}. RAG will lazy-init on first use.")
 
-    threading.Thread(target=_prewarm_vector, daemon=True, name="vector-prewarm").start()
-    logger.info("VectorService prewarm dispatched to background thread")
+    if settings.DISABLE_VECTOR_PREWARM:
+        # 测试/CI/浏览器 E2E：torch 与 sentence-transformers 首次导入会占用数分钟
+        # 并把事件循环饿住（真实踩到 /api/v1/health 90s 超时）。这里直接跳过预热，
+        # RAG 仍会按需懒加载，生产默认不开启该开关。
+        logger.info("VectorService prewarm disabled by DISABLE_VECTOR_PREWARM")
+    else:
+        threading.Thread(target=_prewarm_vector, daemon=True, name="vector-prewarm").start()
+        logger.info("VectorService prewarm dispatched to background thread")
 
     # 安装 Pipeline LLM Bridge（将后端 llm_client 注入到两个技能的 Pipeline）
     try:

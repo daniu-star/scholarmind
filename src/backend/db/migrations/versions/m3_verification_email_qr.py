@@ -85,7 +85,7 @@ def upgrade() -> None:
             if "confirmed_by" not in order_cols:
                 batch_op.add_column(sa.Column(
                     "confirmed_by", sa.Integer(),
-                    sa.ForeignKey("users.id"), nullable=True,
+                    sa.ForeignKey("users.id", name="fk_orders_confirmed_by_users"), nullable=True,
                     comment="确认支付的管理员ID"
                 ))
             if "confirmed_at" not in order_cols:

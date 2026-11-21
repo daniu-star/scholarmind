@@ -1,0 +1,42 @@
+{
+  "port": 8790,
+  "host": "127.0.0.1",
+  "sessionHeader": "x-acp-session",
+  "log": true,
+  "providers": {
+    "https://api.deepseek.com": {
+      "models": {
+        "deepseek-v4-flash": {
+          "context": 1048576,
+          "output": 393216
+        },
+        "deepseek-v4-pro": {
+          "context": 1048576,
+          "output": 393216
+        },
+        "deepseek-chat": {
+          "context": 1048576,
+          "output": 393216
+        }
+      }
+    }
+  },
+  "compress": {
+    "modelContextLimit": 1048576,
+    "maxContextLimit": "60%",
+    "emergencyThresholdPercent": "92%",
+    "preserveRecentMessages": 6,
+    "requireNudge": true,
+    "nudgeGrowthTokens": 40000,
+    "minSummaryLength": 120,
+    "_notes": {
+      "minSummaryLength": "120 是实测下限（代理整批拒绝短于该值的摘要）；调高到 200 会让模型更容易因摘要过短被拒，不推荐"
+    }
+  },
+  "network": {
+    "maxShrinkPerCompress": 0.5
+  },
+  "_notes": {
+    "minSummaryLength": "120 是实测下限（代理整批拒绝短于该值的摘要）；调高到 200 会让模型更容易因摘要过短被拒，不推荐"
+  }
+}
