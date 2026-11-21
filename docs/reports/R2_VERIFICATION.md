@@ -8,7 +8,7 @@
 
 ## 0. 结论
 
-**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 78 passed + 1 skipped、ruff 全绿、三套回归 527 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过、AT-056 的 20000 字真实对照未做**，因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
+**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 78 passed + 1 skipped、ruff 全绿、三套回归 527 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过、AT-056 的「短流程 vs 多角色流程」20000 字对照未做**（预算闸门的真实 A/B 已跑，见 §14），因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
 
 ### 0.1 放行条件
 
@@ -60,7 +60,7 @@
 | AT-053 同浏览器双账号 | **partial** | 已做双账号隔离：新注册账号 B 在 UI 中看不到账号 A 的项目，B 直连 A 的项目 ID 得统一 404（`NOT_FOUND`），见 §11.3；refresh≠access 的 token 混用仍由 R1 用例覆盖、未在浏览器里做 |
 | AT-054 删除撤权/迟到 worker | **partial** | 新增 `test_research_r2/test_deletion_revocation.py` 5 条：删除后读路径全 404 且不泄露文件名、已删版本建任务 404、版本与分块级联清理、非 owner 删除前后均 404、租约 `LEASE_HELD`、终态任务 `TASK_NOT_CLAIMABLE` 且迟到执行器不写事件；未覆盖事件重放泄露（需 Redis 生产环境） |
 | AT-055 R2 图表数据一致性 | partial | 摘要可独立复算、值域与表数据一致、PNG sha256/宽高互证、同输入字节一致、越权 404、失败不落 Artifact；缺口：输入格式收窄（D1）、单位校验未显式（D5 已补策略字段） |
-| AT-056 R2 预算/20000 字对照 | partial | 越界→`partial`+`BUDGET_EXCEEDED` 且成果保留、未知费用 `None`/报表"未知"、事件按 sequence 去重；缺口：真实 20000 字对照未跑 |
+| AT-056 R2 预算/20000 字对照 | partial | 越界→`partial`+`BUDGET_EXCEEDED` 且成果保留、未知费用 `None`/报表"未知"、事件按 sequence 去重；**已补真实 A/B**：同一篇真实论文只改预算三臂，默认 69/69 succeeded、tokens 收紧到 12,000 → 18/69 partial、调用收紧到 8 → 31/69 partial（`R2_BUDGET_AB.md`）；缺口：多角色 vs 短流程的流程增益对照未跑 |
 
 ## 3. 关键证据
 
@@ -251,3 +251,11 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 - 默认仍是词法检索；只有显式配置模型才走向量，且不会联网下载（除非打开 `RESEARCH_EMBEDDING_ALLOW_DOWNLOAD`）。
 - 检索是**请求内实时编码**（无持久化向量索引，也未接 ChromaDB），大文档首次检索会有模型加载耗时（本机 bge-small 约 20 s/进程，之后复用）。
 - 未做混合排序（向量 + BM25 融合），也未做跨版本/跨文档检索；`search` 只在单个已授权版本内进行。
+
+## 14. 附录：T23 预算闸门真实 A/B（2026-11-21）
+
+- 工具：`tools/research_budget_ab.py`（同一份文档、同模型 `deepseek-v4-flash`、同提示词版本，只改受理预算）。
+- 命令：`python tools/research_budget_ab.py --corpus tmp/r2-corpus --only p14-intelligent-communication --db tmp/budget-ab.db --out tmp/budget-ab.json --md docs/reports/R2_BUDGET_AB.md`
+- 结果（`docs/reports/R2_BUDGET_AB.md`）：默认预算 160 calls / 100,000 tokens → **succeeded**，14 次调用 / 32,125 tokens，覆盖 69/69；tokens 收紧到 12,000 → **partial**，5 次调用 / 11,460 tokens，覆盖 18/69；调用收紧到 8 → **partial**，8 次调用 / 20,548 tokens，覆盖 31/69。
+- 语义说明：闸门在「将要越界」前停止继续调用，因此三臂的 `budget_evaluation.state` 都是 `within`；越界的可见后果是覆盖不足并终态降为 `partial`，**没有任何一臂 succeeded**，符合 FR-15。
+- 边界：单篇、单次测量，不是统计基准；`cost_usd` 仍为 `null`（未接供应商计费）。
