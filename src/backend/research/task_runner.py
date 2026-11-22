@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from ..config import settings
 from . import artifact_service, budget
 from .contracts import (
     BillingState,
@@ -52,7 +53,7 @@ from .runtime import (
 logger = logging.getLogger(__name__)
 
 #: 单次尝试的租约时长（秒），与 PRD §9 的累计运行期限一致。
-LEASE_SECONDS = 1200
+LEASE_SECONDS = int(settings.RESEARCH_TASK_LEASE_SECONDS)
 
 _TERMINAL_VALUES = {status.value for status in TERMINAL_STATUSES}
 
@@ -315,6 +316,10 @@ async def execute_task(
     except Exception:  # noqa: BLE001 - 抢占失败同样安全放弃
         logger.warning("任务 %s 抢占异常，跳过", task.id, exc_info=True)
         return
+
+    # 领取即提交：attempt 行与 running 状态必须先落库，否则进程崩溃/被 kill 时
+    # 其它执行器看不到这次领取（租约与 fencing 都无从判断），运维也看不到在跑的任务。
+    await db.commit()
 
     # 把本次领取的 fencing token 绑到上下文：租约被接管后，本次执行的任何
     # 事件/状态写入都会被 repository 以 STALE_ATTEMPT 拒绝（PRD FR-11）。

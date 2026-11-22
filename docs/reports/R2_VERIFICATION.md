@@ -8,7 +8,7 @@
 
 ## 0. 结论
 
-**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 78 passed + 1 skipped、ruff 全绿、三套回归 529 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过**；**AT-056 的「短流程 vs 多角色流程」20000 字对照已跑**（single 109 条 / multi_role 203 条，成本约 2×，见 §15），因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
+**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 78 passed + 1 skipped、ruff 全绿、三套回归 529 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过**；**AT-056 的「短流程 vs 多角色流程」20000 字对照已跑**（single 109 条 / multi_role 203 条，成本约 2×，见 §15）；**Redis/Celery 投递层恢复演练 8/8 PASS**（worker 强杀重投 exactly-once、broker 断连诚实失败、重复投递去重，见 §17），因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
 
 ### 0.1 放行条件
 
@@ -281,5 +281,18 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
   2. `EntitlementService.grant_product` 的 `source_ref` 若已属于另一用户会**静默 no-op**；已改为抛 `ValueError`。
   3. **R2-A13（FR-11）**：fencing token 只落库、未在写入路径校验——租约转移后旧 attempt 仍能 `append_event` 与 `transition`；已修复（`task_repository` 新增 `set_lease_scope`/`_enforce_fence`，`append_event`/`transition`/`close_attempt` 校验 token，冲突码 `STALE_ATTEMPT`；`task_runner.execute_task` 执行期绑定 token）。
 - 回归：三套 `529 passed, 1 skipped in 371.35s`（R0 290 / R1 161 / R2 78），`ruff` 全绿。
-- 未覆盖（如实声明）：Redis 真实断连重连（本机无 redis-server、Docker 引擎不可用）、Celery worker 被杀后 broker 重投（无 broker，研究域走进程内 dispatcher）、多机竞争。
+- 未覆盖（如实声明）：多机竞争。Redis 真实断连重连与 Celery worker 被杀后 broker 重投已在 §17 单独演练（本机 Redis 7 + 真实 Celery worker + 本地 TCP 代理注入断连），8/8 PASS。
 - 残留风险：崩溃 attempt 行保留 `running`（按设计，回收靠 `lease_expires_at`）；从未达终态的任务可能残留 `reserved` 计费行（无独立 reaper）。
+
+## 17. 附录：Redis / Celery 投递层恢复演练（2026-11-22）
+
+- 环境：Windows 11 + 本机**真实 Redis 7**（隔离到 9 号库）+ 真实 `celery worker --pool=solo`，`RESEARCH_MODEL_STUB=true`；broker 断连用脚本内置 `TcpProxy` 注入（无 Docker 可用）。
+- 脚本：`scripts/research_broker_drill.py --proxy-port 6391`；报告：`docs/reports/R2_BROKER_DRILL.md`；结果文件 `tmp/broker-drill.json`。
+- 结论：**PASS（8/8，exit 0）**——`roundtrip_succeeded`、`roundtrip_single_artifact`、`worker_kill_triggers_redelivery`、`worker_kill_exactly_once`、`broker_down_is_honest`、`duplicate_delivery_exactly_once`、`worker_kill_terminal`、`broker_down_terminal`。
+- 关键证据：S2 用 `taskkill /F` 强杀正在执行的 worker → attempts `[[1,"running"],[2,"succeeded"]]`、终态事件 1 条、Artifact 1 个；S3 停掉代理后发布 `OperationalError: Error 10061 … 目标计算机积极拒绝`（不假成功），恢复后同一任务跑完；S4 同一任务重复投递仍只有 1 条终态事件、1 个 Artifact。
+- 演练中发现并修复 2 个真实缺陷：
+  1. `task_runner` 领取（`open_attempt`）后只 flush 不 commit → worker 被强杀时 attempt 与 `running` 状态不可见，租约无法判定；已改为领取即 `await db.commit()`。
+  2. 消息重投早于租约过期时「安全放弃」并被 Celery ack → 任务永久停在 `running`、不再重投；已改为 `research_tasks` 检测未过期租约并 `self.retry(countdown=剩余+5)`，同时新增配置 `RESEARCH_TASK_LEASE_SECONDS`（默认 1200，与 PRD §9 对齐）。
+- AT-038/AT-039 判定：AT-038 从「仅 SQLite 并发断言」升级为「PG 崩溃接管 + broker 重投」双证据，仍为 **partial**（缺多 worker/多机竞争）；AT-039 的「取消后迟到结果」语义在 PG 演练中以 fencing 拒绝覆盖，仍为 partial（未覆盖真实取消后再投递的端到端组合）。
+- 回归：三套 `529 passed, 1 skipped in 517.58s`，`ruff` 全绿。
+- 未覆盖：多 worker/多机竞争、RabbitMQ transport、Docker 容器重启、Redis 主从/持久化故障、任务时长 > visibility_timeout。

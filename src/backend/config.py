@@ -103,6 +103,9 @@ class Settings(BaseSettings):
     RESEARCH_MAX_CONCURRENT_PER_USER: int = 1
     RESEARCH_MAX_CONCURRENT_SYSTEM: int = 3
     RESEARCH_QUEUE_TIMEOUT_SECONDS: int = 300
+    # 任务租约：worker 崩溃后，其它执行器要等到租约过期才能接管。
+    # 恢复演练会把它调小（默认 1200s 与 PRD §9 的单任务 1200s 对齐）。
+    RESEARCH_TASK_LEASE_SECONDS: int = 1200
     RESEARCH_TASK_TIMEOUT_SECONDS: int = 1200
     # 单任务调用预算：诊断 160 次、修改 128 次、100000 tokens。
     RESEARCH_REVIEW_MAX_MODEL_CALLS: int = 160

@@ -1,5 +1,6 @@
 """Celery application configuration."""
 
+import os
 import sys
 from pathlib import Path
 from celery import Celery
@@ -14,7 +15,10 @@ from src.backend.config import settings  # noqa: E402
 
 celery_app = Celery(
     "scholarmind",
-    include=["src.backend.scheduler.chart_tasks"],
+    include=[
+        "src.backend.scheduler.chart_tasks",
+        "src.backend.scheduler.research_tasks",
+    ],
 )
 
 celery_app.conf.update(
@@ -87,6 +91,11 @@ celery_app.conf.update(
     task_acks_late=True,
     task_default_retry_delay=60,
     task_max_retries=3,
+    # redis 传输层的可见性超时：worker 被杀后，未被 ack 的消息要等这么久才会被
+    # 恢复重投（kombu 默认 3600s）。恢复演练把它调小，生产按默认值走。
+    broker_transport_options={
+        "visibility_timeout": int(os.getenv("CELERY_VISIBILITY_TIMEOUT", "3600")),
+    },
 )
 
 # Auto-discover tasks
