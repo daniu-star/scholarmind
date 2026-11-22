@@ -288,11 +288,11 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 
 - 环境：Windows 11 + 本机**真实 Redis 7**（隔离到 9 号库）+ 真实 `celery worker --pool=solo`，`RESEARCH_MODEL_STUB=true`；broker 断连用脚本内置 `TcpProxy` 注入（无 Docker 可用）。
 - 脚本：`scripts/research_broker_drill.py --proxy-port 6391`；报告：`docs/reports/R2_BROKER_DRILL.md`；结果文件 `tmp/broker-drill.json`。
-- 结论：**PASS（8/8，exit 0）**——`roundtrip_succeeded`、`roundtrip_single_artifact`、`worker_kill_triggers_redelivery`、`worker_kill_exactly_once`、`broker_down_is_honest`、`duplicate_delivery_exactly_once`、`worker_kill_terminal`、`broker_down_terminal`。
+- 结论：**PASS（11/11，exit 0）**——`roundtrip_succeeded`、`roundtrip_single_artifact`、`worker_kill_triggers_redelivery`、`worker_kill_exactly_once`、`broker_down_is_honest`、`duplicate_delivery_exactly_once`、`worker_kill_terminal`、`broker_down_terminal`、`two_workers_all_tasks_once`、`two_workers_no_double_artifact`、`two_workers_duplicate_race_exactly_once`。
 - 关键证据：S2 用 `taskkill /F` 强杀正在执行的 worker → attempts `[[1,"running"],[2,"succeeded"]]`、终态事件 1 条、Artifact 1 个；S3 停掉代理后发布 `OperationalError: Error 10061 … 目标计算机积极拒绝`（不假成功），恢复后同一任务跑完；S4 同一任务重复投递仍只有 1 条终态事件、1 个 Artifact。
 - 演练中发现并修复 2 个真实缺陷：
   1. `task_runner` 领取（`open_attempt`）后只 flush 不 commit → worker 被强杀时 attempt 与 `running` 状态不可见，租约无法判定；已改为领取即 `await db.commit()`。
   2. 消息重投早于租约过期时「安全放弃」并被 Celery ack → 任务永久停在 `running`、不再重投；已改为 `research_tasks` 检测未过期租约并 `self.retry(countdown=剩余+5)`，同时新增配置 `RESEARCH_TASK_LEASE_SECONDS`（默认 1200，与 PRD §9 对齐）。
-- AT-038/AT-039 判定：AT-038 从「仅 SQLite 并发断言」升级为「PG 崩溃接管 + broker 重投」双证据，仍为 **partial**（缺多 worker/多机竞争）；AT-039 的「取消后迟到结果」语义在 PG 演练中以 fencing 拒绝覆盖，仍为 partial（未覆盖真实取消后再投递的端到端组合）。
+- AT-038/AT-039 判定：AT-038 从「仅 SQLite 并发断言」升级为「PG 崩溃接管 + broker 重投 + 同机双 worker 竞争」三证据，仍为 **partial**（缺多机竞争）；AT-039 的「取消后迟到结果」语义在 PG 演练中以 fencing 拒绝覆盖，仍为 partial（未覆盖真实取消后再投递的端到端组合）。
 - 回归：三套 `529 passed, 1 skipped in 517.58s`，`ruff` 全绿。
-- 未覆盖：多 worker/多机竞争、RabbitMQ transport、Docker 容器重启、Redis 主从/持久化故障、任务时长 > visibility_timeout。
+- 未覆盖：多机竞争（同机两个 worker 已覆盖）、RabbitMQ transport、Docker 容器重启、Redis 主从/持久化故障、任务时长 > visibility_timeout。

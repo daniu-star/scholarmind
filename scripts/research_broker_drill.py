@@ -96,6 +96,7 @@ def start_worker(
     log_path: Path,
     *,
     concurrency: int = 1,
+    name: str = "brokerdrill",
 ) -> subprocess.Popen:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     handle = log_path.open("ab")
@@ -111,7 +112,7 @@ def start_worker(
         "-c",
         str(max(1, int(concurrency))),
         "-n",
-        "brokerdrill@%h",
+        f"{name}@%h",
     ]
     proc = subprocess.Popen(  # noqa: S603 - 本地演练脚本
         cmd,
@@ -395,6 +396,63 @@ def wait_for(
     return None
 
 
+def _terminal_state(db_url: str, task_id: str, terminal: tuple) -> Optional[Dict[str, Any]]:
+    state = asyncio.run(task_state(db_url, task_id))
+    if state.get("status") in terminal:
+        return state
+    return None
+
+
+def scenario_two_workers(
+    db_url: str,
+    python: str,
+    env: Dict[str, str],
+    log_dir: Path,
+    *,
+    task_count: int = 2,
+    timeout: float = 300.0,
+) -> Dict[str, Any]:
+    """两个 worker 同时在线：并发消费多个任务 + 同一任务被两个 worker 抢。"""
+    stamp = int(time.time() * 1000)
+    tasks = [
+        asyncio.run(prepare_task(db_url, idempotency_key=f"broker-drill-2w-{stamp}-{i}"))
+        for i in range(task_count)
+    ]
+    log("S5", f"两个 worker 在线，并发发布 {len(tasks)} 个任务")
+    worker_a = start_worker(python, env, log_dir / "broker-drill-worker-a.log", name="brokerdrilla")
+    worker_b = start_worker(python, env, log_dir / "broker-drill-worker-b.log", name="brokerdrillb")
+    states: list[Dict[str, Any]] = []
+    race: Dict[str, Any] = {}
+    try:
+        time.sleep(10)  # 等两个 worker 各自连上 broker 并进入消费循环
+        celery_ids = [publish(task["task_id"]) for task in tasks]
+        terminal = ("succeeded", "partial", "failed", "cancelled")
+        for task, celery_id in zip(tasks, celery_ids):
+            state = wait_for(
+                lambda tid=task["task_id"]: _terminal_state(db_url, tid, terminal),
+                timeout=timeout,
+                description=f"任务 {task['task_id']} 到终态",
+            )
+            states.append({"task_id": task["task_id"], "celery_id": celery_id, "state": state or {}})
+
+        # 竞争场景：同一任务同一时刻发布两次，两个 worker 抢
+        race_task = asyncio.run(
+            prepare_task(db_url, idempotency_key=f"broker-drill-2w-race-{stamp}")
+        )
+        race_ids = [publish(race_task["task_id"]), publish(race_task["task_id"])]
+        race_state = wait_for(
+            lambda: _terminal_state(db_url, race_task["task_id"], terminal),
+            timeout=timeout,
+            description="竞争任务到终态",
+        )
+        race = {"task_id": race_task["task_id"], "celery_ids": race_ids, "state": race_state or {}}
+        log("S5", f"竞争任务终态：{(race_state or {}).get('status')}")
+    finally:
+        kill_tree(worker_a)
+        kill_tree(worker_b)
+    return {"tasks": states, "race": race}
+
+
 # ── 场景 ────────────────────────────────────────────────────
 
 
@@ -593,6 +651,9 @@ def build_checks(report: Dict[str, Any]) -> Dict[str, bool]:
     s3 = report.get("broker_down", {})
     s3_state = s3.get("state", {})
     s4 = report.get("duplicate", {}).get("state", {})
+    s5 = report.get("two_workers", {})
+    s5_tasks = [item.get("state", {}) for item in (s5.get("tasks") or [])]
+    s5_race = s5.get("race", {}).get("state", {})
     attempts_s2 = s2_state.get("attempts") or []
     checks = {
         "roundtrip_succeeded": s1.get("status") == "succeeded",
@@ -609,6 +670,13 @@ def build_checks(report: Dict[str, Any]) -> Dict[str, bool]:
         "worker_kill_terminal": s2_state.get("status") in ("succeeded", "partial"),
         "broker_down_terminal": s3.get("skipped") is True
         or s3_state.get("status") in ("succeeded", "partial"),
+        "two_workers_all_tasks_once": bool(s5_tasks)
+        and all(item.get("status") in ("succeeded", "partial") for item in s5_tasks),
+        "two_workers_no_double_artifact": bool(s5_tasks)
+        and all(item.get("artifact_count") == 1 for item in s5_tasks),
+        "two_workers_duplicate_race_exactly_once": bool(s5_race)
+        and s5_race.get("terminal_event_count") == 1
+        and s5_race.get("artifact_count") == 1,
     }
     return checks
 
@@ -632,6 +700,7 @@ def main() -> int:
         help="启动本地 TCP 代理注入 broker 断连（无 Docker 时用），如 6391",
     )
     parser.add_argument("--skip-broker-down", action="store_true")
+    parser.add_argument("--skip-two-workers", action="store_true")
     parser.add_argument("--keep", action="store_true")
     args = parser.parse_args()
 
@@ -710,6 +779,10 @@ def main() -> int:
                 db_url, effective_redis_url, args.redis_container or None, proxy
             )
         report["duplicate"] = scenario_duplicate(db_url)
+        if args.skip_two_workers:
+            report["two_workers"] = {"skipped": True}
+        else:
+            report["two_workers"] = scenario_two_workers(db_url, python, env, REPO_ROOT / "tmp")
         checks = build_checks(report)
     finally:
         kill_tree(worker)

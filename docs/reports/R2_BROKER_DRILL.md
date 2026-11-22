@@ -2,9 +2,10 @@
 
 日期：2026-11-22　执行人：Lead（AI agent）　环境：Windows 11 + 本机 Redis 7 + Celery 5.6.3（solo pool）
 
-> 结论：**8/8 检查通过**（`tmp/broker-drill.json`，`passed=true`，退出码 0）。
+> 结论：**11/11 检查通过**（`tmp/broker-drill.json`，`passed=true`，退出码 0）。
 > 覆盖：正常 round-trip、执行中被 `taskkill` 杀 worker 后的消息重投 + exactly-once、
-> broker 不可达时发布失败（不假成功）与恢复后跑完、同一任务重复投递去重。
+> broker 不可达时发布失败（不假成功）与恢复后跑完、同一任务重复投递去重、
+> **两个 worker 同时在线并发消费 + 同一任务双投竞争**。
 > 演练中发现并修复 **2 个真实产品缺陷**（见 §4）；**未覆盖**多 worker/多机竞争、
 > RabbitMQ、Docker 容器重启、Redis 主从/持久化故障（见 §6）。
 
@@ -44,6 +45,7 @@ Docker Engine 就绪后可直接跑同一套断言；本机当前因 BIOS 未开
 | S2 | 执行中杀 worker | 杀后消息重投、`attempt_no >= 2`、终态事件 1 条、成果 1 个 | PASS（attempts `[(1,running),(2,succeeded)]`，终态事件 1、成果 1） |
 | S3 | broker 断连 → 恢复 | 断连时发布必须**抛错**；恢复后同一任务能跑完 | PASS：断连时 `OperationalError: Error 10061 … 目标计算机积极拒绝`；恢复后发布成功、任务 `succeeded` |
 | S4 | 重复投递 | 同一任务发布两次仍只有 1 条终态事件、1 个成果 | PASS |
+| S5 | 两个 worker 并发 | 2 个任务由两个 worker 分别消费、各 1 成果；同一任务同时投两次（两 worker 抢）仍只 1 attempt 成功 | PASS（两次投递只有 1 个 attempt、终态 1、成果 1） |
 
 `tmp/broker-drill.json` 关键字段：
 
@@ -115,8 +117,7 @@ S2 的 attempts 证据（同一 Celery 消息重投，故 holder 相同）：
 
 ## 6. 未覆盖与残留风险
 
-- **多 worker / 多机竞争**：单机 solo worker，未测两个 worker 同时抢同一任务（租约 + fencing
-  已在 PG 演练覆盖，但 broker 路径未复测）。
+- **多机竞争**：已测**同机两个 worker**（S5：不同任务由不同 worker 消费，各自 exactly-once；同一任务双投竞争只 1 个 attempt 成功）；未测多台机器共享同一 broker（网络分区与时钟漂移更复杂）。
 - **RabbitMQ 传输**：只测 Redis transport；生产若换 RabbitMQ，`visibility_timeout` 语义不同
   （靠 ack + redelivery），需重跑同一脚本。
 - **Docker 容器重启**：容器 OOM/重启的行为等 WSL2 + Docker Engine 就绪后补测。

@@ -378,11 +378,11 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 
 | 项 | 内容 |
 | --- | --- |
-| 结论 | **PASS（8/8，exit 0）**，`tmp/broker-drill.json` |
+| 结论 | **PASS（11/11，exit 0）**，`tmp/broker-drill.json` |
 | 环境 | 本机真实 Redis 7（9 号库隔离）+ 真实 Celery worker（solo），broker 断连由脚本内 TCP 代理注入 |
 | 脚本 | `scripts/research_broker_drill.py --proxy-port 6391`；报告 `docs/reports/R2_BROKER_DRILL.md` |
-| 覆盖 | round-trip、worker 强杀后重投 exactly-once、broker 不可达时发布失败、重复投递去重 |
+| 覆盖 | round-trip、worker 强杀后重投 exactly-once、broker 不可达时发布失败、重复投递去重、同机双 worker 并发 + 同任务双投竞争 |
 | 修复缺陷 | ① 领取未提交（attempt/租约不可见）② 重投早于租约过期被静默吞掉（改 deferred retry + `RESEARCH_TASK_LEASE_SECONDS`） |
 | 环境陷阱 | PATH 里的 `taskkill` 被包装脚本遮蔽 → 固定用 `%SystemRoot%/System32/taskkill.exe` |
-| 未覆盖 | 多 worker/多机竞争、RabbitMQ、Docker 容器重启、Redis 主从/持久化故障 |
+| 未覆盖 | 多机竞争（同机双 worker 已覆盖）、RabbitMQ、Docker 容器重启、Redis 主从/持久化故障 |
 | 计数 | 三套回归仍为 529 passed + 1 skipped（本演练未新增 pytest 用例，断言在演练脚本内） |
