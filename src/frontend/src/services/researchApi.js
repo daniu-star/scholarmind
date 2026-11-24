@@ -179,6 +179,11 @@ export function createProposal() {
   );
 }
 
+// 读取提案（含逐条补丁的真实 id），用于逐条采纳。
+export function getRevisionProposal(proposalId) {
+  return api.get(`${RESEARCH}/revision-proposals/${encodeURIComponent(proposalId)}`);
+}
+
 export function applyProposal(proposalId, payload = {}) {
   return api.post(
     `${RESEARCH}/revision-proposals/${encodeURIComponent(proposalId)}/apply`,

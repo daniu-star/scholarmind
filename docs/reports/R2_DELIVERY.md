@@ -169,8 +169,8 @@
 
 - R0 研究域测试：290 passed（`src/backend/tests/test_research`）
 - R1 研究域测试：161 passed（`src/backend/tests/test_research_r1`，含 `test_review_roles.py` 2 条多角色用例）
-- R2 研究域测试：78 passed + 1 skipped（`src/backend/tests/test_research_r2`，14 文件；`test_basic_charts.py` 6 条、`test_review_locator.py` 4 条、`test_vector_retrieval.py` 9 条计入）
-- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **529 passed, 1 skipped**（收集 530，324.16 s）
+- R2 研究域测试：81 passed + 1 skipped（`src/backend/tests/test_research_r2`，15 文件；`test_basic_charts.py` 6 条、`test_review_locator.py` 4 条、`test_vector_retrieval.py` 9 条、`test_hunk_selection.py` 4 条计入）
+- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **533 passed, 1 skipped**（收集 534）
 - 逐条 AT 判定与放行条件见 `docs/reports/R2_VERIFICATION.md`（合并权威版：Lead 主编 + 独立 verifier 报告附录 `R2_VERIFICATION_VERIFIER.md`；独立性限制在 §0.2 已写明）
 - 既有回归：`src/backend/tests` 全量在本阶段未重跑（历史基线 182 passed；研究域改动只新增包与路由，未改既有服务行为；跑全量需 ~10 分钟且会触发 sentence-transformers 联网超时降级）
 - 迁移：`scripts/research_migration_check.py` 通过（离线 SQL + 升降级可重复）
@@ -386,3 +386,14 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 | 环境陷阱 | PATH 里的 `taskkill` 被包装脚本遮蔽 → 固定用 `%SystemRoot%/System32/taskkill.exe` |
 | 未覆盖 | 多机竞争（同机双 worker 已覆盖）、RabbitMQ、Docker 容器重启、Redis 主从/持久化故障 |
 | 计数 | 三套回归仍为 529 passed + 1 skipped（本演练未新增 pytest 用例，断言在演练脚本内） |
+
+## 17. 2026-11-24 更新：hunk 级采纳（逐条应用）
+
+| 项 | 落点 | 验证 |
+| --- | --- | --- |
+| 只读提案端点 | `GET /api/v1/research/revision-proposals/{proposal_id}`（`revision_service.get_proposal`） | 4 条新测试：暴露 hunk id / 只应用选中 / 未知补丁 422 / 他人 404 |
+| 前端 | `RevisionDiff.js` 逐条勾选 + 全选/全不选/采纳已选；`ResearchWorkspace.js` 传 `hunk_ids` | `node --check`；`test_frontend_contract.py` 断言 `getRevisionProposal` |
+| 构造坑 | 诊断项 locator 必须按**库内版本正文**（`normalize_text(version.text)`）计算偏移，不能用上传前原文 | 首跑 1 hunk 而非 2：偏移错位导致第二条被跳过 |
+| 偏差闭环 | D-R1「只能整份采纳」已闭合 | 见 `R1_DELIVERY.md` §115 行备注 |
+
+计数：R2 收集 82（81 passed + 1 skipped）；三套 533 passed + 1 skipped。

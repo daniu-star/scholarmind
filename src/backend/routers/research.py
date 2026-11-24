@@ -1150,6 +1150,19 @@ async def create_chart(
 # ── 修改应用与导出 ──────────────────────────────────────────────────
 
 
+@router.get("/revision-proposals/{proposal_id}", response_model=C.RevisionProposal)
+async def get_revision_proposal(
+    proposal_id: str,
+    user_id: int = Depends(require_research_user),
+    db: AsyncSession = Depends(get_db),
+) -> C.RevisionProposal:
+    """读取修改提案（含逐条补丁 id），用于前端逐条采纳。"""
+    data = await _service_call(
+        "revision_service", "get_proposal", db, _actor(user_id), proposal_id
+    )
+    return _coerce(C.RevisionProposal, data)
+
+
 @router.post("/revision-proposals/{proposal_id}/apply", response_model=C.ApplyResult)
 async def apply_revision_proposal(
     proposal_id: str,

@@ -35,6 +35,7 @@ REQUIRED_EXPORTS = (
     "getFindings",
     "createProposal",
     "applyProposal",
+    "getRevisionProposal",
     "getExportUrl",
     "exportArtifact",
 )

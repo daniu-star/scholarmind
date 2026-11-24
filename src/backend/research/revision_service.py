@@ -797,6 +797,34 @@ def _task_state_revision(task: Optional[ResearchTask]) -> int:
     return max(1, value)
 
 
+async def get_proposal(
+    db: AsyncSession,
+    actor: Actor,
+    proposal_id: str,
+) -> Dict[str, Any]:
+    """读取提案（含逐条 hunk 的真实 id），供客户端做逐条采纳。"""
+    proposal = await require_proposal(db, actor, proposal_id)
+    report = _as_dict(proposal.validation_report)
+    hunks: List[Dict[str, Any]] = []
+    for item in proposal.hunks_json or []:
+        if not isinstance(item, dict):
+            continue
+        try:
+            hunks.append(RevisionHunk.model_validate(item).model_dump(mode="json"))
+        except ValidationError:
+            continue
+    return {
+        "id": proposal.id,
+        "task_id": proposal.task_id,
+        "document_id": str(report.get("document_id") or ""),
+        "base_version_id": proposal.base_version_id,
+        "selected_findings": list(proposal.selected_findings or []),
+        "hunks": hunks,
+        "validation_report": report,
+        "status": proposal.status,
+    }
+
+
 async def apply_proposal(
     db: AsyncSession,
     actor: Actor,

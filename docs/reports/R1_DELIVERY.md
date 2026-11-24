@@ -113,7 +113,7 @@ npm --prefix src/frontend run build                                           # 
 1. **导出附章默认关闭**：`include_report` / `include_change_log` 在请求体里默认 `false`（PRD 未规定默认值）。
    理由：默认追加会让"只想导出正文"的请求因缺少诊断来源被 422 拦住；UI 侧两个勾选框始终显式传值。
 2. **无 hunk 级采纳**：`apply` 只接受整份提案（前端已知限制）。PRD 的 `hunk_ids` 参数已支持，但缺少
-   "列出可采纳 hunk" 的读取端点，UI 暂不能逐条勾选。
+   "列出可采纳 hunk" 的读取端点，UI 暂不能逐条勾选。（**已由 R2 闭环**：新增只读端点与前端勾选，见 `R2_DELIVERY.md` §17）
 3. **向量检索未接**：`retrieval_service` 仍是词法 + 显式 `degraded` 标注；Chroma 索引构建、版本切换与
    删除清理属 R2。
 4. **生产恢复未验证**：`test_recovery.py` 用 SQLite 替身验证"崩溃后 `drain_once` 续跑、重复投递只执行一次、

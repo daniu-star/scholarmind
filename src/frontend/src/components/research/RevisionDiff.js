@@ -80,6 +80,11 @@ export function RevisionDiff({
   applyError = null,
   conflict = false,
   applyResult = null,
+  proposalHunks = null,
+  selectedHunkIds = [],
+  onToggleHunk,
+  onSelectAllHunks,
+  onApplySelected,
   onApply,
   onRediagnose,
   onDownload,
@@ -114,13 +119,25 @@ export function RevisionDiff({
 
   const body = createElement('div', { className: 'rw-card-body' });
 
-  body.appendChild(
-    notice({
-      tone: 'blue',
-      title: '采纳范围：整份提案',
-      text: '后端 apply 接口需要 hunk_ids，但客户端无法获得逐条 hunk 的真实 ID，因此本页只提交 hunk_ids: []（应用整份提案）。若只想采纳某一条，请对该诊断项单独生成一份修改建议。',
-    })
-  );
+  const serverHunks = Array.isArray(proposalHunks) ? proposalHunks : null;
+  const selected = new Set(Array.isArray(selectedHunkIds) ? selectedHunkIds : []);
+  if (!serverHunks) {
+    body.appendChild(
+      notice({
+        tone: 'blue',
+        title: '采纳范围：整份提案',
+        text: '尚未读取到逐条补丁清单（GET /revision-proposals/{id}）。当前只能整份采纳；读取成功后可按条勾选。',
+      })
+    );
+  } else {
+    body.appendChild(
+      notice({
+        tone: 'blue',
+        title: `采纳范围：逐条可选（共 ${serverHunks.length} 条）`,
+        text: '勾选要采纳的补丁后点「采纳已选」；也可以直接「采纳整份提案」。应用时服务端会重新校验基准版本、原文哈希与补丁区间，被保护片段不会被改写。',
+      })
+    );
+  }
 
   body.appendChild(
     keyValue([
@@ -141,6 +158,58 @@ export function RevisionDiff({
         text: '该提案存在区间或原文匹配问题，不能应用；请重新生成修改建议。',
       })
     );
+  }
+
+  if (serverHunks) {
+    const pickHead = createElement('div', { className: 'rw-card-actions' });
+    pickHead.appendChild(
+      button(`全选（${serverHunks.length}）`, {
+        onClick: () => onSelectAllHunks && onSelectAllHunks(true),
+        variant: 'ghost',
+      })
+    );
+    pickHead.appendChild(
+      button('全不选', {
+        onClick: () => onSelectAllHunks && onSelectAllHunks(false),
+        variant: 'ghost',
+      })
+    );
+    if (onApplySelected) {
+      pickHead.appendChild(
+        button(`采纳已选（${selected.size}）`, {
+          onClick: () => onApplySelected(Array.from(selected)),
+          variant: 'primary',
+          disabled: selected.size === 0,
+        })
+      );
+    }
+    body.appendChild(pickHead);
+    const pickList = createElement('ul', { className: 'rw-hunk-pick' });
+    serverHunks.forEach((hunk, idx) => {
+      const item = createElement('li', { className: 'rw-hunk-pick-item' });
+      const box = createElement('input', {
+        type: 'checkbox',
+        className: 'rw-hunk-check',
+        'aria-label': `选择补丁 ${idx + 1}`,
+      });
+      box.checked = selected.has(hunk.id);
+      box.addEventListener('change', () => onToggleHunk && onToggleHunk(hunk.id, box.checked));
+      item.appendChild(box);
+      const info = createElement('div', { className: 'rw-hunk-pick-info' });
+      info.appendChild(
+        createElement(
+          'div',
+          { className: 'rw-small' },
+          `#${idx + 1} · 码点 ${hunk.start}–${hunk.end} · 诊断项 ${shortId(hunk.finding_id, 14)}`
+        )
+      );
+      info.appendChild(
+        createElement('div', { className: 'rw-small rw-muted' }, (hunk.reason || '').slice(0, 120))
+      );
+      item.appendChild(info);
+      pickList.appendChild(item);
+    });
+    body.appendChild(pickList);
   }
 
   if (!hunks.length) {

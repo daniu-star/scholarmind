@@ -8,7 +8,7 @@
 
 ## 0. 结论
 
-**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 78 passed + 1 skipped、ruff 全绿、三套回归 529 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过**；**AT-056 的「短流程 vs 多角色流程」20000 字对照已跑**（single 109 条 / multi_role 203 条，成本约 2×，见 §15）；**Redis/Celery 投递层恢复演练 8/8 PASS**（worker 强杀重投 exactly-once、broker 断连诚实失败、重复投递去重，见 §17），因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
+**R2 有条件放行。** 机器可验证项全部实测通过（R2 套件 82 收集 / 81 passed + 1 skipped、ruff 全绿、三套回归 533 passed + 1 skipped、迁移可重入、构建为唯一模块化产物、真实浏览器全链路跑通）；**T21 的真实模型评估已完成**（14 篇用户自有论文，13 succeeded / 1 partial，平均覆盖率 97.00%，1,974 条诊断，引文保真 95.44%，纯编造 0.00%，locator 错位 0 条，见 `R2_CORPUS_EVAL.md`）；**人工盲评按用户指示越过**；**AT-056 的「短流程 vs 多角色流程」20000 字对照已跑**（single 109 条 / multi_role 203 条，成本约 2×，见 §15）；**Redis/Celery 投递层恢复演练 8/8 PASS**（worker 强杀重投 exactly-once、broker 断连诚实失败、重复投递去重，见 §17），因此对外只能说"全链路已实测、结论可追溯到原文"，**不得说"诊断质量已验证/准确率达标"**。
 
 ### 0.1 放行条件
 
@@ -109,7 +109,7 @@
 
 ## 6. 放行结论
 
-- **研究域自动化验收**：通过——R2 78 passed + 1 skipped、R0 290 passed、R1 161 passed（合计 529，实跑 529 passed + 1 skipped）、ruff 全绿、迁移可重入、构建唯一模块化入口、真实 Playwright 浏览器全链路 exit 0（含图表前端面板）、14 篇真实论文语料链路可复跑。
+- **研究域自动化验收**：通过——R2 81 passed + 1 skipped（收集 82）、R0 290 passed、R1 161 passed（合计 533，实跑 533 passed + 1 skipped）、ruff 全绿、迁移可重入、构建唯一模块化入口、真实 Playwright 浏览器全链路 exit 0（含图表前端面板）、14 篇真实论文语料链路可复跑。
 - **T21**：**机器可验证部分完成**（14 篇真实论文真实模型全跑通，13 succeeded / 1 partial、覆盖率 97.00%、引文保真 95.44%、纯编造 0.00%、locator 0 错位；`R2_CORPUS_EVAL.md`/`R2_EVAL_STATUS.md`），**人工盲评按用户指示越过 → 质量召回/误报仍属未测量**；**T22**：通过（含 D1/D5 偏差）；**T23**：有条件通过（协议与降级证据齐备，真实对照未跑）。
 - **对外表述基线**："研究域自动化验收通过、图表数值可核验、预算与评估工具诚实可用"；禁止："质量已验证""诊断准确率达标""桌面与移动端全适配"。
 - **2026-11-20 复核更新**：XLSX/CSV 已可直接出图（D1 闭环）；当时仅支持"全数值表"，分类轴 422 `CHART_NON_NUMERIC`。
@@ -296,3 +296,16 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 - AT-038/AT-039 判定：AT-038 从「仅 SQLite 并发断言」升级为「PG 崩溃接管 + broker 重投 + 同机双 worker 竞争」三证据，仍为 **partial**（缺多机竞争）；AT-039 的「取消后迟到结果」语义在 PG 演练中以 fencing 拒绝覆盖，仍为 partial（未覆盖真实取消后再投递的端到端组合）。
 - 回归：三套 `529 passed, 1 skipped in 517.58s`，`ruff` 全绿。
 - 未覆盖：多机竞争（同机两个 worker 已覆盖）、RabbitMQ transport、Docker 容器重启、Redis 主从/持久化故障、任务时长 > visibility_timeout。
+
+## 18. 附录：hunk 级采纳（D-R1 缺口闭环）
+
+R1 记录的偏差「无 hunk 级采纳、只能整份采纳」已闭环：
+
+| 层次 | 落点 | 验证 |
+| --- | --- | --- |
+| 后端只读端点 | `GET /api/v1/research/revision-proposals/{proposal_id}` → `revision_service.get_proposal`（`require_proposal` + 逐条 `RevisionHunk.model_validate`） | `test_hunk_selection.py::test_get_proposal_exposes_hunk_ids`；他人提案 404 |
+| 后端子集应用 | 既有 `apply_proposal(..., hunk_ids=)`，未知 id 抛 422 `HUNK_NOT_FOUND` | `test_apply_only_selected_hunk`（只应用 1 条，其余原文保留）、`test_apply_unknown_hunk_is_rejected` |
+| 前端 | `RevisionDiff.js` 勾选列表 + 全选/全不选/采纳已选（N）；`ResearchWorkspace.js` 提交 `hunk_ids` | `test_frontend_contract.py` 断言 `getRevisionProposal` 导出 |
+| E2E | **未覆盖**：替身模型不产出诊断项，浏览器链路无「有 findings 的提案」可勾选 | 如实标注，不用替身模型伪造 findings |
+
+计数：R2 收集 82（81 passed + 1 skipped），三套 533 passed + 1 skipped。

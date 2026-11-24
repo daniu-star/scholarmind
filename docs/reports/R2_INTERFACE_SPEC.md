@@ -218,3 +218,7 @@ def evaluate_budget(budget, usage) -> dict         # {"state":"within|exceeded",
 - 成本语义：调用/tokens 约 2×；`multi_role` 在 20,000 字量级即消耗默认预算约 96%，更长文档会因预算不足转 `partial`。
 - 报告与 `snapshot_summary` 需带流程标记（warning「诊断流程=multi_role：已执行 2 轮」）。
 
+### 2.8 提案详情与逐条采纳
+
+- `GET /api/v1/research/revision-proposals/{proposal_id}` → `RevisionProposal`（`id`/`task_id`/`base_version_id`/`status`/`hunks[]`；每条 hunk 含 `id`/`finding_id`/`start`/`end`/`original_text`/`original_hash`/`replacement_text`/`reason`）。他人提案统一 404 `NOT_FOUND`。
+- `POST /api/v1/research/revision-proposals/{proposal_id}/apply` 既支持整份（缺省）也支持子集 `hunk_ids: [str]`；未知 id → 422 `HUNK_NOT_FOUND`（`details.missing`），基准版本不符 → 409 `VERSION_CONFLICT`。

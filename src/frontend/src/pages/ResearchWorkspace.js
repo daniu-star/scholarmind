@@ -21,6 +21,7 @@ import {
   getArtifact,
   getArtifactText,
   applyProposal,
+  getRevisionProposal,
   exportArtifact,
   downloadArtifact,
   createChart,
@@ -94,6 +95,10 @@ const s = {
     applyError: null,
     conflict: false,
     applyResult: null,
+    proposal: null,
+    proposalLoading: false,
+    proposalError: null,
+    selectedHunkIds: [],
   },
   activeTaskId: null,
   streamSeq: null,
@@ -292,6 +297,10 @@ function injectStyles() {
 .rw-finding-footer .rw-hint { flex: 1 1 200px; text-align: left; }
 
 .rw-revision .rw-card-body { gap: 12px; }
+.rw-hunk-pick { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rw-hunk-pick-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--rw-border, #e5e5e5); border-radius: 8px; }
+.rw-hunk-pick-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rw-hunk-check { margin-top: 3px; }
 .rw-chart-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px 14px; }
 .rw-chart-result { display: flex; flex-direction: column; gap: 12px; }
 .rw-chart-image { width: 100%; max-width: 760px; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
@@ -760,6 +769,7 @@ async function loadProposal() {
     s.revision.artifact = artifact;
     s.revision.validation = artifact.validation || {};
     s.revision.markdown = await getArtifactText(artifact.id);
+    await loadProposalDetail();
   } catch (err) {
     if (isUnauthorizedError(err)) s.status = 'unauthorized';
     else s.revision.error = err;
@@ -819,6 +829,7 @@ async function startReview() {
   s.revision = {
     taskId: null, task: null, artifact: null, validation: null, markdown: '',
     loading: false, error: null, applyState: 'idle', applyError: null, conflict: false, applyResult: null,
+    proposal: null, proposalLoading: false, proposalError: null, selectedHunkIds: [],
   };
   s.selectedFindingIds = new Set();
   s.streamSeq = null;
@@ -908,6 +919,89 @@ async function startRevision(findingIds, note = '') {
     }
     s.revision.error = err;
     taskStream?.setStream({ state: 'error', message: `修改建议任务创建失败：${err?.message || err}` });
+    sync();
+  }
+}
+
+async function loadProposalDetail() {
+  const proposalId = s.revision.validation?.proposal_id;
+  if (!proposalId) {
+    s.revision.proposal = null;
+    s.revision.selectedHunkIds = [];
+    return;
+  }
+  s.revision.proposalLoading = true;
+  s.revision.proposalError = null;
+  try {
+    const detail = await getRevisionProposal(proposalId);
+    s.revision.proposal = detail;
+    s.revision.selectedHunkIds = (detail.hunks || []).map((hunk) => hunk.id);
+  } catch (err) {
+    s.revision.proposal = null;
+    s.revision.proposalError = err;
+  } finally {
+    s.revision.proposalLoading = false;
+    renderProposal();
+  }
+}
+
+function handleToggleHunk(hunkId, checked) {
+  const current = new Set(s.revision.selectedHunkIds || []);
+  if (checked) current.add(hunkId);
+  else current.delete(hunkId);
+  s.revision.selectedHunkIds = Array.from(current);
+  renderProposal();
+}
+
+function handleSelectAllHunks(selectAll) {
+  const hunks = s.revision.proposal?.hunks || [];
+  s.revision.selectedHunkIds = selectAll ? hunks.map((hunk) => hunk.id) : [];
+  renderProposal();
+}
+
+async function handleApplySelected(hunkIds) {
+  const proposalId = s.revision.validation?.proposal_id;
+  const baseVersion = s.revision.validation?.base_version_id;
+  if (!proposalId || !baseVersion) {
+    showToast('缺少提案 ID 或基准版本，无法应用。', 'error');
+    return;
+  }
+  if (!Array.isArray(hunkIds) || hunkIds.length === 0) {
+    showToast('请至少勾选一条补丁。', 'error');
+    return;
+  }
+  const ok = await showConfirmDialog({
+    title: `采纳已选 ${hunkIds.length} 条补丁`,
+    message: '将调用 POST /revision-proposals/{id}/apply 并提交选中的 hunk_ids，只应用这些补丁并生成新的文档版本。未选中的补丁不会生效。',
+    confirmText: '采纳已选',
+    variant: 'info',
+  });
+  if (!ok) return;
+  s.revision.applyState = 'applying';
+  s.revision.applyError = null;
+  s.revision.conflict = false;
+  renderProposal();
+  try {
+    const result = await applyProposal(proposalId, {
+      expected_version_id: baseVersion,
+      hunk_ids: hunkIds,
+    });
+    s.revision.applyState = 'applied';
+    s.revision.applyResult = result;
+    showToast(`已采纳 ${hunkIds.length} 条补丁，生成新文档版本。`, 'success', 4000);
+    await refreshProject(true);
+    if (result?.new_version_id) {
+      const doc = selectedDoc();
+      if (doc) s.selectedDocumentId = doc.id;
+    }
+  } catch (err) {
+    s.revision.applyState = 'failed';
+    s.revision.applyError = err;
+    s.revision.conflict = err?.status === 409 || err?.data?.error?.code === 'VERSION_CONFLICT';
+    if (s.revision.conflict) showToast('版本冲突：文档已变化，请重新诊断。', 'error', 5000);
+    else showToast(`应用失败：${err?.message || err}`, 'error', 5000);
+  } finally {
+    renderProposal();
     sync();
   }
 }
@@ -1378,6 +1472,11 @@ function renderProposal() {
     applyError: r.applyError,
     conflict: r.conflict,
     applyResult: r.applyResult,
+    proposalHunks: r.proposal?.hunks || null,
+    selectedHunkIds: r.selectedHunkIds || [],
+    onToggleHunk: handleToggleHunk,
+    onSelectAllHunks: handleSelectAllHunks,
+    onApplySelected: handleApplySelected,
     onApply: handleApply,
     onRediagnose: () => { startReview(); },
     onDownload: (artifact) => downloadResult(artifact.id),
