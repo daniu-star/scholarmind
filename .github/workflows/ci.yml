@@ -61,7 +61,8 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-      - run: npm ci
+          cache-dependency-path: src/frontend/package-lock.json
+      - run: npm --prefix src/frontend ci
       - run: npm run build:frontend
       - run: node --check api/send-email.js
       - run: node --check api/send-team-invite.js
@@ -91,6 +92,7 @@ jobs:
         with:
           node-version: "24"
           cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
       - name: Install Python dependencies
         run: pip install -r src/backend/requirements.txt pytest pytest-asyncio ruff
       - name: Lint research domain (must be clean, no autofix)
@@ -113,7 +115,9 @@ jobs:
           node --check src/frontend/src/pages/ResearchWorkspace.js
           node --check src/frontend/src/app/router.js
       - name: Frontend build (single release artifact)
-        run: npm ci && npm run build:frontend
+        run: |
+          npm --prefix src/frontend ci
+          npm run build:frontend
 
   build:
     needs: [lint, type-check, test, frontend-build, research-gate]
