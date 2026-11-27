@@ -1,4 +1,5 @@
 {
+  "installCommand": "npm install --no-audit --no-fund && npm --prefix src/frontend install --no-audit --no-fund",
   "buildCommand": "npm run build:frontend",
   "outputDirectory": "dist",
   "functions": {
@@ -10,7 +11,10 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://scholarmind-production-e56b.up.railway.app/api/$1" },
+    {
+      "source": "/api/((?!platform-status|send-email|send-team-invite).*)",
+      "destination": "https://scholarmind-production-e56b.up.railway.app/api/$1"
+    },
     { "source": "/((?!api/|ws/).*)", "destination": "/index.html" }
   ],
   "headers": [
