@@ -162,6 +162,31 @@ def start_worker(
     return proc
 
 
+def start_beat(python: str, env: Dict[str, str], log_file: Path, schedule: Path) -> subprocess.Popen:
+    """单独进程跑 beat：Windows 上 worker 的 ``-B`` 会直接拒绝启动
+    （``-B option does not work on Windows``），所以周期清扫只能这样验。"""
+    cmd = [
+        python,
+        "-m",
+        "celery",
+        "-A",
+        "src.backend.scheduler.celery_app",
+        "beat",
+        "--loglevel=INFO",
+        "--schedule",
+        str(schedule),
+    ]
+    handle = open(log_file, "a", encoding="utf-8", errors="replace")
+    return subprocess.Popen(  # noqa: S603 - 本地演练脚本
+        cmd,
+        cwd=str(REPO_ROOT),
+        env=env,
+        stdout=handle,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.DEVNULL,
+    )
+
+
 def kill_tree(proc: Optional[subprocess.Popen]) -> None:
     if proc is None or proc.poll() is not None:
         return
@@ -409,6 +434,8 @@ async def task_state(db_url: str, task_id: str) -> Dict[str, Any]:
                 "terminal_event_count": len(terminal),
                 "artifact_count": int(artifacts or 0),
                 "quality_verdict": task.quality_verdict,
+                "error_code": (task.error_json or {}).get("code"),
+                "billing_state": task.billing_state,
             }
     finally:
         await engine.dispose()
@@ -526,7 +553,7 @@ def scenario_worker_killed(
     visibility_timeout: int,
     lease_seconds: int,
     redis_url: str,
-) -> tuple[Dict[str, Any], Optional[subprocess.Popen]]:
+) -> tuple[Dict[str, Any], Optional[subprocess.Popen], Optional[subprocess.Popen]]:
     log("S2", "执行中杀掉 worker，验证 broker 重投与 exactly-once")
     prepared = asyncio.run(prepare_task(db_url, idempotency_key=f"broker-s2-{uuid.uuid4().hex[:8]}"))
     task_id = prepared["task_id"]
@@ -693,6 +720,71 @@ def scenario_duplicate(db_url: str) -> Dict[str, Any]:
 # ── 主流程 ──────────────────────────────────────────────────
 
 
+def drop_broker_state(redis_url: str) -> int:
+    """模拟 broker 丢数据：删除队列与未确认集合（Redis 未持久化时重启即如此）。"""
+    import redis
+
+    client = redis.Redis.from_url(redis_url)
+    try:
+        keys = list(client.scan_iter("*celery*")) + list(client.scan_iter("unacked*"))
+        keys = list(dict.fromkeys(keys))
+        return int(client.delete(*keys)) if keys else 0
+    finally:
+        closer = getattr(client, "aclose", None) or getattr(client, "close", None)
+        if closer is not None:
+            result = closer()
+            if hasattr(result, "__await__"):
+                asyncio.run(result)
+
+
+def scenario_broker_loss(
+    db_url: str,
+    redis_url: str,
+    python: str,
+    env: Dict[str, str],
+    worker_log: Path,
+    worker: Optional[subprocess.Popen],
+    queue_timeout: int,
+) -> tuple[Dict[str, Any], Optional[subprocess.Popen]]:
+    """S6：消息丢失（broker 重启且未持久化）。
+
+    期望：任务不能悄悄消失。排队超时后由清扫任务置为 failed（QUEUE_TIMEOUT）并
+    释放额度；这条路径靠 ``research.reap_stale_queued`` 的 beat 周期触发。
+    """
+    log("S6", "broker 丢消息：任务必须在排队超时后诚实失败，而不是永久 queued")
+    kill_tree(worker)
+    prepared = asyncio.run(prepare_task(db_url, idempotency_key=f"broker-s6-{uuid.uuid4().hex[:8]}"))
+    task_id = prepared["task_id"]
+    message_id = publish(task_id)
+    dropped = drop_broker_state(redis_url)
+    log("S6", f"已发布 {str(message_id)[:8]}…，随后删除 {dropped} 个 broker 键（消息丢失）")
+    beat = start_beat(
+        python,
+        env,
+        worker_log.with_name("broker-drill-beat.log"),
+        REPO_ROOT / "tmp" / "broker-drill-beat-schedule",
+    )
+    revived = start_worker(python, env, worker_log, name="brokerdrill-reaper")
+    state = wait_for(
+        lambda: (lambda st: st if st.get("status") in ("failed", "partial", "succeeded", "cancelled") else None)(
+            asyncio.run(task_state(db_url, task_id))
+        ),
+        timeout=float(queue_timeout) + 180,
+        description="broker 丢消息后由清扫器诚实失败",
+    )
+    return (
+        {
+            "task_id": task_id,
+            "message_id": message_id,
+            "dropped_keys": dropped,
+            "queue_timeout_seconds": queue_timeout,
+            "state": state or {},
+        },
+        revived,
+        beat,
+    )
+
+
 def build_checks(report: Dict[str, Any]) -> Dict[str, bool]:
     s1 = report.get("roundtrip", {}).get("state", {})
     s2 = report.get("worker_killed", {})
@@ -727,6 +819,13 @@ def build_checks(report: Dict[str, Any]) -> Dict[str, bool]:
         and s5_race.get("terminal_event_count") == 1
         and s5_race.get("artifact_count") == 1,
     }
+    s6 = report.get("broker_loss", {})
+    s6_state = s6.get("state", {})
+    skipped = s6.get("skipped") is True
+    checks["broker_loss_not_silent"] = skipped or s6_state.get("status") == "failed"
+    checks["broker_loss_code_queue_timeout"] = skipped or s6_state.get("error_code") == "QUEUE_TIMEOUT"
+    checks["broker_loss_releases_billing"] = skipped or s6_state.get("billing_state") == "released"
+    checks["broker_loss_terminal_event"] = skipped or s6_state.get("terminal_event_count") == 1
     return checks
 
 
@@ -753,6 +852,13 @@ def main() -> int:
         default=0,
         help="启动本地 TCP 代理注入 broker 断连（无 Docker 时用），如 6391",
     )
+    parser.add_argument(
+        "--queue-timeout",
+        type=int,
+        default=20,
+        help="排队超时秒数（写进 RESEARCH_QUEUE_TIMEOUT_SECONDS；生产默认 300）",
+    )
+    parser.add_argument("--skip-broker-loss", action="store_true")
     parser.add_argument("--skip-broker-down", action="store_true")
     parser.add_argument("--skip-two-workers", action="store_true")
     parser.add_argument("--keep", action="store_true")
@@ -787,6 +893,8 @@ def main() -> int:
             "CELERY_BROKER_URL": effective_redis_url,
             "CELERY_VISIBILITY_TIMEOUT": str(args.visibility_timeout),
             "RESEARCH_TASK_LEASE_SECONDS": str(args.lease_seconds),
+            "RESEARCH_QUEUE_TIMEOUT_SECONDS": str(args.queue_timeout),
+            "CELERYBEAT_SCHEDULE_FILE": str(REPO_ROOT / "tmp" / "broker-drill-beat-schedule"),
         }
     )
     worker_log = REPO_ROOT / "tmp" / "broker-drill-worker.log"
@@ -825,6 +933,7 @@ def main() -> int:
     visibility_timeout = args.visibility_timeout
     lease_seconds = args.lease_seconds
     worker: Optional[subprocess.Popen] = None
+    beat: Optional[subprocess.Popen] = None
     try:
         worker = start_worker(python, env, worker_log)
         report["worker_started"] = worker is not None
@@ -843,8 +952,15 @@ def main() -> int:
             report["two_workers"] = {"skipped": True}
         else:
             report["two_workers"] = scenario_two_workers(db_url, python, env, REPO_ROOT / "tmp")
+        if args.skip_broker_loss:
+            report["broker_loss"] = {"skipped": True, "reason": "--skip-broker-loss"}
+        else:
+            report["broker_loss"], worker, beat = scenario_broker_loss(
+                db_url, effective_redis_url, python, env, worker_log, worker, args.queue_timeout
+            )
         checks = build_checks(report)
     finally:
+        kill_tree(beat)
         kill_tree(worker)
         if proxy is not None:
             proxy.stop()

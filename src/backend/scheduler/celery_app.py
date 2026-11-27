@@ -74,6 +74,10 @@ celery_app.conf.update(
             "task": "src.backend.scheduler.tasks.cleanup_old_data",
             "schedule": crontab(minute=0, hour=2, day_of_week="sunday"),
         },
+        "research-reap-stale-queued": {
+            "task": "research.reap_stale_queued",
+            "schedule": 60.0,  # broker 模式没有进程内 dispatcher 的清扫循环
+        },
         "expire-stale-orders": {
             "task": "src.backend.scheduler.tasks.expire_stale_orders",
             "schedule": crontab(minute=15, hour="*"),  # 每小时第 15 分钟
@@ -96,6 +100,8 @@ celery_app.conf.update(
     broker_transport_options={
         "visibility_timeout": int(os.getenv("CELERY_VISIBILITY_TIMEOUT", "3600")),
     },
+    # beat 的调度文件默认落在 cwd；演练/测试用环境变量指到 tmp，避免污染仓库。
+    beat_schedule_filename=os.getenv("CELERYBEAT_SCHEDULE_FILE", "celerybeat-schedule"),
 )
 
 # Auto-discover tasks

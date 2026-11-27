@@ -2,11 +2,11 @@
 
 日期：2026-11-22　执行人：Lead（AI agent）　环境：Windows 11 + 本机 Redis 7 + Celery 5.6.3（solo pool）
 
-> 结论：**11/11 检查通过**（`tmp/broker-drill.json`，`passed=true`，退出码 0）。
+> 结论：**15/15 检查通过**（`tmp/broker-drill.json`，`passed=true`，退出码 0）。
 > 覆盖：正常 round-trip、执行中被 `taskkill` 杀 worker 后的消息重投 + exactly-once、
 > broker 不可达时发布失败（不假成功）与恢复后跑完、同一任务重复投递去重、
 > **两个 worker 同时在线并发消费 + 同一任务双投竞争**。
-> 演练中发现并修复 **2 个真实产品缺陷**（见 §4）；**未覆盖**多 worker/多机竞争、
+> 演练中发现并修复 **3 个真实产品缺陷**（见 §4、§8）；**未覆盖**多 worker/多机竞争、
 > RabbitMQ、Docker 容器重启、Redis 主从/持久化故障（见 §6）。
 
 ## 1. 为什么要单独演练
@@ -123,7 +123,7 @@ S2 的 attempts 证据（同一 Celery 消息重投，故 holder 相同）：
 - **RabbitMQ 传输**：只测 Redis transport；生产若换 RabbitMQ，`visibility_timeout` 语义不同
   （靠 ack + redelivery），需重跑同一脚本。
 - **Docker 容器重启**：已覆盖——`docker stop drill-redis` → 发布失败 → `docker start` →
-  恢复后重新发布 → 任务到终态（§7，11/11 checks PASS）。容器 OOM/镜像拉取失败等更极端的
+  恢复后重新发布 → 任务到终态（§7，11/11 checks PASS；加 §8 丢消息兜底后总计 15/15）。容器 OOM/镜像拉取失败等更极端的
   容器生命周期事件仍未逐一模拟。
 - **Redis 持久化/主从故障**：未测 AOF/RDB 损坏与主从切换。
 - **长任务 > visibility_timeout**：当前 `visibility_timeout=3600`（生产默认）与租约 1200s；
@@ -157,7 +157,7 @@ WSL2 运行时正常；本机 **BIOS 虚拟化本来就是开的**（`systeminfo
   --docker-host tcp://192.168.218.232:2375
 ```
 
-结果：**11/11 checks PASS，exit 0**（`tmp/broker-drill.json`）。断连/恢复证据取自
+结果：**11/11 checks PASS，exit 0**（`tmp/broker-drill.json`；补 §8 后重跑为 15/15）。断连/恢复证据取自
 `broker_down` 场景的实际字段：
 
 | 字段 | 实测值 |
@@ -183,3 +183,56 @@ WSL2 运行时正常；本机 **BIOS 虚拟化本来就是开的**（`systeminfo
 2. Windows→WSL 的 `localhost` 转发在本机不生效 → 使用 WSL IP。
 3. Windows 侧 Python 无法 spawn `wsl.exe`（`Wsl/E_ACCESSDENIED`）→ 走 dockerd TCP 端点。
 4. WSL 空闲会休眠导致容器重启 → 演练期间用 `wsl ... sleep 3600` 保活。
+
+## 8. S6：broker 丢消息后的兜底清扫（2026-11-27）
+
+### 8.1 缺陷（真实存在，非演练假设）
+
+Redis 若未开启持久化就重启，队列消息会凭空消失：任务既没有执行器、也没有错误，
+**永久停在 `queued`**，用户只会看到"一直排队"。这违反 FR-15（诚实失败）。
+
+排查代码后确认根因：清扫函数 `task_service.expire_stale_queued_tasks()` 本身是对的
+（超时 → `failed` + `QUEUE_TIMEOUT` + 释放额度 + `task.failed` 事件），但只有两处调用：
+
+1. `create_task()` 受理时调用一次——只影响"受理时就已经超时"的异常情况；
+2. 进程内 `ResearchDispatcher._maybe_reap()` 每 30s 调用一次——**只有 `TASK_BACKEND=background`
+   的进程内派发器才有**。
+
+也就是说，走 broker（Celery）部署时没有任何周期清扫；同时 `task_service` 里
+`MAX_QUEUE_WAIT_SECONDS` 被硬编码为 300，`RESEARCH_QUEUE_TIMEOUT_SECONDS` 配置项
+根本没被读取（配置漂移，演练时无法把等待压到 20s）。
+
+### 8.2 修复
+
+- `src/backend/research/task_service.py`：`MAX_QUEUE_WAIT_SECONDS = int(settings.RESEARCH_QUEUE_TIMEOUT_SECONDS)`，
+  配置项真正生效。
+- `src/backend/scheduler/research_tasks.py`：新增 `reap_stale_queued` 任务（自建 engine/session，
+  调 `expire_stale_queued_tasks`），并在 `worker_ready` 信号里 `delay()` 一次（worker 重启即清一次）。
+- `src/backend/scheduler/celery_app.py`：`beat_schedule` 注册 `research-reap-stale-queued`（每 60s），
+  并允许用 `CELERYBEAT_SCHEDULE_FILE` 把调度文件放到 `tmp/`（避免污染仓库）。
+- Windows 限制：worker 的 `-B`（内嵌 beat）会直接报
+  `-B option does not work on Windows. Please run celery beat as a separate service.`，
+  因此演练里 beat 用**独立进程**启动（`scripts/research_broker_drill.py: start_beat`）。
+
+### 8.3 演练过程与证据
+
+`--queue-timeout 20`，S6 步骤：杀 worker → 发布任务 → 删除 broker 键（模拟未持久化重启）
+→ 起独立 beat + worker → 等待终态。
+
+| 观测 | 值 |
+| --- | --- |
+| 删除的 broker 键 | 4 |
+| 任务 | `task_aaeb16b605b54d37b0116f395ee0bd53` |
+| 事件序列 | `task.accepted → task.failed`（seq 1,2；终态事件 1 条） |
+| 终态 | `failed`，`error.code = QUEUE_TIMEOUT` |
+| 额度 | `billing_state = released`（预留已退还） |
+| attempts | `[]`（从未被任何执行器领取） |
+
+15 项检查全部 PASS（11 项既有 + `broker_loss_not_silent`、`broker_loss_code_queue_timeout`、
+`broker_loss_releases_billing`、`broker_loss_terminal_event`）。
+
+### 8.4 边界与限制
+
+- 演练把排队上限压到 20s、beat 周期 60s，只为在几分钟内复现；生产默认 300s，语义相同。
+- beat 与 worker 同机；beat 自身单点（重启窗口内不清扫）未演练。
+- 未覆盖：Redis 持久化配置错误导致的部分丢失、多机 beat 竞争。

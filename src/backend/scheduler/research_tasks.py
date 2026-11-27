@@ -13,6 +13,8 @@ from typing import Any, Optional
 
 import structlog
 
+from celery.signals import worker_ready
+
 from .celery_app import celery_app
 
 logger = structlog.get_logger(__name__)
@@ -118,4 +120,45 @@ def execute_research_task(
         raise
 
 
-__all__ = ["execute_research_task"]
+async def _reap() -> int:
+    from src.backend.config import settings
+    from src.backend.db.session import (
+        create_async_engine_from_url,
+        create_async_sessionmaker_from_engine,
+    )
+    from src.backend.research import task_service
+
+    engine = create_async_engine_from_url(settings.DATABASE_URL)
+    factory = create_async_sessionmaker_from_engine(engine)
+    try:
+        async with factory() as db:
+            return await task_service.expire_stale_queued_tasks(db)
+    finally:
+        await engine.dispose()
+
+
+@celery_app.task(name="research.reap_stale_queued", acks_late=False)
+def reap_stale_queued() -> dict:
+    """把排队超时的任务诚实失败并释放额度。
+
+    为什么需要它：broker 丢消息（例如 Redis 未持久化却被重启）时，消息永远不会再
+    投递，任务会永久停在 ``queued``。进程内 dispatcher 有 30s 的清扫循环，但 broker
+    模式下没有 ``_maybe_reap()``，所以这里补一个周期性清扫（beat 每分钟）并在
+    worker 启动时立即扫一次，避免「重启后才恢复」的长期悬挂。
+    """
+    count = asyncio.run(_reap())
+    if count:
+        logger.warning("research.stale_queued_reaped", count=count)
+    return {"reaped": count}
+
+
+@worker_ready.connect
+def _reap_on_worker_ready(**_kwargs: Any) -> None:
+    """worker 启动即扫一次：恢复演练里重启 worker 后立刻可见诚实失败。"""
+    try:
+        reap_stale_queued.delay()
+    except Exception:  # noqa: BLE001 - 清扫失败不应阻止 worker 启动
+        logger.warning("research.reaper_dispatch_failed", exc_info=True)
+
+
+__all__ = ["execute_research_task", "reap_stale_queued"]

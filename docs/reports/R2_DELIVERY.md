@@ -170,7 +170,7 @@
 - R0 研究域测试：290 passed（`src/backend/tests/test_research`）
 - R1 研究域测试：161 passed（`src/backend/tests/test_research_r1`，含 `test_review_roles.py` 2 条多角色用例）
 - R2 研究域测试：81 passed + 1 skipped（`src/backend/tests/test_research_r2`，15 文件；`test_basic_charts.py` 6 条、`test_review_locator.py` 4 条、`test_vector_retrieval.py` 9 条、`test_hunk_selection.py` 4 条计入）
-- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **533 passed, 1 skipped**（收集 534）
+- 三套一次跑：`pytest src/backend/tests/test_research_r2 src/backend/tests/test_research_r1 src/backend/tests/test_research -q` → **537 passed, 1 skipped**（收集 538）
 - 逐条 AT 判定与放行条件见 `docs/reports/R2_VERIFICATION.md`（合并权威版：Lead 主编 + 独立 verifier 报告附录 `R2_VERIFICATION_VERIFIER.md`；独立性限制在 §0.2 已写明）
 - 既有回归：`src/backend/tests` 全量在本阶段未重跑（历史基线 182 passed；研究域改动只新增包与路由，未改既有服务行为；跑全量需 ~10 分钟且会触发 sentence-transformers 联网超时降级）
 - 迁移：`scripts/research_migration_check.py` 通过（离线 SQL + 升降级可重复）
@@ -378,13 +378,15 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 
 | 项 | 内容 |
 | --- | --- |
-| 结论 | **PASS（11/11，exit 0）**，`tmp/broker-drill.json` |
+| 结论 | **PASS（15/15，exit 0）**，`tmp/broker-drill.json`（11 项投递/并发 + 4 项丢消息兜底） |
 | 环境 | 真实 Redis 7 + 真实 Celery worker（solo）；断连注入两种：脚本内 TCP 代理、WSL2/Docker 的真实 `redis:7` 容器 stop/start |
 | 脚本 | `scripts/research_broker_drill.py --proxy-port 6391`；报告 `docs/reports/R2_BROKER_DRILL.md` |
 | 覆盖 | round-trip、worker 强杀后重投 exactly-once、broker 不可达时发布失败、重复投递去重、同机双 worker 并发 + 同任务双投竞争 |
 | 修复缺陷 | ① 领取未提交（attempt/租约不可见）② 重投早于租约过期被静默吞掉（改 deferred retry + `RESEARCH_TASK_LEASE_SECONDS`） |
 | 环境陷阱 | PATH 里的 `taskkill` 被包装脚本遮蔽 → 固定用 `%SystemRoot%/System32/taskkill.exe` |
-| Docker 模式 | 同一套断言在 **WSL2 + Docker Engine 29.10.1 + `redis:7` 容器** 上重跑：`docker stop` → 发布失败 → `docker start` → 重新投递 → `succeeded`，11/11 PASS |
+| Docker 模式 | 同一套断言在 **WSL2 + Docker Engine 29.10.1 + `redis:7` 容器** 上重跑：`docker stop` → 发布失败 → `docker start` → 重新投递 → `succeeded` |
+| S6 broker 丢消息（2026-11-27） | 删 4 个 broker 键模拟 Redis 未持久化重启 → 独立 beat + worker 启动 → 任务由 `research.reap_stale_queued` 置为 `failed`、`error.code=QUEUE_TIMEOUT`、`billing_state=released`、事件 `task.accepted → task.failed`、attempts 空 |
+| 缺陷（S6，已修） | 清扫器只在进程内 dispatcher 周期调用，broker 部署下任务会永久 `queued`；`MAX_QUEUE_WAIT_SECONDS` 硬编码 300 未读配置。改为读 `RESEARCH_QUEUE_TIMEOUT_SECONDS` + `reap_stale_queued`（worker_ready + beat 60s）；Windows 上 beat 必须独立进程（worker `-B` 拒绝启动） |
 | 未覆盖 | 多机竞争（同机双 worker 已覆盖）、RabbitMQ、Redis 主从/持久化故障、容器 OOM |
 | 计数 | 三套回归仍为 529 passed + 1 skipped（本演练未新增 pytest 用例，断言在演练脚本内） |
 
@@ -397,4 +399,4 @@ p10（59,582 码点 / 146 块）用 98,824/100,000 tokens 覆盖 88 块（60.27%
 | 构造坑 | 诊断项 locator 必须按**库内版本正文**（`normalize_text(version.text)`）计算偏移，不能用上传前原文 | 首跑 1 hunk 而非 2：偏移错位导致第二条被跳过 |
 | 偏差闭环 | D-R1「只能整份采纳」已闭合 | 见 `R1_DELIVERY.md` §115 行备注 |
 
-计数：R2 收集 82（81 passed + 1 skipped）；三套 533 passed + 1 skipped。
+计数：R2 收集 86（85 passed + 1 skipped）；三套 537 passed + 1 skipped。

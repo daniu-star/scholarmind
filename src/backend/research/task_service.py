@@ -18,6 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import settings
 from ..models.orm import Skill
 from . import billing_service, budget, outbox, task_repository
 from .contracts import (
@@ -49,7 +50,9 @@ MAX_ACTIVE_TASKS_PER_USER = 1
 #: 系统总并发（running）上限。
 MAX_SYSTEM_RUNNING_TASKS = 3
 #: 排队等待上限；超过则拒绝受理（429，可重试）。
-MAX_QUEUE_WAIT_SECONDS = 300
+# PRD §9 的排队上限（默认 300s）；做成可配置是因为恢复演练需要在几十秒内
+# 触发「排队超时 → 诚实失败」，否则一条用例要等 5 分钟。
+MAX_QUEUE_WAIT_SECONDS = int(settings.RESEARCH_QUEUE_TIMEOUT_SECONDS)
 #: 单个任务累计运行期限（与默认租约一致）。
 TASK_MAX_RUNTIME_SECONDS = 1200
 #: needs_input / recoverable 暂不结算的最长持有时间（FR-14：24 小时）。
