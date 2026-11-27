@@ -49,7 +49,43 @@ def log(stage: str, message: str = "") -> None:
     print(f"[{stamp}] [{stage}] {message}", flush=True)
 
 
-# ── 环境预检 ────────────────────────────────────────────────
+# ── docker 调用（本机 socket 或远程 TCP，例如 WSL 里的 dockerd）──
+
+DEFAULT_DOCKER_HOST = os.environ.get("BROKER_DRILL_DOCKER_HOST", "")
+
+
+def _docker_argv(host: str = "") -> list:
+    return ["docker", "-H", host] if host else ["docker"]
+
+
+def docker_available(host: str = "") -> Optional[str]:
+    """探测 docker 守护进程；host 为空表示本机默认 socket。"""
+    try:
+        probe = subprocess.run(  # noqa: S603,S607
+            [*_docker_argv(host), "version", "--format", "{{.Server.Version}}"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if probe.returncode == 0 and probe.stdout.strip():
+            return host or "local"
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
+def docker_container_cmd(action: str, container: str, host: str = "") -> subprocess.CompletedProcess:
+    """``docker stop|start <container>``；host 非空时通过 ``-H`` 连远程守护进程。"""
+    if docker_available(host) is None:
+        raise RuntimeError(f"docker 守护进程不可达（host={host or 'local'}）")
+    return subprocess.run(  # noqa: S603
+        [*_docker_argv(host), action, container],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=180,
+    )
 
 
 def check_redis(redis_url: str) -> Optional[str]:
@@ -542,6 +578,7 @@ def scenario_broker_down(
     redis_url: str,
     container: Optional[str],
     proxy: Optional[TcpProxy],
+    docker_host: str = "",
 ) -> Dict[str, Any]:
     """broker 不可达 → 发布必须失败（不假成功）→ 恢复后任务能跑完。"""
     log("S3", "broker 断连与恢复")
@@ -591,9 +628,9 @@ def scenario_broker_down(
         }
 
     def redis_cmd(action: str) -> bool:  # pragma: no cover - 需要 docker
-        result = subprocess.run(  # noqa: S603
-            ["docker", action, container], capture_output=True, text=True, check=False
-        )
+        result = docker_container_cmd(action, container, docker_host)
+        log("S3", f"docker {action} {container} -> rc={result.returncode} "
+                  f"{(result.stderr or result.stdout).strip()[:120]}")
         return result.returncode == 0
 
     stopped = redis_cmd("stop")  # pragma: no cover
@@ -604,7 +641,18 @@ def scenario_broker_down(
     except Exception as exc:  # noqa: BLE001  # pragma: no cover
         publish_error = f"{type(exc).__name__}: {exc}"
     started = redis_cmd("start") if stopped else False  # pragma: no cover
-    recovered = None if check_redis(redis_url) else check_redis(redis_url)  # pragma: no cover
+    recovered = check_redis(redis_url)  # pragma: no cover
+    for _ in range(90):  # pragma: no cover - 容器重启后端口重新监听
+        recovered = check_redis(redis_url)
+        if recovered is None:
+            break
+        time.sleep(1)
+    time.sleep(2)  # pragma: no cover
+    publish_after_recovery: Optional[str] = None  # pragma: no cover
+    try:  # pragma: no cover
+        publish_after_recovery = publish(task_id)
+    except Exception as exc:  # noqa: BLE001  # pragma: no cover
+        publish_after_recovery = f"ERROR {type(exc).__name__}: {exc}"
     state = wait_for(  # pragma: no cover
         lambda: (lambda st: st if st.get("status") in ("succeeded", "partial", "failed") else None)(
             asyncio.run(task_state(db_url, task_id))
@@ -621,6 +669,7 @@ def scenario_broker_down(
         "publish_error_when_down": publish_error,
         "restarted": started,
         "redis_error_after_restart": recovered,
+        "publish_after_recovery": publish_after_recovery,
         "state": state or {},
     }
 
@@ -691,6 +740,11 @@ def main() -> int:
     parser.add_argument("--db-url", default=os.getenv("DATABASE_URL", ""))
     parser.add_argument("--out", default="tmp/broker-drill.json")
     parser.add_argument("--redis-container", default="", help="docker 容器名，用于 broker 断连场景")
+    parser.add_argument(
+        "--docker-host",
+        default=DEFAULT_DOCKER_HOST,
+        help="docker 守护进程地址（如 tcp://192.168.218.232:2375，WSL 里的 dockerd）；留空=本机 socket",
+    )
     parser.add_argument("--visibility-timeout", type=int, default=20)
     parser.add_argument("--lease-seconds", type=int, default=25)
     parser.add_argument(
@@ -753,6 +807,12 @@ def main() -> int:
     if shutil.which("celery") is None:
         log("preflight", "celery CLI 未安装（pip install celery）")
         return 3
+    if args.redis_container:
+        mode = docker_available(args.docker_host)
+        if mode is None:
+            log("preflight", f"--redis-container 需要可用的 docker（host={args.docker_host or 'local'}）")
+            return 3
+        log("preflight", f"docker 可用（{mode}），容器 {args.redis_container}")
     log("preflight", "redis 连通、celery CLI 存在")
 
     report: Dict[str, Any] = {
@@ -776,7 +836,7 @@ def main() -> int:
             report["broker_down"] = {"skipped": True, "reason": "--skip-broker-down"}
         else:
             report["broker_down"] = scenario_broker_down(
-                db_url, effective_redis_url, args.redis_container or None, proxy
+                db_url, effective_redis_url, args.redis_container or None, proxy, args.docker_host
             )
         report["duplicate"] = scenario_duplicate(db_url)
         if args.skip_two_workers:

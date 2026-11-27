@@ -32,8 +32,10 @@ worker**。这条路径的失败模式完全不同于进程内 dispatcher：
 | 数据库 | SQLite `tmp/broker-drill.db`（schema 由 `init_db` 建）；任务租约通过 `RESEARCH_TASK_LEASE_SECONDS=25` 调小 |
 | 模型 | `RESEARCH_MODEL_STUB=true`（替身模型，产物只用于流程验证，不代表质量） |
 
-Docker 路线（`docker stop drill-redis`）保留在脚本 `--redis-container` 分支，等 WSL2 +
-Docker Engine 就绪后可直接跑同一套断言；本机当前因 BIOS 未开虚拟化用不了 Docker。
+Docker 路线（`--redis-container` + `--docker-host`）在 WSL2 + Docker Engine 就绪后已实跑，
+结果见 **§7**：同一套 11 项断言在「真实容器 `docker stop/start`」下全部通过。
+（本机 Windows 侧的 `wsl.exe` 无法被 Python 子进程直接调用，因此演练通过 dockerd 的 TCP
+端点管理容器；这是环境差异，不是产品缺陷。）
 
 ## 3. 四个场景与实测证据
 
@@ -120,9 +122,64 @@ S2 的 attempts 证据（同一 Celery 消息重投，故 holder 相同）：
 - **多机竞争**：已测**同机两个 worker**（S5：不同任务由不同 worker 消费，各自 exactly-once；同一任务双投竞争只 1 个 attempt 成功）；未测多台机器共享同一 broker（网络分区与时钟漂移更复杂）。
 - **RabbitMQ 传输**：只测 Redis transport；生产若换 RabbitMQ，`visibility_timeout` 语义不同
   （靠 ack + redelivery），需重跑同一脚本。
-- **Docker 容器重启**：容器 OOM/重启的行为等 WSL2 + Docker Engine 就绪后补测。
+- **Docker 容器重启**：已覆盖——`docker stop drill-redis` → 发布失败 → `docker start` →
+  恢复后重新发布 → 任务到终态（§7，11/11 checks PASS）。容器 OOM/镜像拉取失败等更极端的
+  容器生命周期事件仍未逐一模拟。
 - **Redis 持久化/主从故障**：未测 AOF/RDB 损坏与主从切换。
 - **长任务 > visibility_timeout**：当前 `visibility_timeout=3600`（生产默认）与租约 1200s；
   若任务真的跑超过 1 小时，消息可能被重复投递，此时依赖 `attempt_no`/fencing 去重——已由
   PG 演练覆盖该语义，但 broker 路径未做超长任务实测。
 - 演练使用替身模型，**不涉及质量结论**；任务结果为 `succeeded` 仅证明流程闭环。
+
+## 7. Docker 模式实跑（WSL2 + Docker Engine，2026-11-27）
+
+前提：Windows 的 `HypervisorPlatform`/`VirtualMachinePlatform` 由 DISM 启用并重启一次后，
+WSL2 运行时正常；本机 **BIOS 虚拟化本来就是开的**（`systeminfo` 显示 hypervisor detected），
+之前 `VirtualizationFirmwareEnabled=False` 是 VBS 运行时的假信号。完整步骤见
+`scripts/setup_wsl_docker.md`，这里只记录演练相关差异。
+
+| 项 | 实际做法 |
+| --- | --- |
+| Linux | WSL 2.6.3.0 / 内核 6.6.87.2-1；Ubuntu 26.04.1 LTS（未建普通用户，命令以 root 跑） |
+| Docker | **Docker Engine 29.10.1 静态二进制**（不用 Docker Desktop），systemd 托管 `docker.service` |
+| dockerd 端点 | `unix:///var/run/docker.sock` + `tcp://0.0.0.0:2375`（Windows 侧用 TCP 管理容器） |
+| Redis | `redis:7` 容器，`-p 6380:6379`（Windows 主机 6379 被其它项目占用），`--restart unless-stopped` |
+| 访问地址 | `redis://192.168.218.232:6380/0`（WSL IP；本机 Windows→WSL 的 localhost 转发不生效） |
+| 数据库 / 模型 | 与 §2 相同：SQLite + `RESEARCH_MODEL_STUB=true`，租约 25s |
+| 容器重启 | `docker stop drill-redis` / `docker start drill-redis`（走 `--redis-container` + `--docker-host`） |
+
+运行：
+
+```powershell
+./.venv/Scripts/python.exe scripts/research_broker_drill.py `
+  --redis-url redis://192.168.218.232:6380/0 `
+  --redis-container drill-redis `
+  --docker-host tcp://192.168.218.232:2375
+```
+
+结果：**11/11 checks PASS，exit 0**（`tmp/broker-drill.json`）。断连/恢复证据取自
+`broker_down` 场景的实际字段：
+
+| 字段 | 实测值 |
+| --- | --- |
+| `stopped` | `True`（`docker stop` rc=0） |
+| `redis_down_error` | `ConnectionError: Error 22 connecting to 192.168.218.232:6380` |
+| `publish_error_when_down` | `OperationalError: Error 10061 … 由于目标计算机积极拒绝，无法连接` |
+| `restarted` | `True`（`docker start` rc=0） |
+| `redis_error_after_restart` | `None`（恢复可连） |
+| `publish_after_recovery` | `38ddff61-04f0-42b1-bb81-f2a4b1c58e93`（重新投递的消息 id） |
+| `state.status` | `succeeded`，attempts `[(1, succeeded, celery:38dd…) ]` |
+
+同一轮里 S2（杀 worker 重投）、S4（重复投递）、S5（双 worker 并发）同样全部通过，
+说明「真实容器重启」与「TCP 代理模拟断连」两种注入方式得到一致结论。
+
+首跑时 docker 分支的两个 `broker_down_*` 断言失败，根因是**演练脚本**自身：tcp-proxy
+分支恢复后会重新 `publish`，docker 分支漏了这一步，任务停在 `queued`。已补齐「等 Redis
+恢复 → 重新投递 → 等终态」，并在报告里如实记录这条脚本缺陷（不是产品缺陷）。
+
+四个环境坑（都已写进 `scripts/setup_wsl_docker.md`）：
+
+1. `docker.io` 在本机被 DNS 假 IP 劫持 → 配 `registry-mirrors`（`docker.1ms.run` 等可用）。
+2. Windows→WSL 的 `localhost` 转发在本机不生效 → 使用 WSL IP。
+3. Windows 侧 Python 无法 spawn `wsl.exe`（`Wsl/E_ACCESSDENIED`）→ 走 dockerd TCP 端点。
+4. WSL 空闲会休眠导致容器重启 → 演练期间用 `wsl ... sleep 3600` 保活。
