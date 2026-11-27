@@ -1,6 +1,6 @@
 'use strict';
 
-const DEFAULT_BACKEND_ORIGIN = 'https://scholarmind-production-e56b.up.railway.app';
+const DEFAULT_BACKEND_ORIGIN = 'https://lodging-fossil-significantly-sleeping.trycloudflare.com';
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -11,7 +11,7 @@ module.exports = async (req, res) => {
 
   const backendOrigin = (process.env.BACKEND_ORIGIN || DEFAULT_BACKEND_ORIGIN).replace(/\/+$/, '');
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5000);
+  const timeout = setTimeout(() => controller.abort(), 15000);
 
   try {
     const response = await fetch(`${backendOrigin}/api/v1/readyz`, {
@@ -25,14 +25,26 @@ module.exports = async (req, res) => {
       status: ready ? 'ok' : 'degraded',
       frontend: 'ok',
       backend: response.ok ? body.status || 'unknown' : 'unavailable',
+      backend_code: response.status,
       database: Boolean(body.database?.connected),
+      detail: ready
+        ? 'All systems operational'
+        : response.ok
+          ? `Backend OK but database disconnected (pool=${JSON.stringify(body.database?.pool || {})})`
+          : `Backend responded with HTTP ${response.status}`,
     });
   } catch (error) {
+    const errMsg =
+      error.name === 'AbortError'
+        ? 'Backend health check timed out after 15s'
+        : `Backend unreachable: ${error.message}`;
     return res.status(503).json({
       status: 'degraded',
       frontend: 'ok',
       backend: 'unavailable',
+      backend_code: null,
       database: false,
+      detail: errMsg,
     });
   } finally {
     clearTimeout(timeout);
