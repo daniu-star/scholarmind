@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install --no-audit --no-fund && npm --prefix src/frontend install --no-audit --no-fund",
+  "installCommand": "npm --prefix src/frontend install --no-audit --no-fund",
   "buildCommand": "npm run build:frontend",
   "outputDirectory": "dist",
   "functions": {
@@ -13,29 +13,47 @@
   "rewrites": [
     {
       "source": "/api/((?!platform-status|send-email|send-team-invite).*)",
-      "destination": "https://scholarmind-production-e56b.up.railway.app/api/$1"
+      "destination": "https://lodging-fossil-significantly-sleeping.trycloudflare.com/api/$1"
     },
-    { "source": "/((?!api/|ws/).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/|ws/).*)",
+      "destination": "/index.html"
+    }
   ],
   "headers": [
     {
       "source": "/",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
       ]
     },
     {
       "source": "/index.html",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
       ]
     },
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
       ]
     }
   ]
