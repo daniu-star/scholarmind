@@ -13,7 +13,7 @@
   "rewrites": [
     {
       "source": "/api/((?!platform-status|send-email|send-team-invite).*)",
-      "destination": "https://lodging-fossil-significantly-sleeping.trycloudflare.com/api/$1"
+      "destination": "https://tribute-devel-capability-lips.trycloudflare.com/api/$1"
     },
     {
       "source": "/((?!api/|ws/).*)",
