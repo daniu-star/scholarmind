@@ -77,4 +77,66 @@ npm run build:frontend && bash /c/vtmp/vc.sh build --prod && bash /c/vtmp/vc.sh 
 curl -s https://www.quannengyanjiu.cn/api/platform-status
 ```
 
-已知历史坑：Vercel CLI 在本机会因主机名含中文而崩（`byteString ... 20113`），必须用 `node --require /c/vtmp/fixhost.cjs .../vc.js`；`npm` 在 MSYS 里要用 `npm.cmd`；SQLite 绝对路径要写四个斜杠（`sqlite+aiosqlite:////C:/...`）。
+已知历史坑：Vercel CLI 在本机会因主机名含中文而崩（`byteString ... 20113`），必须用 `node --require /c/vtmp/fixhost.cjs .../vc.js`；`npm` 在 MSYS 里要用 `npm.cmd`；WSL systemd 用 interop 启动 Windows 进程时不会传播自定义环境变量，SQLite 路径必须落到 `PROJECT_ROOT` 默认位置或显式写在 ExecStart 的 `env` 变量里（详见 §7.2）。
+
+## 7. 2026-11-28 稳定性加固与数据路径修复
+
+> 触发：上一轮结束时，本机后端与 cloudflared 随会话进程一起退出，线上 `/api/platform-status` 变为
+> `{"status":"degraded","detail":"Backend unreachable: fetch failed"}`。
+
+### 7.1 常驻方式：WSL systemd（替代会话内进程）
+
+| 单元 | 作用 | 关键配置 |
+| --- | --- | --- |
+| `/etc/systemd/system/scholarmind-backend.service` | 后端 8020 | `WorkingDirectory=/mnt/c/Users/13067/Desktop/全能研究Agent`；`ExecStart=/usr/bin/env … /mnt/c/.../.venv/Scripts/python.exe -m uvicorn src.backend.app:create_app --factory --host 127.0.0.1 --port 8020`；`Restart=always` |
+| `/etc/systemd/system/scholarmind-tunnel.service` | Cloudflare 快速隧道 | `ExecStart=/mnt/c/vtmp/cloudflared.exe tunnel --url http://127.0.0.1:8020 --no-autoupdate --logfile C:\vtmp\cloudflared-svc.log`；`Restart=always` |
+
+- 两个单元均 `systemctl enable --now`，重启 WSL/机器后自动恢复（`wsl --shutdown` 后需等系统启动，`systemctl` 自动拉起）。
+- 已放弃的方案：`schtasks`（任务一直 `Queued` 不执行）、会话内 `Start-Process`（会话结束即被杀）。
+- 当前隧道地址：`https://tribute-devel-capability-lips.trycloudflare.com`（每次隧道重启会变，需 `scripts/point_backend.py` + 重新部署）。
+
+### 7.2 数据路径修复（真实缺陷）
+
+现象：进程健康、`/api/v1/readyz` 显示 `database.connected=true`，但 `POST /api/v1/auth/login` 对既有账号返回
+`AUTHENTICATION_FAILED`。
+
+根因：`src/backend/config.py` 的 SQLite 相对路径会按 `PROJECT_ROOT`（= `src/backend/`）重建绝对 URL；而 WSL systemd 通过 interop 启动的 **Windows** 进程不继承 systemd 的 `Environment=`（自定义环境变量没有通过 WSLENV 传播），
+于是 `DATABASE_URL` 未生效，进程回落到默认库 `src/backend/data/scholarmind_orm.db`（一个空库）。
+
+修复：把线上数据放到默认库路径（不依赖环境变量传播）——`src/backend/data/scholarmind_orm.db`
+（备份旧空库于 `C:/vtmp/scholarmind_orm.db.bak`，原数据副本保留在 `C:/smdeploy_runtime/scholarmind_public.db` 与仓库 `smdeploy_runtime/scholarmind_public.db`）。
+修后立即验证：登录 200、`/api/v1/research/projects` 返回 3 个历史项目。
+
+### 7.3 Vercel 侧网络绕行与 token 刷新
+
+- `api.vercel.com`、`github.com` 间歇 TCP 超时，而 `vercel.com` 正常；`https://vercel.com/api` 可作为同一 API 网关。
+- access token 过期后，用 `POST https://vercel.com/api/login/oauth/token`（`client_id=cl_HYyOPBNtFMfHhaUn9L4QPfTZz6TP47bp`、`grant_type=refresh_token`）刷新并回写 `auth.json`。
+- CLI 仍用 `bash /c/vtmp/vc.sh`（`node --require /c/vtmp/fixhost.cjs …vc.js`，规避本机中文主机名导致的 `byteString` 崩溃）。
+
+### 7.4 公网回归（2026-11-28 19:47–19:50）
+
+| 检查 | 结果 |
+| --- | --- |
+| `GET https://www.quannengyanjiu.cn/api/platform-status` | `{"status":"ok","frontend":"ok","backend":"ok","backend_code":200,"database":true,"detail":"All systems operational"}` |
+| `GET https://tribute-devel-capability-lips.trycloudflare.com/api/v1/readyz` | 200，`database.connected=true`、`llm_reachable=true` |
+| `POST /api/v1/auth/login`（既有账号 `deploy-check-1795757964@example.com`） | 200，返回 `access_token` |
+| `GET /api/v1/research/projects`（带 token） | 200，3 个历史项目（含 `公网验收 1795758280`） |
+| `GET /api/v1/research/tasks/task_962b3156c5394151adc92745c2ea7401` | 200，`status=succeeded`、`quality_verdict=issues_found` |
+| `GET …/findings` | 200，7 条历史诊断项 |
+
+### 7.5 运维命令
+
+```bash
+# 状态 / 重启
+wsl -d Ubuntu -u root -e systemctl status scholarmind-backend scholarmind-tunnel --no-pager
+wsl -d Ubuntu -u root -e systemctl restart scholarmind-backend
+# 健康
+curl -s http://127.0.0.1:8020/api/v1/health
+curl -s https://www.quannengyanjiu.cn/api/platform-status
+```
+
+### 7.6 仍存在的边界
+
+- 后端跑在本机：**电脑关机/断网即不可用**；隧道地址重启会变，需要重新部署前端。
+- 数据是单文件 SQLite（`src/backend/data/scholarmind_orm.db`），无备份机制。
+- Vercel 项目未接 Git 集成，部署仍靠 CLI；CI（mypy/test/research-gate）仍红灯，属既有问题。
