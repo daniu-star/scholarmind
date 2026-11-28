@@ -1,6 +1,6 @@
 'use strict';
 
-const DEFAULT_BACKEND_ORIGIN = 'https://views-flexibility-kings-manchester.trycloudflare.com';
+const DEFAULT_BACKEND_ORIGIN = 'https://tribute-devel-capability-lips.trycloudflare.com';
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
